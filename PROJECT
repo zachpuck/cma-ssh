@@ -1,0 +1,3 @@
+version: "1"
+domain: sds.samsung.com
+repo: github.com/samsung-cnct/cma-ssh
