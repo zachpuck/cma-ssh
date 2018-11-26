@@ -1,5 +1,6 @@
 /*
 Copyright 2018 Samsung SDS.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,22 +18,80 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+const ClusterFinalizer = "cluster.cluster.sds.samsung.com"
 
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Cluster network configuration
+	ClusterNetwork ClusterNetworkingConfig `json:"clusterNetwork"`
+
+	// Provider-specific serialized configuration to use during
+	// cluster creation. It is recommended that providers maintain
+	// their own versioned API types that should be
+	// serialized/deserialized from this field.
+	// +optional
+	ProviderSpec ProviderSpec `json:"providerSpec,omitempty"`
+}
+
+// ClusterNetworkingConfig specifies the different networking
+// parameters for a cluster.
+type ClusterNetworkingConfig struct {
+	// The network ranges from which service VIPs are allocated.
+	Services NetworkRanges `json:"services"`
+
+	// The network ranges from which POD networks are allocated.
+	Pods NetworkRanges `json:"pods"`
+
+	// Domain name for services.
+	ServiceDomain string `json:"serviceDomain"`
+}
+
+// NetworkRanges represents ranges of network addresses.
+type NetworkRanges struct {
+	CIDRBlocks []string `json:"cidrBlocks"`
 }
 
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// APIEndpoint represents the endpoint to communicate with the IP.
+	// +optional
+	APIEndpoints []APIEndpoint `json:"apiEndpoints,omitempty"`
+
+	// NB: Eventually we will redefine ErrorReason as ClusterStatusError once the
+	// following issue is fixed.
+	// https://github.com/kubernetes-incubator/apiserver-builder/issues/176
+
+	// If set, indicates that there is a problem reconciling the
+	// state, and will be set to a token value suitable for
+	// programmatic interpretation.
+	// +optional
+	ErrorReason common.ClusterStatusError `json:"errorReason,omitempty"`
+
+	// If set, indicates that there is a problem reconciling the
+	// state, and will be set to a descriptive error message.
+	// +optional
+	ErrorMessage string `json:"errorMessage,omitempty"`
+
+	// Provider-specific status.
+	// It is recommended that providers maintain their
+	// own versioned API types that should be
+	// serialized/deserialized from this field.
+	// +optional
+	ProviderStatus *runtime.RawExtension `json:"providerStatus,omitempty"`
+}
+
+// APIEndpoint represents a reachable Kubernetes API endpoint.
+type APIEndpoint struct {
+	// The hostname on which the API server is serving.
+	Host string `json:"host"`
+
+	// The port on which the API server is serving.
+	Port int `json:"port"`
 }
 
 // +genclient

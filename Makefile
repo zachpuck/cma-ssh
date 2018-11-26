@@ -1,20 +1,20 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= quay.io/samsung_cnct/cma-ssh:latest
 
-all: test manager
+all: test binary
 
 # Run tests
 test: generate fmt vet manifests
 	go test ./pkg/... ./cmd/... -coverprofile cover.out
 
 # Build manager binary
-manager: generate fmt vet
-	go build -o bin/manager github.com/samsung-cnct/cma-ssh/cmd/manager
+binary: generate fmt vet
+	go build -o bin/cma-ssh github.com/samsung-cnct/cma-ssh/cmd/cma-ssh
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet
-	go run ./cmd/manager/main.go
+	go run ./cmd/cma-ssh/main.go
 
 # Install CRDs into a cluster
 install: manifests
@@ -44,8 +44,8 @@ generate:
 # Build the docker image
 docker-build: test
 	docker build . -t ${IMG}
-	@echo "updating kustomize image patch file for manager resource"
-	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
+	@echo "updating kustomize image patch file for cma-ssh resource"
+	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/cma_ssh_image_patch.yaml
 
 # Push the docker image
 docker-push:

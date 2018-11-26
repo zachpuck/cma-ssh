@@ -20,10 +20,10 @@ spec:
           type: string
         metadata:
           type: object
-        spec:
+        providerSpec:
           type: object
-        status:
-          type: object
+      required:
+      - providerSpec
   version: v1alpha1
 status:
   acceptedNames:

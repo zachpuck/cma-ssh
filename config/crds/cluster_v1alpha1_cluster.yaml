@@ -21,8 +21,71 @@ spec:
         metadata:
           type: object
         spec:
+          properties:
+            clusterNetwork:
+              properties:
+                pods:
+                  properties:
+                    cidrBlocks:
+                      items:
+                        type: string
+                      type: array
+                  required:
+                  - cidrBlocks
+                  type: object
+                serviceDomain:
+                  type: string
+                services:
+                  properties:
+                    cidrBlocks:
+                      items:
+                        type: string
+                      type: array
+                  required:
+                  - cidrBlocks
+                  type: object
+              required:
+              - services
+              - pods
+              - serviceDomain
+              type: object
+            providerSpec:
+              properties:
+                value:
+                  type: object
+                valueFrom:
+                  properties:
+                    machineClass:
+                      properties:
+                        provider:
+                          type: string
+                      type: object
+                  type: object
+              type: object
+          required:
+          - clusterNetwork
           type: object
         status:
+          properties:
+            apiEndpoints:
+              items:
+                properties:
+                  host:
+                    type: string
+                  port:
+                    format: int64
+                    type: integer
+                required:
+                - host
+                - port
+                type: object
+              type: array
+            errorMessage:
+              type: string
+            errorReason:
+              type: string
+            providerStatus:
+              type: object
           type: object
   version: v1alpha1
 status:
