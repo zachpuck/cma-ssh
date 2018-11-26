@@ -49,21 +49,11 @@ spec:
               - pods
               - serviceDomain
               type: object
-            providerSpec:
-              properties:
-                value:
-                  type: object
-                valueFrom:
-                  properties:
-                    machineClass:
-                      properties:
-                        provider:
-                          type: string
-                      type: object
-                  type: object
-              type: object
+            kubernetesVersion:
+              type: string
           required:
           - clusterNetwork
+          - kubernetesVersion
           type: object
         status:
           properties:
@@ -84,8 +74,11 @@ spec:
               type: string
             errorReason:
               type: string
-            providerStatus:
-              type: object
+            lastUpdated:
+              format: date-time
+              type: string
+            phase:
+              type: string
           type: object
   version: v1alpha1
 status:

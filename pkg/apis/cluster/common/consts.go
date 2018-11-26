@@ -57,6 +57,8 @@ const (
 	DeleteMachineError MachineStatusError = "DeleteError"
 )
 
+type StatusPhase string
+
 type ClusterStatusError string
 
 const (
@@ -100,3 +102,5 @@ const (
 	// i.e gradually scale down the old MachineSet and scale up the new one.
 	RollingUpdateMachineDeploymentStrategyType MachineDeploymentStrategyType = "RollingUpdate"
 )
+
+type MachineRoles string
