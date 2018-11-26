@@ -8,10 +8,10 @@ COPY cmd/    cmd/
 COPY vendor/ vendor/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager github.com/samsung-cnct/cma-ssh/cmd/manager
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o cma-ssh github.com/samsung-cnct/cma-ssh/cmd/cma-ssh
 
 # Copy the controller-manager into a thin image
-FROM ubuntu:latest
+FROM alpine:3.8
 WORKDIR /root/
-COPY --from=builder /go/src/github.com/samsung-cnct/cma-ssh/manager .
-ENTRYPOINT ["./manager"]
+COPY --from=builder /go/src/github.com/samsung-cnct/cma-ssh/cma-ssh .
+ENTRYPOINT ["./cma-ssh"]
