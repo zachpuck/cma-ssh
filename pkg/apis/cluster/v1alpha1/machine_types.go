@@ -98,6 +98,7 @@ type MachineVersionInfo struct {
 
 // Machine is the Schema for the machines API
 // +k8s:openapi-gen=true
+// +kubebuilder:subresource:status
 type Machine struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

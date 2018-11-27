@@ -74,6 +74,9 @@ const (
 
 	// resources are ready
 	ReadyResourcePhase StatusPhase = "ReadyResources"
+
+	// resources are in error state
+	ErrorResourcePhase StatusPhase = "ResourcesError"
 )
 
 type ClusterStatusError string
@@ -121,3 +124,24 @@ const (
 )
 
 type MachineRoles string
+
+const (
+	MachineRoleMaster MachineRoles = "master"
+	MachineRoleEtcd   MachineRoles = "etcd"
+	MachineRoleWorker MachineRoles = "worker"
+)
+
+type ControllerEvents string
+
+const (
+	// ErrResourceFailed is used as part of the Event 'reason' when a resource fails
+	ErrResourceFailed ControllerEvents = "ErrResourceFailed"
+	// ResourceStateChange is used as part of Event 'reason' when a resource changes phase (non error)
+	ResourceStateChange ControllerEvents = "ResourceStateChange"
+
+	// MessageResourceExists is the message used for Events when a resource fails to sync
+	MessageResourceFailed ControllerEvents = "Resource %q failed to reconcile"
+	// MessageResourceStateChange is the message used for an Event fired when a resource
+	// changes phase (non error)
+	MessageResourceStateChange ControllerEvents = "Resource %q changed state to %q"
+)
