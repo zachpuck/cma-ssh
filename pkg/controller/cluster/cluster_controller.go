@@ -19,6 +19,7 @@ package cluster
 import (
 	"context"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
+	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -49,7 +50,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("Cluster Controller Add()")
+	log := logf.Log.WithName("cluster Controller Add()")
 
 	// Create a new controller
 	c, err := controller.New("cluster-controller", mgr, controller.Options{Reconciler: r})
@@ -75,7 +76,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 					&client.ListOptions{LabelSelector: labels.Everything()},
 					machineList)
 				if err != nil {
-					log.Error(err, "Could not list Machines")
+					log.Error(err, "could not list Machines")
 					return []reconcile.Request{}
 				}
 
@@ -117,7 +118,7 @@ type ReconcileCluster struct {
 // +kubebuilder:rbac:groups=machine.sds.samsung.com,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("Cluster Controller Reconcile()")
+	log := logf.Log.WithName("cluster Controller Reconcile()")
 
 	// Fetch the Cluster instance
 	clusterInstance := &clusterv1alpha1.Cluster{}
@@ -138,7 +139,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 		&client.ListOptions{LabelSelector: labels.Everything()},
 		machineList)
 	if err != nil {
-		log.Error(err, "Could not list Machines")
+		log.Error(err, "could not list Machines")
 		return reconcile.Result{}, err
 	}
 
@@ -147,6 +148,12 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 		if machineInstance.Spec.ClusterName == clusterInstance.GetName() {
 			machineStatuses = append(machineStatuses, machineInstance.Status.Phase)
 		}
+	}
+
+	clusterStatus, err := util.GetStatus(machineStatuses)
+	if err != nil {
+		log.Error(err, "could not get cluster status")
+		return reconcile.Result{}, err
 	}
 
 	// TODO: check whether current machine statuses are either
