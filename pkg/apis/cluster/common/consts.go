@@ -57,6 +57,25 @@ const (
 	DeleteMachineError MachineStatusError = "DeleteError"
 )
 
+type StatusPhase string
+
+const (
+	// no machines in the cluster
+	EmptyClusterPhase StatusPhase = "NoResources"
+
+	// resource is creating
+	CreatingResourcePhase StatusPhase = "CreatingResources"
+
+	// resource is ugrading
+	UpgradingResourcePhase StatusPhase = "UpgradingResources"
+
+	// resource is deleting
+	DeletingResourcePhase StatusPhase = "DeletingResources"
+
+	// resources are ready
+	ReadyResourcePhase StatusPhase = "ReadyResources"
+)
+
 type ClusterStatusError string
 
 const (
@@ -100,3 +119,5 @@ const (
 	// i.e gradually scale down the old MachineSet and scale up the new one.
 	RollingUpdateMachineDeploymentStrategyType MachineDeploymentStrategyType = "RollingUpdate"
 )
+
+type MachineRoles string

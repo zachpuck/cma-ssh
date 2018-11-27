@@ -22,38 +22,30 @@ spec:
           type: object
         spec:
           properties:
-            configSource:
-              type: object
+            clustername:
+              type: string
             metadata:
               type: object
-            providerSpec:
+            roles:
+              items:
+                type: string
+              type: array
+            sshconfig:
               properties:
-                value:
-                  type: object
-                valueFrom:
-                  properties:
-                    machineClass:
-                      properties:
-                        provider:
-                          type: string
-                      type: object
-                  type: object
+                host:
+                  type: string
+                port:
+                  format: int32
+                  type: integer
+                secret:
+                  type: string
+                username:
+                  type: string
               type: object
             taints:
               items:
                 type: object
               type: array
-            versions:
-              properties:
-                controlPlane:
-                  type: string
-                kubelet:
-                  type: string
-              required:
-              - kubelet
-              type: object
-          required:
-          - providerSpec
           type: object
         status:
           properties:
@@ -74,16 +66,14 @@ spec:
               type: string
             nodeRef:
               type: object
-            providerStatus:
-              type: object
+            phase:
+              type: string
             versions:
               properties:
-                controlPlane:
-                  type: string
-                kubelet:
+                kubernetesVersion:
                   type: string
               required:
-              - kubelet
+              - kubernetesVersion
               type: object
           type: object
   version: v1alpha1

@@ -20,7 +20,6 @@ package v1alpha1
 import (
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const ClusterFinalizer = "cluster.cluster.sds.samsung.com"
@@ -30,12 +29,7 @@ type ClusterSpec struct {
 	// Cluster network configuration
 	ClusterNetwork ClusterNetworkingConfig `json:"clusterNetwork"`
 
-	// Provider-specific serialized configuration to use during
-	// cluster creation. It is recommended that providers maintain
-	// their own versioned API types that should be
-	// serialized/deserialized from this field.
-	// +optional
-	ProviderSpec ProviderSpec `json:"providerSpec,omitempty"`
+	KubernetesVersion string `json:"kubernetesVersion"`
 }
 
 // ClusterNetworkingConfig specifies the different networking
@@ -62,9 +56,9 @@ type ClusterStatus struct {
 	// +optional
 	APIEndpoints []APIEndpoint `json:"apiEndpoints,omitempty"`
 
-	// NB: Eventually we will redefine ErrorReason as ClusterStatusError once the
-	// following issue is fixed.
-	// https://github.com/kubernetes-incubator/apiserver-builder/issues/176
+	// When was this status last observed
+	// +optional
+	LastUpdated *metav1.Time `json:"lastUpdated,omitempty"`
 
 	// If set, indicates that there is a problem reconciling the
 	// state, and will be set to a token value suitable for
@@ -77,12 +71,8 @@ type ClusterStatus struct {
 	// +optional
 	ErrorMessage string `json:"errorMessage,omitempty"`
 
-	// Provider-specific status.
-	// It is recommended that providers maintain their
-	// own versioned API types that should be
-	// serialized/deserialized from this field.
-	// +optional
-	ProviderStatus *runtime.RawExtension `json:"providerStatus,omitempty"`
+	// Cluster status
+	Phase common.StatusPhase `json:"phase,omitempty"`
 }
 
 // APIEndpoint represents a reachable Kubernetes API endpoint.

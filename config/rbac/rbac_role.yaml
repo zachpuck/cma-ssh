@@ -5,9 +5,9 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - apps
+  - cluster.sds.samsung.com
   resources:
-  - deployments
+  - clusters
   verbs:
   - get
   - list
@@ -17,7 +17,7 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - cluster.sds.samsung.com
+  - machine.sds.samsung.com
   resources:
   - clusters
   verbs:
@@ -44,30 +44,6 @@ rules:
   - cluster.sds.samsung.com
   resources:
   - machines
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - cluster.sds.samsung.com
-  resources:
-  - machineclasses
   verbs:
   - get
   - list
