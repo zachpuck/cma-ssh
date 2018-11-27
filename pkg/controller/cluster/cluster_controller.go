@@ -19,11 +19,15 @@ package cluster
 import (
 	"context"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
-	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
+	"github.com/samsung-cnct/cma-ssh/pkg/util"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/tools/record"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,7 +48,11 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileCluster{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileCluster{
+		Client:        mgr.GetClient(),
+		scheme:        mgr.GetScheme(),
+		EventRecorder: mgr.GetRecorder("ClusterController"),
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -70,11 +78,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestsFromMapFunc{
 			ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
 
-				machineList := &clusterv1alpha1.MachineList{}
-				err = mgr.GetClient().List(
-					context.TODO(),
-					&client.ListOptions{LabelSelector: labels.Everything()},
-					machineList)
+				machineList, err := getClusterMachineList(mgr.GetClient(), a.Meta.GetName())
 				if err != nil {
 					log.Error(err, "could not list Machines")
 					return []reconcile.Request{}
@@ -109,6 +113,7 @@ var _ reconcile.Reconciler = &ReconcileCluster{}
 type ReconcileCluster struct {
 	client.Client
 	scheme *runtime.Scheme
+	record.EventRecorder
 }
 
 // Reconcile reads that state of the cluster for a Cluster object and makes changes based on the state read
@@ -116,6 +121,7 @@ type ReconcileCluster struct {
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=cluster.sds.samsung.com,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=machine.sds.samsung.com,resources=clusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("cluster Controller Reconcile()")
@@ -126,23 +132,70 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
-			// For additional cleanup logic use finalizers.
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
 
-	machineList := &clusterv1alpha1.MachineList{}
-	err = r.Client.List(
-		context.TODO(),
-		&client.ListOptions{LabelSelector: labels.Everything()},
-		machineList)
+	if clusterInstance.ObjectMeta.DeletionTimestamp.IsZero() {
+		// The object is not being deleted, add the finalizer and update the object.
+		if !util.ContainsString(clusterInstance.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer) {
+			clusterInstance.ObjectMeta.Finalizers =
+				append(clusterInstance.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
+
+			if err := r.Update(context.Background(), clusterInstance); err != nil {
+				return reconcile.Result{Requeue: true}, nil
+			}
+		}
+	} else {
+		// The object is being deleted
+		if util.ContainsString(clusterInstance.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer) {
+			// update status to "deleting"
+			clusterInstance.Status.Phase = common.DeletingResourcePhase
+			err = r.updateStatus(clusterInstance, corev1.EventTypeNormal,
+				common.ResourceStateChange, common.MessageResourceStateChange,
+				clusterInstance.GetName(), common.DeletingResourcePhase)
+			if err != nil {
+				log.Error(err, "could not update cluster status")
+				return reconcile.Result{}, err
+			}
+
+			// there is a finalizer so we check if there are any machines left
+			machineList, err := getClusterMachineList(r.Client, clusterInstance.GetName())
+			if err != nil {
+				log.Error(err, "could not list Machines")
+				return reconcile.Result{}, err
+			}
+
+			// delete machines unless they are already being deleted and requeue
+			if len(machineList.Items) > 0 {
+				for _, machineInstance := range machineList.Items {
+					if machineInstance.Status.Phase != common.DeletingResourcePhase {
+						err = r.Client.Delete(context.Background(), &machineInstance)
+						if err != nil {
+							log.Error(err, "could not delete Machine "+machineInstance.GetName())
+						}
+						return reconcile.Result{Requeue: true}, err
+					}
+				}
+			}
+
+			// if no Machines left to be deleted
+			// remove our finalizer from the list and update it.
+			clusterInstance.ObjectMeta.Finalizers =
+				util.RemoveString(clusterInstance.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
+			if err := r.Update(context.Background(), clusterInstance); err != nil {
+				return reconcile.Result{Requeue: true}, nil
+			}
+		}
+	}
+
+	machineList, err := getClusterMachineList(r.Client, clusterInstance.GetName())
 	if err != nil {
 		log.Error(err, "could not list Machines")
 		return reconcile.Result{}, err
 	}
-
 	var machineStatuses []common.StatusPhase
 	for _, machineInstance := range machineList.Items {
 		if machineInstance.Spec.ClusterName == clusterInstance.GetName() {
@@ -152,17 +205,55 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	clusterStatus, err := util.GetStatus(machineStatuses)
 	if err != nil {
-		log.Error(err, "could not get cluster status")
+		log.Error(err, "could not get status of all cluster machines")
+		clusterInstance.Status.ErrorMessage = "Cluster machines are in inconsistent phase" +
+			" - all must be either Ready or the same one phase"
+		clusterInstance.Status.ErrorReason = common.UnsupportedChangeClusterError
+		clusterInstance.Status.Phase = common.ErrorResourcePhase
+
+		err = r.updateStatus(clusterInstance, corev1.EventTypeWarning,
+			common.ErrResourceFailed, common.MessageResourceFailed, clusterInstance.GetName())
+		if err != nil {
+			log.Error(err, "could not update cluster status")
+		}
+
 		return reconcile.Result{}, err
 	}
 
-	// TODO: check whether current machine statuses are either
-	// 1) Some 'ready', some uniformly something else - set the current status to the other non ready status
-	// 2) Some 'ready', some are non-uniformly something else (this is an error)
-	// 3) No machines - set status to EmptyClusterPhase
-	// 4) All ready - set status to ReadyResourcePhase
-
-	// TODO: update status
+	clusterInstance.Status.Phase = clusterStatus
+	err = r.updateStatus(clusterInstance, corev1.EventTypeNormal,
+		common.ResourceStateChange, common.MessageResourceStateChange, clusterInstance.GetName(), clusterStatus)
+	if err != nil {
+		log.Error(err, "could not update cluster status")
+		return reconcile.Result{}, err
+	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileCluster) updateStatus(clusterInstance *clusterv1alpha1.Cluster, eventType string,
+	event common.ControllerEvents, eventMessage common.ControllerEvents, args ...interface{}) error {
+	clusterInstance.Status.LastUpdated = &metav1.Time{Time: time.Now()}
+
+	r.Eventf(clusterInstance, eventType,
+		string(event), string(eventMessage), args)
+
+	return r.Status().Update(context.Background(), clusterInstance)
+}
+
+func getClusterMachineList(c client.Client, clusterName string) (*clusterv1alpha1.MachineList, error) {
+	machineList := &clusterv1alpha1.MachineList{}
+	err := c.List(
+		context.TODO(),
+		&client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(
+				"spec.clustername",
+				clusterName),
+		},
+		machineList)
+	if err != nil {
+		return nil, err
+	}
+
+	return machineList, nil
 }
