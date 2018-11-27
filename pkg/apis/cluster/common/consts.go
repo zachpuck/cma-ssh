@@ -59,6 +59,23 @@ const (
 
 type StatusPhase string
 
+const (
+	// no machines in the cluster
+	EmptyClusterPhase StatusPhase = "NoResources"
+
+	// resource is creating
+	CreatingResourcePhase StatusPhase = "CreatingResources"
+
+	// resource is ugrading
+	UpgradingResourcePhase StatusPhase = "UpgradingResources"
+
+	// resource is deleting
+	DeletingResourcePhase StatusPhase = "DeletingResources"
+
+	// resources are ready
+	ReadyResourcePhase StatusPhase = "ReadyResources"
+)
+
 type ClusterStatusError string
 
 const (

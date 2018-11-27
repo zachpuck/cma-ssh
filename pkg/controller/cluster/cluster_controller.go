@@ -18,33 +18,25 @@ package cluster
 
 import (
 	"context"
-	"log"
-	"reflect"
-
+	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
-
 // Add creates a new Cluster Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-// USER ACTION REQUIRED: update cmd/manager/main.go to call this cluster.Add(mgr) to install this Controller
 func Add(mgr manager.Manager) error {
 	return add(mgr, newReconciler(mgr))
 }
@@ -56,6 +48,9 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("Cluster Controller Add()")
+
 	// Create a new controller
 	c, err := controller.New("cluster-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
@@ -68,12 +63,38 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by Cluster - change this for objects you create
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &clusterv1alpha1.Cluster{},
-	})
+	// Watch Machine objects with corresponding cluster name
+	err = c.Watch(
+		&source.Kind{Type: &clusterv1alpha1.Machine{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
+
+				machineList := &clusterv1alpha1.MachineList{}
+				err = mgr.GetClient().List(
+					context.TODO(),
+					&client.ListOptions{LabelSelector: labels.Everything()},
+					machineList)
+				if err != nil {
+					log.Error(err, "Could not list Machines")
+					return []reconcile.Request{}
+				}
+
+				var keys []reconcile.Request
+				for _, machineInstance := range machineList.Items {
+					if machineInstance.Spec.ClusterName == a.Meta.GetName() {
+						keys = append(keys, reconcile.Request{
+							NamespacedName: types.NamespacedName{
+								Namespace: machineInstance.GetNamespace(),
+								Name:      machineInstance.GetName(),
+							},
+						})
+					}
+				}
+
+				// return found keys
+				return keys
+			}),
+		}, predicate.ResourceVersionChangedPredicate{})
 	if err != nil {
 		return err
 	}
@@ -91,15 +112,16 @@ type ReconcileCluster struct {
 
 // Reconcile reads that state of the cluster for a Cluster object and makes changes based on the state read
 // and what is in the Cluster.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  The scaffolding writes
-// a Deployment as an example
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=cluster.sds.samsung.com,resources=clusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=machine.sds.samsung.com,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("Cluster Controller Reconcile()")
+
 	// Fetch the Cluster instance
-	instance := &clusterv1alpha1.Cluster{}
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	clusterInstance := &clusterv1alpha1.Cluster{}
+	err := r.Get(context.TODO(), request.NamespacedName, clusterInstance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -110,57 +132,30 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	// TODO(user): Change this to be the object type created by your controller
-	// Define the desired Deployment object
-	deploy := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Name + "-deployment",
-			Namespace: instance.Namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"deployment": instance.Name + "-deployment"},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"deployment": instance.Name + "-deployment"}},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "nginx",
-							Image: "nginx",
-						},
-					},
-				},
-			},
-		},
-	}
-	if err := controllerutil.SetControllerReference(instance, deploy, r.scheme); err != nil {
+	machineList := &clusterv1alpha1.MachineList{}
+	err = r.Client.List(
+		context.TODO(),
+		&client.ListOptions{LabelSelector: labels.Everything()},
+		machineList)
+	if err != nil {
+		log.Error(err, "Could not list Machines")
 		return reconcile.Result{}, err
 	}
 
-	// TODO(user): Change this for the object type created by your controller
-	// Check if the Deployment already exists
-	found := &appsv1.Deployment{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: deploy.Name, Namespace: deploy.Namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
-		log.Printf("Creating Deployment %s/%s\n", deploy.Namespace, deploy.Name)
-		err = r.Create(context.TODO(), deploy)
-		if err != nil {
-			return reconcile.Result{}, err
+	var machineStatuses []common.StatusPhase
+	for _, machineInstance := range machineList.Items {
+		if machineInstance.Spec.ClusterName == clusterInstance.GetName() {
+			machineStatuses = append(machineStatuses, machineInstance.Status.Phase)
 		}
-	} else if err != nil {
-		return reconcile.Result{}, err
 	}
 
-	// TODO(user): Change this for the object type created by your controller
-	// Update the found object and write the result back if there are any changes
-	if !reflect.DeepEqual(deploy.Spec, found.Spec) {
-		found.Spec = deploy.Spec
-		log.Printf("Updating Deployment %s/%s\n", deploy.Namespace, deploy.Name)
-		err = r.Update(context.TODO(), found)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-	}
+	// TODO: check whether current machine statuses are either
+	// 1) Some 'ready', some uniformly something else - set the current status to the other non ready status
+	// 2) Some 'ready', some are non-uniformly something else (this is an error)
+	// 3) No machines - set status to EmptyClusterPhase
+	// 4) All ready - set status to ReadyResourcePhase
+
+	// TODO: update status
+
 	return reconcile.Result{}, nil
 }
