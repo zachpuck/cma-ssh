@@ -266,7 +266,7 @@ func (r *ReconcileMachine) updateStatus(machineInstance *clusterv1alpha1.Machine
 	machineFreshInstance.Status.LastUpdated = &metav1.Time{Time: time.Now()}
 
 	r.Eventf(machineFreshInstance, eventType,
-		string(event), string(eventMessage), args)
+		string(event), string(eventMessage), args...)
 
 	return r.Update(context.Background(), machineFreshInstance)
 }

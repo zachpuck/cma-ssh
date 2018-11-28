@@ -114,11 +114,17 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 		if !util.ContainsString(clusterInstance.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer) {
 			clusterInstance.ObjectMeta.Finalizers =
 				append(clusterInstance.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
+			clusterInstance.Status.Phase = common.ReconcilingClusterPhase
 
-			if err := r.Update(context.Background(), clusterInstance); err != nil {
-				return reconcile.Result{Requeue: true}, nil
+			err = r.updateStatus(clusterInstance, corev1.EventTypeNormal,
+				common.ResourceStateChange, common.MessageResourceStateChange,
+				clusterInstance.GetName(), common.ReconcilingClusterPhase)
+			if err != nil {
+				log.Error(err, "could not update status of cluster", "cluster", clusterInstance)
+				return reconcile.Result{}, err
 			}
 		}
+
 	} else {
 		// The object is being deleted
 		if util.ContainsString(clusterInstance.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer) {
@@ -153,7 +159,6 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 					}
 				}
 
-				log.Info("deleted machines")
 				return reconcile.Result{}, err
 			}
 
@@ -161,10 +166,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			// remove our finalizer from the list and update it.
 			clusterInstance.ObjectMeta.Finalizers =
 				util.RemoveString(clusterInstance.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
-			if err := r.Update(context.Background(), clusterInstance); err != nil {
-				return reconcile.Result{Requeue: true}, nil
-			}
-			log.Info("deleted finalizer")
+			return reconcile.Result{}, r.Update(context.Background(), clusterInstance)
 		}
 	}
 
@@ -181,20 +183,33 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			common.ResourceStateChange, common.MessageResourceStateChange, clusterInstance.GetName(), clusterStatus)
 		if err != nil {
 			log.Error(err, "could not update object cluster status", "cluster", clusterInstance)
-			return reconcile.Result{}, err
 		}
 	}
-	return reconcile.Result{}, nil
+	return reconcile.Result{}, err
 }
 
 func (r *ReconcileCluster) updateStatus(clusterInstance *clusterv1alpha1.Cluster, eventType string,
 	event common.ControllerEvents, eventMessage common.ControllerEvents, args ...interface{}) error {
-	clusterInstance.Status.LastUpdated = &metav1.Time{Time: time.Now()}
 
-	r.Eventf(clusterInstance, eventType,
-		string(event), string(eventMessage), args)
+	clusterFreshInstance := &clusterv1alpha1.Cluster{}
+	err := r.Get(
+		context.Background(),
+		client.ObjectKey{
+			Namespace: clusterInstance.GetNamespace(),
+			Name:      clusterInstance.GetName(),
+		}, clusterFreshInstance)
+	if err != nil {
+		return err
+	}
 
-	return r.Update(context.Background(), clusterInstance)
+	clusterFreshInstance.Status.LastUpdated = &metav1.Time{Time: time.Now()}
+	clusterFreshInstance.Status.Phase = clusterInstance.Status.Phase
+	clusterFreshInstance.ObjectMeta.Finalizers = clusterInstance.ObjectMeta.Finalizers
+
+	r.Eventf(clusterFreshInstance, eventType,
+		string(event), string(eventMessage), args...)
+
+	return r.Update(context.Background(), clusterFreshInstance)
 }
 
 func getClusterMachineList(c client.Client, clusterName string) ([]clusterv1alpha1.Machine, error) {
