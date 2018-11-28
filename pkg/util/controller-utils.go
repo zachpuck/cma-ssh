@@ -5,8 +5,8 @@ import (
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 )
 
-func GetStatus(machines *clusterv1alpha1.MachineList) common.ClusterStatusPhase {
-	if len(machines.Items) == 0 {
+func GetStatus(machines []clusterv1alpha1.Machine) common.ClusterStatusPhase {
+	if len(machines) == 0 {
 		return common.UnspecifiedClusterPhase
 	}
 
@@ -27,8 +27,8 @@ func GetStatus(machines *clusterv1alpha1.MachineList) common.ClusterStatusPhase 
 	return common.RunningClusterPhase
 }
 
-func ContainsStatuses(machines *clusterv1alpha1.MachineList, ss []common.MachineStatusPhase) bool {
-	for _, item := range machines.Items {
+func ContainsStatuses(machines []clusterv1alpha1.Machine, ss []common.MachineStatusPhase) bool {
+	for _, item := range machines {
 		for _, ssItem := range ss {
 			if item.Status.Phase == ssItem {
 				return true
