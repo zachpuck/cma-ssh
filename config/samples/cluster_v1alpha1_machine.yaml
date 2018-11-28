@@ -3,9 +3,32 @@ kind: Machine
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: machine-sample
+  name: machine-cp-sample
 spec:
   # Add fields here
-  status:
-    phase: ""
-    kubernetesVersion: "1.10.6"
+  clustername: cluster-sample
+  roles:
+    - etcd
+    - master
+  sshconfig:
+    host: 1.1.1.1
+    port: 22
+    username: centos
+    secret: cats
+---
+apiVersion: cluster.sds.samsung.com/v1alpha1
+kind: Machine
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: machine-worker-sample
+spec:
+  # Add fields here
+  clustername: cluster-sample
+  roles:
+  - worker
+  sshconfig:
+    host: 1.1.1.1
+    port: 22
+    username: centos
+    secret: cats
