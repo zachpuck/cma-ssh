@@ -28,7 +28,7 @@ const MachineFinalizer = "machine.cluster.sds.samsung.com"
 // MachineSpec defines the desired state of Machine
 type MachineSpec struct {
 	// name of the Cluster object this node belongs to
-	ClusterName string `json:"clustername,omitempty"`
+	ClusterRef string `json:"clusterref,omitempty"`
 
 	// The full, authoritative list of taints to apply to the corresponding
 	// Node.
@@ -70,7 +70,6 @@ type MachineStatus struct {
 
 // Machine is the Schema for the machines API
 // +k8s:openapi-gen=true
-// +kubebuilder:subresource:status
 type Machine struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

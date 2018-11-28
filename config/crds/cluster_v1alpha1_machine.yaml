@@ -11,8 +11,6 @@ spec:
     kind: Machine
     plural: machines
   scope: Namespaced
-  subresources:
-    status: {}
   validation:
     openAPIV3Schema:
       properties:
@@ -24,7 +22,7 @@ spec:
           type: object
         spec:
           properties:
-            clustername:
+            clusterref:
               type: string
             roles:
               items:

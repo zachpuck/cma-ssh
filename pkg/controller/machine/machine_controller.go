@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -71,8 +70,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to Clusters
-	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.Cluster{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.Cluster{}},
+		&handler.EnqueueRequestsFromMapFunc{ToRequests: util.ClusterToMachineMapper{Client: mgr.GetClient()}})
 	if err != nil {
 		return err
 	}
@@ -91,9 +90,8 @@ type ReconcileMachine struct {
 
 // Reconcile reads that state of the cluster for a Machine object and makes changes based on the state read
 // and what is in the Machine.Spec
-// Automatically generate RBAC rules to allow the Controller to read and write Deployments
-// +kubebuilder:rbac:groups=cluster.sds.samsung.com,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=machine.sds.samsung.com,resources=machines,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cluster.sds.samsung.com,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	logf.SetLogger(logf.ZapLogger(false))
@@ -101,11 +99,11 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// Fetch the Machine machine
 	machineInstance := &clusterv1alpha1.Machine{}
-	err := r.Get(context.TODO(), request.NamespacedName, machineInstance)
+	err := r.Get(context.Background(), request.NamespacedName, machineInstance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
-			log.Error(err, "could not find machine", "machine", request)
+			// log.Error(err, "could not find machine", "machine", request)
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -113,11 +111,11 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterName)
+	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
-			log.Error(err, "could not find cluster "+machineInstance.Spec.ClusterName)
+			log.Error(err, "could not find cluster "+machineInstance.Spec.ClusterRef)
 
 			machineInstance.Status.Phase = common.ErrorMachinePhase
 			err = r.updateStatus(machineInstance, corev1.EventTypeWarning, common.ErrResourceFailed,
@@ -131,14 +129,6 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 		// Error reading the object - requeue the request.
 		log.Error(err, "error reading object machine", "machine", machineInstance)
 		return reconcile.Result{}, err
-	}
-
-	err = controllerutil.SetControllerReference(clusterInstance, machineInstance, r.scheme)
-	if err != nil {
-		if _, alreadyOwned := err.(*controllerutil.AlreadyOwnedError); !alreadyOwned {
-			log.Error(err, "error setting owner reference on object machine", "machine", machineInstance)
-			return reconcile.Result{}, err
-		}
 	}
 
 	if machineInstance.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -160,6 +150,7 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 			// if cluster object kubernetes version is not equal to machine kubernetes version,
 			// trigger an upgrade
 			if !clusterKuberneteVersion.Equal(machineKuberneteVersion) {
+
 				return r.handleUpgrade(machineInstance, clusterInstance)
 			}
 
@@ -196,11 +187,6 @@ func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.Machine
 		// start delete process
 		r.periodicBackgroundRunner(preDelete, checkDeleteStatus, machineInstance, "handleUpgrade")
 
-		machineInstance.ObjectMeta.Finalizers =
-			util.RemoveString(machineInstance.ObjectMeta.Finalizers, clusterv1alpha1.MachineFinalizer)
-		if err := r.Update(context.Background(), machineInstance); err != nil {
-			return reconcile.Result{Requeue: true}, nil
-		}
 	}
 
 	return reconcile.Result{}, nil
@@ -238,14 +224,11 @@ func (r *ReconcileMachine) handleCreate(machineInstance *clusterv1alpha1.Machine
 		return reconcile.Result{}, nil
 	}
 
-	// The object is not being deleted, add the finalizer and update the object.
+	// The object is not being deleted, add the finalizer
 	if !util.ContainsString(machineInstance.ObjectMeta.Finalizers, clusterv1alpha1.MachineFinalizer) {
 		machineInstance.ObjectMeta.Finalizers =
 			append(machineInstance.ObjectMeta.Finalizers, clusterv1alpha1.MachineFinalizer)
 
-		if err := r.Update(context.Background(), machineInstance); err != nil {
-			return reconcile.Result{Requeue: true}, nil
-		}
 	}
 
 	// update status to "creating"
@@ -266,12 +249,26 @@ func (r *ReconcileMachine) handleCreate(machineInstance *clusterv1alpha1.Machine
 
 func (r *ReconcileMachine) updateStatus(machineInstance *clusterv1alpha1.Machine, eventType string,
 	event common.ControllerEvents, eventMessage common.ControllerEvents, args ...interface{}) error {
-	machineInstance.Status.LastUpdated = &metav1.Time{Time: time.Now()}
 
-	r.Eventf(machineInstance, eventType,
+	machineFreshInstance := &clusterv1alpha1.Machine{}
+	err := r.Get(
+		context.Background(),
+		client.ObjectKey{
+			Namespace: machineInstance.GetNamespace(),
+			Name:      machineInstance.GetName(),
+		}, machineFreshInstance)
+	if err != nil {
+		return err
+	}
+
+	machineFreshInstance.Status.Phase = machineInstance.Status.Phase
+	machineFreshInstance.Status.KubernetesVersion = machineInstance.Status.KubernetesVersion
+	machineFreshInstance.Status.LastUpdated = &metav1.Time{Time: time.Now()}
+
+	r.Eventf(machineFreshInstance, eventType,
 		string(event), string(eventMessage), args)
 
-	return r.Status().Update(context.Background(), machineInstance)
+	return r.Update(context.Background(), machineFreshInstance)
 }
 
 func getCluster(c client.Client, namespace string, clusterName string) (*clusterv1alpha1.Cluster, error) {
@@ -282,7 +279,7 @@ func getCluster(c client.Client, namespace string, clusterName string) (*cluster
 	}
 
 	clusterInstance := &clusterv1alpha1.Cluster{}
-	err := c.Get(context.TODO(), clusterKey, clusterInstance)
+	err := c.Get(context.Background(), clusterKey, clusterInstance)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +299,7 @@ func checkBootstrapStatus(r *ReconcileMachine, machineInstance *clusterv1alpha1.
 	// TODO: run bootstrap check here
 
 	// Set status to ready
-	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterName)
+	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
 	if err != nil {
 		return err
 	}
@@ -331,7 +328,7 @@ func checkUpgradeStatus(r *ReconcileMachine, machineInstance *clusterv1alpha1.Ma
 	// TODO: run kubernetes physical node upgrade check here
 
 	// Set status to ready
-	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterName)
+	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
 	if err != nil {
 		return err
 	}
@@ -359,9 +356,19 @@ func checkDeleteStatus(r *ReconcileMachine, machineInstance *clusterv1alpha1.Mac
 
 	// TODO: run kubernetes physical node delete check here
 
-	machineInstance.ObjectMeta.Finalizers =
-		util.RemoveString(machineInstance.ObjectMeta.Finalizers, clusterv1alpha1.MachineFinalizer)
-	if err := r.Update(context.Background(), machineInstance); err != nil {
+	machineFreshInstance := &clusterv1alpha1.Machine{}
+	err := r.Get(
+		context.Background(),
+		client.ObjectKey{
+			Namespace: machineInstance.GetNamespace(),
+			Name:      machineInstance.GetName(),
+		}, machineFreshInstance)
+	if err != nil {
+		return err
+	}
+	machineFreshInstance.ObjectMeta.Finalizers =
+		util.RemoveString(machineFreshInstance.ObjectMeta.Finalizers, clusterv1alpha1.MachineFinalizer)
+	if err := r.Update(context.Background(), machineFreshInstance); err != nil {
 		return err
 	}
 

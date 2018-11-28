@@ -41,9 +41,9 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - cluster.sds.samsung.com
+  - machine.sds.samsung.com
   resources:
-  - clusters
+  - machines
   verbs:
   - get
   - list
@@ -53,9 +53,9 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - machine.sds.samsung.com
+  - cluster.sds.samsung.com
   resources:
-  - machines
+  - clusters
   verbs:
   - get
   - list

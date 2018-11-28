@@ -6,7 +6,7 @@ metadata:
   name: machine-cp-sample
 spec:
   # Add fields here
-  clustername: cluster-sample
+  clusterref: cluster-sample
   roles:
     - etcd
     - master
@@ -24,7 +24,7 @@ metadata:
   name: machine-worker-sample
 spec:
   # Add fields here
-  clustername: cluster-sample
+  clusterref: cluster-sample
   roles:
   - worker
   sshconfig:
