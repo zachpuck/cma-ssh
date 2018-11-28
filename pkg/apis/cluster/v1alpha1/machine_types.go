@@ -27,12 +27,6 @@ const MachineFinalizer = "machine.cluster.sds.samsung.com"
 
 // MachineSpec defines the desired state of Machine
 type MachineSpec struct {
-	// This ObjectMeta will autopopulate the Node created. Use this to
-	// indicate what labels, annotations, name prefix, etc., should be used
-	// when creating the Node.
-	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
 	// name of the Cluster object this node belongs to
 	ClusterName string `json:"clustername,omitempty"`
 
@@ -60,36 +54,14 @@ type MachineSshConfigInfo struct {
 
 // MachineStatus defines the observed state of Machine
 type MachineStatus struct {
-	// If the corresponding Node exists, this will point to its object.
-	// +optional
-	NodeRef *corev1.ObjectReference `json:"nodeRef,omitempty"`
-
 	// When was this status last observed
 	// +optional
 	LastUpdated *metav1.Time `json:"lastUpdated,omitempty"`
 
-	// The current versions of software on the corresponding Node
-	// +optional
-	Versions *MachineVersionInfo `json:"versions,omitempty"`
-
-	// +optional
-	ErrorReason *common.MachineStatusError `json:"errorReason,omitempty"`
-	// +optional
-	ErrorMessage *string `json:"errorMessage,omitempty"`
 	// Machine status
-	Phase common.StatusPhase `json:"phase,omitempty"`
+	Phase common.MachineStatusPhase `json:"phase,omitempty"`
 
-	// Addresses is a list of addresses assigned to the machine. Queried from cloud provider, if available.
-	// +optional
-	Addresses []corev1.NodeAddress `json:"addresses,omitempty"`
-
-	// List of conditions synced from the node conditions of the corresponding node-object.
-	// Refer: https://kubernetes.io/docs/concepts/architecture/nodes/#condition
-	// +optional
-	Conditions []corev1.NodeCondition `json:"conditions,omitempty"`
-}
-
-type MachineVersionInfo struct {
+	// kubernetes version of the node, should be equal to corresponding cluster version
 	KubernetesVersion string `json:"kubernetesVersion"`
 }
 

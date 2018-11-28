@@ -29,12 +29,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -57,9 +55,6 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("cluster Controller Add()")
-
 	// Create a new controller
 	c, err := controller.New("cluster-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
@@ -72,34 +67,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch Machine objects with corresponding cluster name
-	err = c.Watch(
-		&source.Kind{Type: &clusterv1alpha1.Machine{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
-
-				machineList, err := getClusterMachineList(mgr.GetClient(), a.Meta.GetName())
-				if err != nil {
-					log.Error(err, "could not list Machines")
-					return []reconcile.Request{}
-				}
-
-				var keys []reconcile.Request
-				for _, machineInstance := range machineList.Items {
-					if machineInstance.Spec.ClusterName == a.Meta.GetName() {
-						keys = append(keys, reconcile.Request{
-							NamespacedName: types.NamespacedName{
-								Namespace: machineInstance.GetNamespace(),
-								Name:      machineInstance.GetName(),
-							},
-						})
-					}
-				}
-
-				// return found keys
-				return keys
-			}),
-		}, predicate.ResourceVersionChangedPredicate{})
+	// Watch for changes to Machines
+	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.Machine{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -132,9 +101,11 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
+			log.Error(err, "could not find cluster", "cluster", request)
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
+		log.Error(err, "error reading object cluster", "cluster", request)
 		return reconcile.Result{}, err
 	}
 
@@ -152,33 +123,27 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 		// The object is being deleted
 		if util.ContainsString(clusterInstance.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer) {
 			// update status to "deleting"
-			clusterInstance.Status.Phase = common.DeletingResourcePhase
-			err = r.updateStatus(clusterInstance, corev1.EventTypeNormal,
-				common.ResourceStateChange, common.MessageResourceStateChange,
-				clusterInstance.GetName(), common.DeletingResourcePhase)
-			if err != nil {
-				log.Error(err, "could not update cluster status")
-				return reconcile.Result{}, err
+			if clusterInstance.Status.Phase != common.StoppingClusterPhase {
+				clusterInstance.Status.Phase = common.StoppingClusterPhase
+				err = r.updateStatus(clusterInstance, corev1.EventTypeNormal,
+					common.ResourceStateChange, common.MessageResourceStateChange,
+					clusterInstance.GetName(), common.StoppingClusterPhase)
+				if err != nil {
+					log.Error(err, "could not update status of cluster", "cluster", clusterInstance)
+					return reconcile.Result{}, err
+				}
 			}
 
 			// there is a finalizer so we check if there are any machines left
 			machineList, err := getClusterMachineList(r.Client, clusterInstance.GetName())
 			if err != nil {
-				log.Error(err, "could not list Machines")
+				log.Error(err, "could not list Machines for object cluster", "cluster", clusterInstance)
 				return reconcile.Result{}, err
 			}
 
-			// delete machines unless they are already being deleted and requeue
+			// if there are still machines pending deletion, requeue
 			if len(machineList.Items) > 0 {
-				for _, machineInstance := range machineList.Items {
-					if machineInstance.Status.Phase != common.DeletingResourcePhase {
-						err = r.Client.Delete(context.Background(), &machineInstance)
-						if err != nil {
-							log.Error(err, "could not delete Machine "+machineInstance.GetName())
-						}
-						return reconcile.Result{Requeue: true}, err
-					}
-				}
+				return reconcile.Result{Requeue: true}, nil
 			}
 
 			// if no Machines left to be deleted
@@ -196,38 +161,17 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 		log.Error(err, "could not list Machines")
 		return reconcile.Result{}, err
 	}
-	var machineStatuses []common.StatusPhase
-	for _, machineInstance := range machineList.Items {
-		if machineInstance.Spec.ClusterName == clusterInstance.GetName() {
-			machineStatuses = append(machineStatuses, machineInstance.Status.Phase)
-		}
-	}
 
-	clusterStatus, err := util.GetStatus(machineStatuses)
-	if err != nil {
-		log.Error(err, "could not get status of all cluster machines")
-		clusterInstance.Status.ErrorMessage = "Cluster machines are in inconsistent phase" +
-			" - all must be either Ready or the same one phase"
-		clusterInstance.Status.ErrorReason = common.UnsupportedChangeClusterError
-		clusterInstance.Status.Phase = common.ErrorResourcePhase
-
-		err = r.updateStatus(clusterInstance, corev1.EventTypeWarning,
-			common.ErrResourceFailed, common.MessageResourceFailed, clusterInstance.GetName())
+	clusterStatus := util.GetStatus(machineList)
+	if clusterInstance.Status.Phase != clusterStatus {
+		clusterInstance.Status.Phase = clusterStatus
+		err = r.updateStatus(clusterInstance, corev1.EventTypeNormal,
+			common.ResourceStateChange, common.MessageResourceStateChange, clusterInstance.GetName(), clusterStatus)
 		if err != nil {
-			log.Error(err, "could not update cluster status")
+			log.Error(err, "could not update object cluster status", "cluster", clusterInstance)
+			return reconcile.Result{}, err
 		}
-
-		return reconcile.Result{}, err
 	}
-
-	clusterInstance.Status.Phase = clusterStatus
-	err = r.updateStatus(clusterInstance, corev1.EventTypeNormal,
-		common.ResourceStateChange, common.MessageResourceStateChange, clusterInstance.GetName(), clusterStatus)
-	if err != nil {
-		log.Error(err, "could not update cluster status")
-		return reconcile.Result{}, err
-	}
-
 	return reconcile.Result{}, nil
 }
 
