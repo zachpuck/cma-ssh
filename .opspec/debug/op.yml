@@ -1,0 +1,60 @@
+name: debug
+description: local debug of cma-ssh using kind (kubernetes in docker)
+inputs:
+  name:
+    string:
+      description: name of kind cluster
+      default: cma-ssh-debug-cluster
+  dockerSocket:
+    socket:
+      description: access to docker on node (ex. /var/run/docker.sock)
+  host-machine-ip:
+    string:
+      description: the ip address of the machine running the op (ex. 192.168.1.129
+  srcDir:
+    dir:
+      description: directory containing cma-ssh source code
+      default: .
+run:
+  serial:
+    - op:
+        ref: debug/create-kind-cluster
+        inputs:
+          name:
+          dockerSocket:
+          host-machine-ip:
+          srcDir:
+        outputs:
+          kubeConfig:
+    # apply crd's and samples to cluster
+    - container:
+        image: { ref: 'opspecpkgs/k8s.config.apply-dir:1.1.0' }
+        cmd:
+        - sh
+        - -ce
+        - |
+          # using "--insecure-skip-tls-verify" since we are accessing the cluster from an untrusted ip
+
+          # apply all crds to kind cluster
+          kubectl apply --insecure-skip-tls-verify -f /repo/config/crds
+
+          # apply all samples to kind cluster
+          kubectl apply --insecure-skip-tls-verify -f /repo/config/samples
+        dirs:
+          /repo: $(srcDir)
+        files:
+          /root/.kube/config: $(kubeConfig)
+    # TODO:starts a container running the latest cma-ssh code
+#    - container:
+#        image: { ref: 'golang:1.10-alpine' }
+#        cmd:
+#          - sh
+#          - -ce
+#          - |
+#            apk add make
+#            make run
+#        dirs:
+#          /go/src/cma-ssh: $(srcDir)
+#        files:
+#          /root/.kube/config: $(kubeConfig)
+#        workDir: /go/src/cma-ssh

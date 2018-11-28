@@ -8,3 +8,4 @@ spec:
   # Add fields here
   status:
     phase: ""
+    kubernetesVersion: "1.10.6"

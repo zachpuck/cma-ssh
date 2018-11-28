@@ -6,4 +6,9 @@ metadata:
   name: cluster-sample
 spec:
   # Add fields here
-  foo: bar
+  clusterNetwork:
+    pods:
+    serviceDomain:
+    services:
+
+  kubernetesVersion: 1.10.6

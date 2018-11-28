@@ -1,9 +1,0 @@
-apiVersion: cluster.sds.samsung.com/v1alpha1
-kind: MachineClass
-metadata:
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: machineclass-sample
-spec:
-  # Add fields here
-  foo: bar
