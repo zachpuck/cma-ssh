@@ -26,8 +26,6 @@ spec:
           properties:
             clustername:
               type: string
-            metadata:
-              type: object
             roles:
               items:
                 type: string
@@ -51,32 +49,15 @@ spec:
           type: object
         status:
           properties:
-            addresses:
-              items:
-                type: object
-              type: array
-            conditions:
-              items:
-                type: object
-              type: array
-            errorMessage:
-              type: string
-            errorReason:
+            kubernetesVersion:
               type: string
             lastUpdated:
               format: date-time
               type: string
-            nodeRef:
-              type: object
             phase:
               type: string
-            versions:
-              properties:
-                kubernetesVersion:
-                  type: string
-              required:
-              - kubernetesVersion
-              type: object
+          required:
+          - kubernetesVersion
           type: object
   version: v1alpha1
 status:

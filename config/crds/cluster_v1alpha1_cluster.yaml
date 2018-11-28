@@ -59,23 +59,6 @@ spec:
           type: object
         status:
           properties:
-            apiEndpoints:
-              items:
-                properties:
-                  host:
-                    type: string
-                  port:
-                    format: int64
-                    type: integer
-                required:
-                - host
-                - port
-                type: object
-              type: array
-            errorMessage:
-              type: string
-            errorReason:
-              type: string
             lastUpdated:
               format: date-time
               type: string

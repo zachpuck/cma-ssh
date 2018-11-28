@@ -52,27 +52,12 @@ type NetworkRanges struct {
 
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
-	// APIEndpoint represents the endpoint to communicate with the IP.
-	// +optional
-	APIEndpoints []APIEndpoint `json:"apiEndpoints,omitempty"`
-
 	// When was this status last observed
 	// +optional
 	LastUpdated *metav1.Time `json:"lastUpdated,omitempty"`
 
-	// If set, indicates that there is a problem reconciling the
-	// state, and will be set to a token value suitable for
-	// programmatic interpretation.
-	// +optional
-	ErrorReason common.ClusterStatusError `json:"errorReason,omitempty"`
-
-	// If set, indicates that there is a problem reconciling the
-	// state, and will be set to a descriptive error message.
-	// +optional
-	ErrorMessage string `json:"errorMessage,omitempty"`
-
 	// Cluster status
-	Phase common.StatusPhase `json:"phase,omitempty"`
+	Phase common.ClusterStatusPhase `json:"phase,omitempty"`
 }
 
 // APIEndpoint represents a reachable Kubernetes API endpoint.

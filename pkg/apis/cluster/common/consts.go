@@ -1,4 +1,5 @@
 /*
+Copyright 2018 Samsung SDS.
 Copyright 2018 The Kubernetes Authors.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,70 +14,43 @@ limitations under the License.
 
 package common
 
-// Constants aren't automatically generated for unversioned packages.
-// Instead share the same constant for all versioned packages
-type MachineStatusError string
+type MachineStatusPhase string
 
 const (
-	// Represents that the combination of configuration in the MachineSpec
-	// is not supported by this cluster. This is not a transient error, but
-	// indicates a state that must be fixed before progress can be made.
-	//
-	// Example: the ProviderSpec specifies an instance type that doesn't exist,
-	InvalidConfigurationMachineError MachineStatusError = "InvalidConfiguration"
-
-	// This indicates that the MachineSpec has been updated in a way that
-	// is not supported for reconciliation on this cluster. The spec may be
-	// completely valid from a configuration standpoint, but the controller
-	// does not support changing the real world state to match the new
-	// spec.
-	//
-	// Example: the responsible controller is not capable of changing the
-	// container runtime from docker to rkt.
-	UnsupportedChangeMachineError MachineStatusError = "UnsupportedChange"
-
-	// This generally refers to exceeding one's quota in a cloud provider,
-	// or running out of physical machines in an on-premise environment.
-	InsufficientResourcesMachineError MachineStatusError = "InsufficientResources"
-
-	// There was an error while trying to create a Node to match this
-	// Machine. This may indicate a transient problem that will be fixed
-	// automatically with time, such as a service outage, or a terminal
-	// error during creation that doesn't match a more specific
-	// MachineStatusError value.
-	//
-	// Example: timeout trying to connect to GCE.
-	CreateMachineError MachineStatusError = "CreateError"
-
-	// An error was encountered while trying to delete the Node that this
-	// Machine represents. This could be a transient or terminal error, but
-	// will only be observable if the provider's Machine controller has
-	// added a finalizer to the object to more gracefully handle deletions.
-	//
-	// Example: cannot resolve EC2 IP address.
-	DeleteMachineError MachineStatusError = "DeleteError"
-)
-
-type StatusPhase string
-
-const (
-	// no machines in the cluster
-	EmptyClusterPhase StatusPhase = "NoResources"
 
 	// resource is creating
-	CreatingResourcePhase StatusPhase = "CreatingResources"
+	ProvisioningMachinePhase MachineStatusPhase = "CreatingMachine"
 
 	// resource is ugrading
-	UpgradingResourcePhase StatusPhase = "UpgradingResources"
+	UpgradingMachinePhase MachineStatusPhase = "UpgradingMachine"
 
 	// resource is deleting
-	DeletingResourcePhase StatusPhase = "DeletingResources"
+	DeletingMachinePhase MachineStatusPhase = "DeletingMachine"
 
 	// resources are ready
-	ReadyResourcePhase StatusPhase = "ReadyResources"
+	ReadyMachinePhase MachineStatusPhase = "ReadyMachine"
 
 	// resources are in error state
-	ErrorResourcePhase StatusPhase = "ResourcesError"
+	ErrorMachinePhase MachineStatusPhase = "ErrorMachine"
+)
+
+type ClusterStatusPhase string
+
+const (
+	UnspecifiedClusterPhase ClusterStatusPhase = "Unspecified"
+
+	// The RUNNING state indicates the cluster has been created and is fully usable.
+	RunningClusterPhase ClusterStatusPhase = "RunningCluster"
+
+	// The RECONCILING state indicates that some work is actively being done on the cluster, such as
+	// upgrading the master or node software.
+	ReconcilingClusterPhase ClusterStatusPhase = "ReconcilingCluster"
+
+	// The STOPPING state indicates the cluster is being deleted
+	StoppingClusterPhase ClusterStatusPhase = "StoppingCluster"
+
+	// The ERROR state indicates the cluster may be unusable
+	ErrorClusterPhase ClusterStatusPhase = "ErrorCluster"
 )
 
 type ClusterStatusError string
@@ -102,25 +76,6 @@ const (
 	// DeleteClusterError indicates that an error was encountered
 	// when trying to delete the cluster.
 	DeleteClusterError ClusterStatusError = "DeleteError"
-)
-
-type MachineSetStatusError string
-
-const (
-	// Represents that the combination of configuration in the MachineTemplateSpec
-	// is not supported by this cluster. This is not a transient error, but
-	// indicates a state that must be fixed before progress can be made.
-	//
-	// Example: the ProviderSpec specifies an instance type that doesn't exist.
-	InvalidConfigurationMachineSetError MachineSetStatusError = "InvalidConfiguration"
-)
-
-type MachineDeploymentStrategyType string
-
-const (
-	// Replace the old MachineSet by new one using rolling update
-	// i.e gradually scale down the old MachineSet and scale up the new one.
-	RollingUpdateMachineDeploymentStrategyType MachineDeploymentStrategyType = "RollingUpdate"
 )
 
 type MachineRoles string
