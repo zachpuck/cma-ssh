@@ -6,4 +6,10 @@ metadata:
   name: cluster-sample
 spec:
   # Add fields here
-  foo: bar
+  clusterNetwork:
+    services:
+      cidrBlocks: ["10.96.0.0/12"]
+    pods:
+      cidrBlocks: ["10.244.0.0/16"]
+    serviceDomain: "cluster.local"
+  kubernetesVersion: 1.10.6

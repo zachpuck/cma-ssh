@@ -1,0 +1,36 @@
+name: debug/create-kind-cluster
+description: provision local dev environment using kind
+inputs:
+  name:
+    string:
+      description: name of kind cluster
+      default: cma-ssh-debug-cluster
+  dockerSocket:
+    socket:
+      description: access to docker on node (ex. /var/run/docker.sock)
+  host-machine-ip:
+    string:
+      description: the ip address of the machine running the op (ex. 192.168.1.129)
+  srcDir:
+    dir:
+      description: source code
+      default: .
+outputs:
+  kubeConfig:
+    file:
+      description: kind cluster kubeConfig
+run:
+  container:
+    image: { ref: 'zachpuck/kind-ci:latest' }
+    cmd: [ /cmd.sh ]
+    dirs:
+      /repo: $(srcDir)
+    files:
+      /cmd.sh:
+      /kubeConfig: $(kubeConfig)
+    envVars:
+      name:
+      HOST_MACHINE_IP: $(host-machine-ip)
+    sockets:
+      /var/run/docker.sock: dockerSocket
+    workDir: /repo

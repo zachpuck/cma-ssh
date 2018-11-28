@@ -1,0 +1,33 @@
+name: cleanup
+description: cleanup local debug environment
+inputs:
+  name:
+    string:
+      description: name of kind cluster
+      default: cma-ssh-debug-cluster
+  dockerSocket:
+    socket:
+      description: access to docker on node (ex. /var/run/docker.sock)
+  srcDir:
+    dir:
+      description: source code
+      default: .
+run:
+ container:
+    image: { ref: 'zachpuck/kind-ci:latest' }
+    cmd:
+    - sh
+    - -ce
+    - |
+      echo "delete kind-kubeConfig.yaml"
+      rm /repo/kind-kubeConfig.yaml
+
+      echo "delete cluster"
+      kind delete cluster --name $name
+    envVars:
+      name:
+    sockets:
+      /var/run/docker.sock: dockerSocket
+    dirs:
+      /repo: $(srcDir)
+    workDir: /repo
