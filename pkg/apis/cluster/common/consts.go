@@ -100,3 +100,7 @@ const (
 	// changes phase (non error)
 	MessageResourceStateChange ControllerEvents = "Resource %q changed state to %q"
 )
+
+const (
+	ApiEnpointPort = "6443"
+)

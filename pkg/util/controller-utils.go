@@ -5,13 +5,23 @@ import (
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 )
 
-func GetStatus(machines []clusterv1alpha1.Machine) common.ClusterStatusPhase {
+// returns overall cluster status and api enpoint if available
+func GetStatus(machines []clusterv1alpha1.Machine) (common.ClusterStatusPhase, string) {
+
 	if len(machines) == 0 {
-		return common.UnspecifiedClusterPhase
+		return common.UnspecifiedClusterPhase, ""
+	}
+
+	// if there is a Ready machine and it's a master, grab the api endpoint
+	apiEndpoint := ""
+	for _, machine := range machines {
+		if machine.Status.Phase == common.ReadyMachinePhase && ContainsRole(machine.Spec.Roles, common.MachineRoleMaster) {
+			apiEndpoint = machine.Spec.SshConfig.Host + ":" + common.ApiEnpointPort
+		}
 	}
 
 	if ContainsStatuses(machines, []common.MachineStatusPhase{common.ErrorMachinePhase}) {
-		return common.ErrorClusterPhase
+		return common.ErrorClusterPhase, apiEndpoint
 	}
 
 	if ContainsStatuses(machines,
@@ -21,10 +31,10 @@ func GetStatus(machines []clusterv1alpha1.Machine) common.ClusterStatusPhase {
 			common.UpgradingMachinePhase,
 			"",
 		}) {
-		return common.ReconcilingClusterPhase
+		return common.ReconcilingClusterPhase, apiEndpoint
 	}
 
-	return common.RunningClusterPhase
+	return common.RunningClusterPhase, apiEndpoint
 }
 
 func ContainsStatuses(machines []clusterv1alpha1.Machine, ss []common.MachineStatusPhase) bool {
@@ -33,6 +43,15 @@ func ContainsStatuses(machines []clusterv1alpha1.Machine, ss []common.MachineSta
 			if item.Status.Phase == ssItem {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func ContainsRole(slice []common.MachineRoles, s common.MachineRoles) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
 		}
 	}
 	return false
