@@ -20,7 +20,7 @@ run:
     - -ce
     - |
       echo "delete kind-kubeConfig.yaml"
-      rm /repo/kind-kubeConfig.yaml
+      rm -f /repo/kind-kubeConfig.yaml
 
       echo "delete cluster"
       kind delete cluster --name $name
