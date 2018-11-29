@@ -2,10 +2,10 @@ package ssh
 
 import (
 	"io"
-	"log"
 	"net"
 
 	"golang.org/x/crypto/ssh"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 // Client contains the underlying net.Conn and an ssh.Client for the conn.
@@ -66,7 +66,10 @@ const proxy = "http://192.168.99.1:3128"
 var proxyEnvs = []string{"http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY"}
 
 func (c *CommandRunner) exec(client *ssh.Client, cmd Command) error {
-	log.Printf("running %s on remote host %v", cmd, client.RemoteAddr())
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("pkg/ssh: exec")
+
+	log.Info("running command on remote host", cmd, client.RemoteAddr())
 	session, err := client.NewSession()
 	if err != nil {
 		return err
@@ -75,7 +78,7 @@ func (c *CommandRunner) exec(client *ssh.Client, cmd Command) error {
 
 	for _, proxyEnv := range proxyEnvs {
 		if err := session.Setenv(proxyEnv, proxy); err != nil {
-			log.Printf("make sure AcceptEnv is set for %s in /etc/ssh/sshd_config: %v", proxyEnv, err)
+			log.Error(err, "make sure AcceptEnv is set for remote host in /etc/ssh/sshd_config", proxyEnv)
 		}
 	}
 
@@ -85,9 +88,9 @@ func (c *CommandRunner) exec(client *ssh.Client, cmd Command) error {
 	if err := session.Run(cmd.Cmd); err != nil {
 		switch e := err.(type) {
 		case *ssh.ExitMissingError:
-			log.Printf("comand exitted without status: %v", e)
+			log.Info("comand exitted without status", e)
 		case *ssh.ExitError:
-			log.Printf("command unsuccessful: %v", e.String())
+			log.Info("command unsuccessful", e.String())
 		}
 		return err
 	}
