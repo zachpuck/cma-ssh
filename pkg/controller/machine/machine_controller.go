@@ -314,10 +314,7 @@ func preBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine)
 		return err
 	}
 
-	if err := installNginx(sshclient); err != nil {
-		return err
-	}
-	if err := installDocker(sshclient); err != nil {
+	if err := ipAddr(sshclient); err != nil {
 		return err
 	}
 

@@ -22,6 +22,9 @@ func NewClient(address, user string, privateKey []byte) (*Client, error) {
 		return nil, err
 	}
 	c, err := net.Dial("tcp", address)
+	if err != nil {
+		return nil, err
+	}
 	conn, newCh, reqCh, err := ssh.NewClientConn(c, address, &ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{
