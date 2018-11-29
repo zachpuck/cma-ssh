@@ -19,9 +19,12 @@ package machine
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/masterminds/semver"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
+	"github.com/samsung-cnct/cma-ssh/pkg/ssh"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,7 +38,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"time"
 )
 
 type backgroundMachineOp func(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) error
@@ -291,7 +293,30 @@ func preBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine)
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller preBootstrap()")
 
-	// TODO: run kubernetes physical node bootstrap here
+	sshconfig := machineInstance.Spec.SshConfig
+	secret := &corev1.Secret{}
+	err := r.Get(
+		context.Background(),
+		client.ObjectKey{
+			Namespace: machineInstance.GetNamespace(),
+			Name:      sshconfig.Secret,
+		},
+		secret)
+	if err != nil {
+		log.Error(err,
+			"could not find object secret", "secret", sshconfig.Secret)
+		return err
+	}
+
+	addr := fmt.Sprintf("%v:%v", sshconfig.Host, sshconfig.Port)
+	sshclient, err := ssh.NewClient(addr, sshconfig.Username, secret.Data["private-key"])
+	if err != nil {
+		return err
+	}
+
+	if err := installNginx(sshclient); err != nil {
+		return err
+	}
 
 	// if this is a worker machine, wait for cluster to get an API endpoint
 	if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleWorker) {
