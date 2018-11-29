@@ -1,0 +1,14 @@
+{
+	"insecure-registries": [
+   		"docker",
+		"docker.io",
+		"registry-1.docker.io",
+		"gcr.io",
+		"k8s.gcr.io",
+		"quay.io",
+		"182.195.81.113:9401",
+		"182.195.81.113:9402",
+		"182.195.81.113:9403",
+		"182.195.81.113:9404"
+	]
+}

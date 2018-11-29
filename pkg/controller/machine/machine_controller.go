@@ -317,6 +317,9 @@ func preBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine)
 	if err := installNginx(sshclient); err != nil {
 		return err
 	}
+	if err := installDocker(sshclient); err != nil {
+		return err
+	}
 
 	// if this is a worker machine, wait for cluster to get an API endpoint
 	if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleWorker) {
