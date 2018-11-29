@@ -38,7 +38,7 @@ import (
 	"time"
 )
 
-type backgroundMachineOp func(machineInstance *clusterv1alpha1.Machine) error
+type backgroundMachineOp func(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) error
 type backgroundMachineOpCheck func(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) error
 
 // Add creates a new Machine Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -287,10 +287,29 @@ func getCluster(c client.Client, namespace string, clusterName string) (*cluster
 	return clusterInstance, nil
 }
 
-func preBootstrap(machineInstance *clusterv1alpha1.Machine) error {
+func preBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) error {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("machine Controller preBootstrap()")
 
 	// TODO: run kubernetes physical node bootstrap here
 
+	// if this is a worker machine, wait for cluster to get an API endpoint
+	if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleWorker) {
+		for {
+			clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
+			if err != nil {
+				return err
+			}
+
+			if clusterInstance.Status.APIEndpoint != "" {
+				break
+			}
+
+			log.Info("Waiting for cluster initialize with APIEndpoint for worker machine",
+				"machine", machineInstance)
+			time.Sleep(3 * time.Second)
+		}
+	}
 	return nil
 }
 
@@ -316,7 +335,7 @@ func checkBootstrapStatus(r *ReconcileMachine, machineInstance *clusterv1alpha1.
 	return nil
 }
 
-func preUpgrade(machineInstance *clusterv1alpha1.Machine) error {
+func preUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) error {
 
 	// TODO: run kubernetes physical node upgrade here
 
@@ -345,7 +364,7 @@ func checkUpgradeStatus(r *ReconcileMachine, machineInstance *clusterv1alpha1.Ma
 	return nil
 }
 
-func preDelete(machineInstance *clusterv1alpha1.Machine) error {
+func preDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) error {
 
 	// TODO: run kubernetes physical node delete here
 
@@ -393,7 +412,7 @@ func (r *ReconcileMachine) periodicBackgroundRunner(preOp backgroundMachineOp,
 	// start bootstrap command (or pre upgrade etc)
 	preOpResult := make(chan error)
 	go func(ch chan<- error) {
-		ch <- preOp(machineInstance)
+		ch <- preOp(r, machineInstance)
 		close(ch)
 	}(preOpResult)
 
@@ -402,7 +421,7 @@ func (r *ReconcileMachine) periodicBackgroundRunner(preOp backgroundMachineOp,
 		preOpDone := false
 		for {
 			select {
-			// operation timed oud, error
+			// operation timed out, error
 			case <-timeout:
 				err := fmt.Errorf("operation %s timed out for machine %s",
 					operationName, machineInstance.GetNamespace())

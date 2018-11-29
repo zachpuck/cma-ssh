@@ -176,9 +176,10 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	clusterStatus := util.GetStatus(machineList)
-	if clusterInstance.Status.Phase != clusterStatus {
+	clusterStatus, apiEndpoint := util.GetStatus(machineList)
+	if clusterInstance.Status.Phase != clusterStatus || clusterInstance.Status.APIEndpoint != apiEndpoint {
 		clusterInstance.Status.Phase = clusterStatus
+		clusterInstance.Status.APIEndpoint = apiEndpoint
 		err = r.updateStatus(clusterInstance, corev1.EventTypeNormal,
 			common.ResourceStateChange, common.MessageResourceStateChange, clusterInstance.GetName(), clusterStatus)
 		if err != nil {
@@ -204,6 +205,7 @@ func (r *ReconcileCluster) updateStatus(clusterInstance *clusterv1alpha1.Cluster
 
 	clusterFreshInstance.Status.LastUpdated = &metav1.Time{Time: time.Now()}
 	clusterFreshInstance.Status.Phase = clusterInstance.Status.Phase
+	clusterFreshInstance.Status.APIEndpoint = clusterInstance.Status.APIEndpoint
 	clusterFreshInstance.ObjectMeta.Finalizers = clusterInstance.ObjectMeta.Finalizers
 
 	r.Eventf(clusterFreshInstance, eventType,

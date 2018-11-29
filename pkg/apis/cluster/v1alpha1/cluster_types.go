@@ -55,7 +55,8 @@ type ClusterStatus struct {
 	// When was this status last observed
 	// +optional
 	LastUpdated *metav1.Time `json:"lastUpdated,omitempty"`
-
+	// API endpoint
+	APIEndpoint string `json:"apiendpoint,omitempty"`
 	// Cluster status
 	Phase common.ClusterStatusPhase `json:"phase,omitempty"`
 }
