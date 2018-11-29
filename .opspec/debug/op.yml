@@ -18,6 +18,12 @@ inputs:
 run:
   serial:
     - op:
+        ref: cleanup
+        inputs:
+          name:
+          dockerSocket:
+          srcDir:
+    - op:
         ref: debug/create-kind-cluster
         inputs:
           name:
@@ -44,17 +50,3 @@ run:
           /repo: $(srcDir)
         files:
           /root/.kube/config: $(kubeConfig)
-    # TODO:starts a container running the latest cma-ssh code
-#    - container:
-#        image: { ref: 'golang:1.10-alpine' }
-#        cmd:
-#          - sh
-#          - -ce
-#          - |
-#            apk add make
-#            make run
-#        dirs:
-#          /go/src/cma-ssh: $(srcDir)
-#        files:
-#          /root/.kube/config: $(kubeConfig)
-#        workDir: /go/src/cma-ssh
