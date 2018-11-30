@@ -19,6 +19,8 @@ package machine
 import (
 	"context"
 	"fmt"
+	"github.com/cloudflare/cfssl/log"
+	"github.com/docker/docker/pkg/integration/cmd"
 	"time"
 
 	"github.com/masterminds/semver"
@@ -293,30 +295,18 @@ func preBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine)
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller preBootstrap()")
 
-	sshconfig := machineInstance.Spec.SshConfig
-	secret := &corev1.Secret{}
-	err := r.Get(
-		context.Background(),
-		client.ObjectKey{
-			Namespace: machineInstance.GetNamespace(),
-			Name:      sshconfig.Secret,
-		},
-		secret)
-	if err != nil {
-		log.Error(err,
-			"could not find object secret", "secret", sshconfig.Secret)
-		return err
-	}
-
-	addr := fmt.Sprintf("%v:%v", sshconfig.Host, sshconfig.Port)
-	sshclient, err := ssh.NewClient(addr, sshconfig.Username, secret.Data["private-key"])
+	out, err := r.runSshCommand(machineInstance, ipAddr)
+	log.Info("ipAdrr: " + out)
 	if err != nil {
 		return err
 	}
 
-	if err := ipAddr(sshclient); err != nil {
+	// TODO: on airgapped environment
+	/*out, err = r.runSshCommand(machineInstance, installNginx)
+	if err != nil {
 		return err
-	}
+	}*/
+
 
 	// if this is a worker machine, wait for cluster to get an API endpoint
 	if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleWorker) {
@@ -494,4 +484,53 @@ func (r *ReconcileMachine) periodicBackgroundRunner(preOp backgroundMachineOp,
 			}
 		}
 	}()
+}
+
+func (r *ReconcileMachine) runSshCommand(machineInstance *clusterv1alpha1.Machine, command sshCommand) (string, error)  {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("machine controller runSshCommand()")
+
+	sshConfig := machineInstance.Spec.SshConfig
+	secret := &corev1.Secret{}
+	err := r.Get(
+		context.Background(),
+		client.ObjectKey{
+			Namespace: machineInstance.GetNamespace(),
+			Name:      sshConfig.Secret,
+		},
+		secret)
+	if err != nil {
+		log.Error(err,
+			"could not find object secret", "secret", sshConfig.Secret)
+		return "", err
+	}
+
+	addr := fmt.Sprintf("%v:%v", sshConfig.Host, sshConfig.Port)
+	sshClient, err := ssh.NewClient(addr, sshConfig.Username, secret.Data["private-key"])
+	if err != nil {
+		return "", err
+	}
+
+	output, err := command(sshClient)
+	if err != nil {
+		log.Error(err,
+			"could not run command", "secret", sshConfig.Secret)
+	}
+
+	if output == nil {
+		return "", err
+	} else {
+		return string(output[:]), err
+	}
+}
+
+
+if err := session.Run(cmd.Cmd); err != nil {
+switch e := err.(type) {
+case *ssh.ExitMissingError:
+log.Info("comand exited without status", e)
+case *ssh.ExitError:
+log.Info("command unsuccessful", e.String())
+}
+return err
 }
