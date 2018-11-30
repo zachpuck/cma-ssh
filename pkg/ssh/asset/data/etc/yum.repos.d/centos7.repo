@@ -1,0 +1,53 @@
+[epel]
+name=Extra Packages for Enterprise Linux 7 - $basearch
+baseurl=http://182.195.81.113:9468/repository/cmp-yum-epel/$releasever/$basearch
+failovermethod=priority
+enabled=1
+gpgcheck=0
+#gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-7
+
+[epel-debuginfo]
+name=Extra Packages for Enterprise Linux 7 - $basearch - Debug
+baseurl=http://182.195.81.113:9468/repository/cmp-yum-epel/$releasever/$basearch/debug
+failovermethod=priority
+enabled=0
+gpgcheck=0
+#gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-7
+
+[epel-source]
+name=Extra Packages for Enterprise Linux 7 - $basearch - Source
+baseurl=http://182.195.81.113:9468/repository/cmp-yum-epel/$releasever/SRPMS
+failovermethod=priority
+enabled=0
+gpgcheck=0
+#gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-7
+
+[base]
+name=Nexus Repository
+baseurl=http://182.195.81.113:9468/repository/cmp-yum-centos/$releasever/os/$basearch/
+enabled=1
+gpgcheck=0
+#gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+priority=1
+
+#released updates
+[updates]
+name=CentOS-$releasever - Updates
+baseurl=http://182.195.81.113:9468/repository/cmp-yum-centos/$releasever/updates/$basearch/
+gpgcheck=0
+#gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+
+#additional packages that may be useful
+[extras]
+name=CentOS-$releasever - Extras
+baseurl=http://182.195.81.113:9468/repository/cmp-yum-centos/$releasever/extras/$basearch/
+gpgcheck=0
+#gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+
+#additional packages that extend functionality of existing packages
+[centosplus]
+name=CentOS-$releasever - Plus
+baseurl=http://182.195.81.113:9468/repository/cmp-yum-centos/$releasever/centosplus/$basearch/
+enabled=0
+gpgcheck=0
+#gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7

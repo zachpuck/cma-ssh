@@ -328,6 +328,22 @@
   version = "v0.8.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:2906e41e24d7d3a181f7a6c13bf78d931f1018e6865bae4ad11b55847a1884b6"
+  name = "github.com/shurcooL/httpfs"
+  packages = ["vfsutil"]
+  pruneopts = "T"
+  revision = "809beceb23714880abc4a382a00c05f89d13b1cc"
+
+[[projects]]
+  branch = "master"
+  digest = "1:fbd3f063c7433425ddad5f2b28bc2b1bc8a580913d312e180485707c1532edae"
+  name = "github.com/shurcooL/vfsgen"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "a97a25d856cadfe6481325baeb35a70d6723ca0c"
+
+[[projects]]
   digest = "1:b7bf9fd95d38ebe6726a63b7d0320611f7c920c64e2c8313eba0cec51926bf55"
   name = "github.com/spf13/afero"
   packages = [
@@ -389,7 +405,16 @@
   branch = "master"
   digest = "1:a0097f60e459fbf5512fcc7aa8bf7df60471624dc7956c68e7eb7f8db3706aa7"
   name = "golang.org/x/crypto"
-  packages = ["ssh/terminal"]
+  packages = [
+    "curve25519",
+    "ed25519",
+    "ed25519/internal/edwards25519",
+    "internal/chacha20",
+    "internal/subtle",
+    "poly1305",
+    "ssh",
+    "ssh/terminal",
+  ]
   pruneopts = "T"
   revision = "e657309f52e71501f9934566ac06dc5c2f7f11a1"
 
@@ -845,6 +870,8 @@
     "github.com/masterminds/semver",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
+    "github.com/shurcooL/vfsgen",
+    "golang.org/x/crypto/ssh",
     "k8s.io/api/core/v1",
     "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
     "k8s.io/apimachinery/pkg/api/errors",

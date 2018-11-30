@@ -1,0 +1,6 @@
+[kubernetes-old]
+name=Kubernetes-old
+baseurl=file:///var/log/rpms/1.10.6
+enabled=1
+gpgcheck=0
+repo_gpgcheck=0
