@@ -19,14 +19,11 @@ package machine
 import (
 	"context"
 	"fmt"
-	"github.com/cloudflare/cfssl/log"
-	"github.com/docker/docker/pkg/integration/cmd"
 	"time"
 
 	"github.com/masterminds/semver"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
-	"github.com/samsung-cnct/cma-ssh/pkg/ssh"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -295,36 +292,44 @@ func preBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine)
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller preBootstrap()")
 
-	out, err := r.runSshCommand(machineInstance, ipAddr)
-	log.Info("ipAdrr: " + out)
+	// install local nginx proxy
+	_, err := RunSshCommand(r.Client, machineInstance, InstallNginx)
 	if err != nil {
 		return err
 	}
 
-	// TODO: on airgapped environment
-	/*out, err = r.runSshCommand(machineInstance, installNginx)
+	// install docker
+	_, err = RunSshCommand(r.Client, machineInstance, InstallDocker)
 	if err != nil {
 		return err
-	}*/
+	}
 
+	// install kubernetes components
+	_, err = RunSshCommand(r.Client, machineInstance, InstallKubernetes)
+	if err != nil {
+		return err
+	}
 
-	// if this is a worker machine, wait for cluster to get an API endpoint
-	if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleWorker) {
-		for {
-			clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
-			if err != nil {
-				return err
-			}
-
-			if clusterInstance.Status.APIEndpoint != "" {
-				break
-			}
-
+	// if this is a master, proceed with bootstrap
+	if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleMaster) {
+		// run kubeadm init
+		_, err = RunSshCommand(r.Client, machineInstance, KubeadmInit)
+		if err != nil {
+			return err
+		}
+	} else if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleWorker) {
+		// on worker, see if master is able to run kubeadm
+		// if it is, run kubeadm token create and use the token to
+		// do kubeadm join.
+		// otherwise wait for a bit and try again.
+		/*for {
 			log.Info("Waiting for cluster initialize with APIEndpoint for worker machine",
 				"machine", machineInstance)
 			time.Sleep(3 * time.Second)
-		}
+		}*/
 	}
+
+
 	return nil
 }
 
@@ -484,53 +489,4 @@ func (r *ReconcileMachine) periodicBackgroundRunner(preOp backgroundMachineOp,
 			}
 		}
 	}()
-}
-
-func (r *ReconcileMachine) runSshCommand(machineInstance *clusterv1alpha1.Machine, command sshCommand) (string, error)  {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("machine controller runSshCommand()")
-
-	sshConfig := machineInstance.Spec.SshConfig
-	secret := &corev1.Secret{}
-	err := r.Get(
-		context.Background(),
-		client.ObjectKey{
-			Namespace: machineInstance.GetNamespace(),
-			Name:      sshConfig.Secret,
-		},
-		secret)
-	if err != nil {
-		log.Error(err,
-			"could not find object secret", "secret", sshConfig.Secret)
-		return "", err
-	}
-
-	addr := fmt.Sprintf("%v:%v", sshConfig.Host, sshConfig.Port)
-	sshClient, err := ssh.NewClient(addr, sshConfig.Username, secret.Data["private-key"])
-	if err != nil {
-		return "", err
-	}
-
-	output, err := command(sshClient)
-	if err != nil {
-		log.Error(err,
-			"could not run command", "secret", sshConfig.Secret)
-	}
-
-	if output == nil {
-		return "", err
-	} else {
-		return string(output[:]), err
-	}
-}
-
-
-if err := session.Run(cmd.Cmd); err != nil {
-switch e := err.(type) {
-case *ssh.ExitMissingError:
-log.Info("comand exited without status", e)
-case *ssh.ExitError:
-log.Info("command unsuccessful", e.String())
-}
-return err
 }

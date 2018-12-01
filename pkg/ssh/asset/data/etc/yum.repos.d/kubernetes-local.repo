@@ -1,0 +1,6 @@
+[kubernetes-local]
+name=Kubernetes-local
+baseurl=file:///etc/kubernetes/rpms
+enabled=1
+gpgcheck=0
+repo_gpgcheck=0
