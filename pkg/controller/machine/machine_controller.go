@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"k8s.io/apimachinery/pkg/labels"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -186,7 +187,7 @@ func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.Machine
 		}
 
 		// start delete process
-		r.periodicBackgroundRunner(preDelete, checkDeleteStatus, machineInstance, "handleUpgrade")
+		r.backgroundRunner(doDelete, machineInstance, "handleUpgrade")
 
 	}
 
@@ -212,7 +213,7 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.Machin
 	}
 
 	// start upgrade process
-	r.periodicBackgroundRunner(preUpgrade, checkUpgradeStatus, machineInstance, "handleUpgrade")
+	r.backgroundRunner(doUpgrade, machineInstance, "handleUpgrade")
 
 	return reconcile.Result{}, nil
 }
@@ -243,7 +244,7 @@ func (r *ReconcileMachine) handleCreate(machineInstance *clusterv1alpha1.Machine
 	}
 
 	// start bootstrap process
-	r.periodicBackgroundRunner(preBootstrap, checkBootstrapStatus, machineInstance, "handleCreate")
+	r.backgroundRunner(doBootstrap, machineInstance, "handleCreate")
 
 	return reconcile.Result{}, nil
 }
@@ -288,24 +289,24 @@ func getCluster(c client.Client, namespace string, clusterName string) (*cluster
 	return clusterInstance, nil
 }
 
-func preBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) error {
+func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) error {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller preBootstrap()")
 
 	// install local nginx proxy
-	_, err := RunSshCommand(r.Client, machineInstance, InstallNginx)
+	_, err := RunSshCommand(r.Client, machineInstance, InstallNginx, make(map[string]string))
 	if err != nil {
 		return err
 	}
 
 	// install docker
-	_, err = RunSshCommand(r.Client, machineInstance, InstallDocker)
+	_, err = RunSshCommand(r.Client, machineInstance, InstallDocker, make(map[string]string))
 	if err != nil {
 		return err
 	}
 
 	// install kubernetes components
-	_, err = RunSshCommand(r.Client, machineInstance, InstallKubernetes)
+	_, err = RunSshCommand(r.Client, machineInstance, InstallKubernetes, make(map[string]string))
 	if err != nil {
 		return err
 	}
@@ -313,7 +314,7 @@ func preBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine)
 	// if this is a master, proceed with bootstrap
 	if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleMaster) {
 		// run kubeadm init
-		_, err = RunSshCommand(r.Client, machineInstance, KubeadmInit)
+		_, err = RunSshCommand(r.Client, machineInstance, KubeadmInit, make(map[string]string))
 		if err != nil {
 			return err
 		}
@@ -322,20 +323,48 @@ func preBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine)
 		// if it is, run kubeadm token create and use the token to
 		// do kubeadm join.
 		// otherwise wait for a bit and try again.
-		/*for {
-			log.Info("Waiting for cluster initialize with APIEndpoint for worker machine",
-				"machine", machineInstance)
-			time.Sleep(3 * time.Second)
-		}*/
+
+		// get machine list
+		machineList := &clusterv1alpha1.MachineList{}
+		err := r.List(
+			context.Background(),
+			&client.ListOptions{LabelSelector: labels.Everything()},
+			machineList)
+		if err != nil {
+			return err
+		}
+
+		masterMachine, err := util.GetMaster(machineList.Items)
+		if err != nil {
+			return err
+		}
+
+		for {
+			// check if kubeadm is available
+			_, err = RunSshCommand(r.Client, masterMachine, CheckKubeadm, make(map[string]string))
+			if err != nil {
+				log.Info("Waiting for kubeadm to be available on master machine",
+					"machine", masterMachine)
+				time.Sleep(3 * time.Second)
+			} else {
+				// break out of wait loop
+				break;
+			}
+		}
+
+		// run kubeadm create token on master machine, get token back
+		token, err := RunSshCommand(r.Client, masterMachine, KubeadmTokenCreate, make(map[string]string))
+		if err != nil {
+			return err
+		}
+
+		// run kubeadm join on worker machine
+		_, err = RunSshCommand(r.Client, machineInstance,
+			KubeadmJoin, map[string]string{"token": token, "master": masterMachine.Spec.SshConfig.Host})
+		if err != nil {
+			return err
+		}
 	}
-
-
-	return nil
-}
-
-func checkBootstrapStatus(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) error {
-
-	// TODO: run bootstrap check here
 
 	// Set status to ready
 	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
@@ -355,17 +384,10 @@ func checkBootstrapStatus(r *ReconcileMachine, machineInstance *clusterv1alpha1.
 	return nil
 }
 
-func preUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) error {
+func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) error {
 
 	// TODO: run kubernetes physical node upgrade here
 
-	return nil
-}
-
-func checkUpgradeStatus(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) error {
-
-	// TODO: run kubernetes physical node upgrade check here
-
 	// Set status to ready
 	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
 	if err != nil {
@@ -384,17 +406,9 @@ func checkUpgradeStatus(r *ReconcileMachine, machineInstance *clusterv1alpha1.Ma
 	return nil
 }
 
-func preDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) error {
+func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) error {
 
 	// TODO: run kubernetes physical node delete here
-
-	return nil
-}
-
-func checkDeleteStatus(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) error {
-
-	// TODO: run kubernetes physical node delete check here
-
 	machineFreshInstance := &clusterv1alpha1.Machine{}
 	err := r.Get(
 		context.Background(),
@@ -414,35 +428,27 @@ func checkDeleteStatus(r *ReconcileMachine, machineInstance *clusterv1alpha1.Mac
 	return nil
 }
 
-func (r *ReconcileMachine) periodicBackgroundRunner(preOp backgroundMachineOp,
-	operationCheck backgroundMachineOpCheck, machineInstance *clusterv1alpha1.Machine, operationName string) {
+func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
+	machineInstance *clusterv1alpha1.Machine, operationName string) {
 	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("machine Controller periodicBackgroundRunner()")
-
-	// check on progress every 10 seconds
-	ticker := time.NewTicker(10 * time.Second)
-
-	// cluster operation timeouts shouldn't take longer than 10 minutes
-	timeout := make(chan bool)
-	go func() {
-		time.Sleep(600 * time.Second)
-		timeout <- true
-	}()
+	log := logf.Log.WithName("machine Controller backgroundRunner()")
 
 	// start bootstrap command (or pre upgrade etc)
-	preOpResult := make(chan error)
+	opResult := make(chan error)
+	defer close(opResult)
+
+	timer := time.NewTimer(10 * time.Minute)
+	defer timer.Stop()
+
 	go func(ch chan<- error) {
-		ch <- preOp(r, machineInstance)
-		close(ch)
-	}(preOpResult)
+		ch <- op(r, machineInstance)
+	}(opResult)
 
 	go func() {
-		defer ticker.Stop()
-		preOpDone := false
 		for {
 			select {
-			// operation timed out, error
-			case <-timeout:
+			// cluster operation timeouts shouldn't take longer than 10 minutes
+			case <-timer.C:
 				err := fmt.Errorf("operation %s timed out for machine %s",
 					operationName, machineInstance.GetNamespace())
 				log.Error(err, "Provisioning operation timed out for object machine",
@@ -457,35 +463,22 @@ func (r *ReconcileMachine) periodicBackgroundRunner(preOp backgroundMachineOp,
 					log.Error(err, "could not update status of machine", "machine", machineInstance)
 				}
 				return
-			case <-ticker.C:
-				// check on bootstrap command if needed (or pre upgrade etc) - blocking here until done or error
-				if !preOpDone {
-					err, ok := <-preOpResult
-					if err != nil {
-						log.Error(err, "could not complete object machine pre-start step of "+operationName,
-							"machine", machineInstance)
-						// set error status
-						machineInstance.Status.Phase = common.ErrorMachinePhase
-						err = r.updateStatus(machineInstance, corev1.EventTypeWarning,
-							common.ResourceStateChange, common.MessageResourceStateChange,
-							machineInstance.GetName(), common.ErrorMachinePhase)
-						if err != nil {
-							log.Error(err, "could not update status of machine", "machine", machineInstance)
-						}
-
-						return
-					}
-					preOpDone = !ok
-				}
-
-				// then keep doing checks until timeout or success
-				err := operationCheck(r, machineInstance)
+			case err := <-opResult:
+				// if finished with error
 				if err != nil {
-					log.Error(err, "Failed object machine periodic check "+operationName,
+					log.Error(err, "could not complete object machine pre-start step of "+operationName,
 						"machine", machineInstance)
-				} else {
-					return
+					// set error status
+					machineInstance.Status.Phase = common.ErrorMachinePhase
+					err = r.updateStatus(machineInstance, corev1.EventTypeWarning,
+						common.ResourceStateChange, common.MessageResourceStateChange,
+						machineInstance.GetName(), common.ErrorMachinePhase)
+					if err != nil {
+						log.Error(err, "could not update status of machine", "machine", machineInstance)
+					}
 				}
+
+				return
 			}
 		}
 	}()

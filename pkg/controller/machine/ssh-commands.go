@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/cloudflare/cfssl/log"
+	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"github.com/samsung-cnct/cma-ssh/pkg/ssh"
 	"github.com/samsung-cnct/cma-ssh/pkg/ssh/asset"
@@ -23,9 +23,12 @@ type boostrapConfigInfo struct {
 }
 
 type sshCommand func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine, templateData boostrapConfigInfo) ([]byte, error)
+	machineInstance *clusterv1alpha1.Machine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error)
 
-func RunSshCommand(kubeClient client.Client, machineInstance *clusterv1alpha1.Machine, command sshCommand) (string, error)  {
+func RunSshCommand(kubeClient client.Client,
+	machineInstance *clusterv1alpha1.Machine,
+	command sshCommand, commandArgs map[string]string) (string, error)  {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("RunSshCommand()")
 
@@ -60,7 +63,7 @@ func RunSshCommand(kubeClient client.Client, machineInstance *clusterv1alpha1.Ma
 		ProxyIp: proxyIp,
 	}
 
-	output, err := command(sshClient, kubeClient, machineInstance, templateInfo)
+	output, err := command(sshClient, kubeClient, machineInstance, templateInfo, commandArgs)
 	if err != nil {
 		switch err.(type) {
 		case *crypto.ExitMissingError:
@@ -79,7 +82,8 @@ func RunSshCommand(kubeClient client.Client, machineInstance *clusterv1alpha1.Ma
 
 
 var IpAddr sshCommand = func (client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine, templateData boostrapConfigInfo) ([]byte, error) {
+	machineInstance *clusterv1alpha1.Machine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
 	cr := &ssh.CommandRunner{}
 
 	return cr.GetOutput(
@@ -89,7 +93,11 @@ var IpAddr sshCommand = func (client *ssh.Client, kubeClient client.Client,
 }
 
 var InstallNginx = func (client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine, templateData boostrapConfigInfo) ([]byte, error) {
+	machineInstance *clusterv1alpha1.Machine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("Install nginx command")
+
 	centosConf, err := asset.Assets.Open("/etc/yum.repos.d/centos7.repo")
 	if err != nil {
 		return nil, err
@@ -159,7 +167,8 @@ var InstallNginx = func (client *ssh.Client, kubeClient client.Client,
 }
 
 var InstallDocker = func (client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine, templateData boostrapConfigInfo) ([]byte, error) {
+	machineInstance *clusterv1alpha1.Machine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("Install docker command")
 
@@ -224,7 +233,8 @@ var InstallDocker = func (client *ssh.Client, kubeClient client.Client,
 }
 
 var InstallKubernetes = func (client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine, templateData boostrapConfigInfo) ([]byte, error) {
+	machineInstance *clusterv1alpha1.Machine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("Install kubernetes command")
 
@@ -323,7 +333,8 @@ var InstallKubernetes = func (client *ssh.Client, kubeClient client.Client,
 }
 
 var KubeadmInit = func (client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine, templateData boostrapConfigInfo) ([]byte, error) {
+	machineInstance *clusterv1alpha1.Machine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("Kubeadm init command")
 
@@ -365,6 +376,132 @@ var KubeadmInit = func (client *ssh.Client, kubeClient client.Client,
 	)
 	if err != nil {
 		log.Error(err, "error kubeadm init")
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+var CheckKubeadm = func (client *ssh.Client, kubeClient client.Client,
+	machineInstance *clusterv1alpha1.Machine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("Check kubeadm command")
+
+	bout := bufio.NewWriter(os.Stdout)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stdout writer")
+		}
+	}(bout)
+
+	berr := bufio.NewWriter(os.Stderr)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stderr writer")
+		}
+	}(berr)
+
+	cr := ssh.CommandRunner{
+		Stdout: bout,
+		Stderr: berr,
+	}
+
+	// kubeadm check
+	err := cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "which kubeadm"},
+	)
+	if err != nil {
+		log.Error(err, "error kubeadm check")
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+var KubeadmTokenCreate = func (client *ssh.Client, kubeClient client.Client,
+	machineInstance *clusterv1alpha1.Machine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("Kubeadm token create command")
+
+	bout := bufio.NewWriter(os.Stdout)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stdout writer")
+		}
+	}(bout)
+
+	berr := bufio.NewWriter(os.Stderr)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stderr writer")
+		}
+	}(berr)
+
+	cr := ssh.CommandRunner{
+		Stdout: bout,
+		Stderr: berr,
+	}
+
+	// kubeadm check
+	token, err := cr.GetOutput(
+		client.Client,
+		ssh.Command{Cmd: "kubeadm token create --description " + machineInstance.GetName()},
+	)
+	if err != nil {
+		log.Error(err, "error kubeadm token create")
+		return nil, err
+	}
+
+	return token, nil
+}
+
+var KubeadmJoin = func (client *ssh.Client, kubeClient client.Client,
+	machineInstance *clusterv1alpha1.Machine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("Kubeadm join command")
+
+	bout := bufio.NewWriter(os.Stdout)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stdout writer")
+		}
+	}(bout)
+
+	berr := bufio.NewWriter(os.Stderr)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stderr writer")
+		}
+	}(berr)
+
+	token := commandArgs["token"]
+	master := commandArgs["master"]+ ":" + common.ApiEnpointPort
+
+	cr := ssh.CommandRunner{
+		Stdout: bout,
+		Stderr: berr,
+	}
+
+	// kubeadm join
+	err := cr.Run(
+		client.Client,
+		ssh.Command{Cmd: " kubeadm join --token " +
+			token +
+			" --ignore-preflight-errors=all --discovery-token-unsafe-skip-ca-verification " +
+			master},
+	)
+	if err != nil {
+		log.Error(err, "error kubeadm join")
 		return nil, err
 	}
 

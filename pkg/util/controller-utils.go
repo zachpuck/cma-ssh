@@ -1,8 +1,6 @@
 package util
 
 import (
-	"bufio"
-	"crypto/rand"
 	"fmt"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
@@ -79,48 +77,15 @@ func RemoveString(slice []string, s string) (result []string) {
 	return
 }
 
-
-const validBootstrapTokenChars = "0123456789abcdefghijklmnopqrstuvwxyz"
-const BootstrapTokenIDBytes = 6
-const BootstrapTokenSecretBytes = 16
-
-func GenerateBootstrapToken() (string, error) {
-	tokenID, err := randBytes(BootstrapTokenIDBytes)
-	if err != nil {
-		return "", err
-	}
-
-	tokenSecret, err := randBytes(BootstrapTokenSecretBytes)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%s.%s", tokenID, tokenSecret), nil
-}
-
-func randBytes(length int) (string, error) {
-	const maxByteValue = 252
-
-	var (
-		b     byte
-		err   error
-		token = make([]byte, length)
-	)
-
-	reader := bufio.NewReaderSize(rand.Reader, length*2)
-	for i := range token {
-		for {
-			if b, err = reader.ReadByte(); err != nil {
-				return "", err
-			}
-			if b < maxByteValue {
-				break
+func GetMaster(machines []clusterv1alpha1.Machine) (*clusterv1alpha1.Machine, error) {
+	for _, item := range machines {
+		for _, role := range item.Spec.Roles {
+			if role == common.MachineRoleMaster {
+				return &item, nil
 			}
 		}
-
-		token[i] = validBootstrapTokenChars[int(b)%len(validBootstrapTokenChars)]
 	}
 
-	return string(token), nil
+	return nil, fmt.Errorf("could not find master node")
 }
 
