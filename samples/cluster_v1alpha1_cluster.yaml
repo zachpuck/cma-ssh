@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: cluster-sample
+  name: cluster
 spec:
   # Add fields here
   clusterNetwork:

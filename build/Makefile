@@ -1,10 +1,11 @@
 GOCMD=go
-DOCKERTAG?=quay.io/samsung_cnct/cma-ssh:local
-BOOTSTRAPDOCKERTAG?=quay.io/samsung_cnct/cma-ssh-bootstrap:local
 GOBUILD=$(GOCMD) build
 GOGET=$(GOCMD) get
 GOTEST=$(GOCMD) test
 PROJECTDIR=$(shell pwd)
+VERSIONFILE=$(shell cat ${PROJECTDIR}/.versionfile)
+DOCKERTAG?=quay.io/samsung_cnct/cma-ssh:$(VERSIONFILE)-local
+BOOTSTRAPDOCKERTAG?=quay.io/samsung_cnct/cma-ssh-bootstrap:$(VERSIONFILE)-local
 DEPCMD=dep
 
 # Variables for binary version information
@@ -99,3 +100,7 @@ docker-build:
 docker-push:
 	docker push ${DOCKERTAG}
 	docker push ${BOOTSTRAPDOCKERTAG}
+	@echo Install chart with local tags:
+	@echo helm install deployments/helm/cma-ssh --name cma-ssh \\
+	@echo --set images.operator.tag=$(VERSIONFILE)-local \\
+	@echo --set images.bootstrap.tag=$(VERSIONFILE)-local

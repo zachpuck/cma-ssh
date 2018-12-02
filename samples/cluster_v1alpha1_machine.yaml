@@ -3,7 +3,7 @@ kind: Machine
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: machine-cp-sample
+  name: master
 spec:
   # Add fields here
   clusterref: cluster-sample
@@ -11,24 +11,24 @@ spec:
     - etcd
     - master
   sshconfig:
-    host: 1.1.1.1
+    host: 192.168.0.113
     port: 22
-    username: centos
-    secret: cats
+    username: root
+    secret: ssh-key
 ---
 apiVersion: cluster.sds.samsung.com/v1alpha1
 kind: Machine
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: machine-worker-sample
+  name: worker
 spec:
   # Add fields here
   clusterref: cluster-sample
   roles:
   - worker
   sshconfig:
-    host: 1.1.1.1
+    host: 192.168.0.112
     port: 22
-    username: centos
-    secret: cats
+    username: root
+    secret: ssh-key
