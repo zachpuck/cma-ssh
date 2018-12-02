@@ -19,6 +19,7 @@ package machine
 import (
 	"context"
 	"fmt"
+	"github.com/samsung-cnct/cma-ssh/pkg/util/k8sutil"
 	"time"
 
 	"github.com/masterminds/semver"
@@ -319,6 +320,24 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) 
 		if err != nil {
 			return err
 		}
+
+		// get kubeconfig
+		kubeConfig, err := RunSshCommand(r.Client, machineInstance, GetKubeConfig, make(map[string]string))
+		if err != nil {
+			return err
+		}
+
+		// create kubeconfig secret with cluster as controller reference
+		clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
+		if err != nil {
+			return err
+		}
+
+		err = k8sutil.CreateKubeconfigSecret(r.Client, clusterInstance, r.scheme, kubeConfig)
+		if err != nil {
+			return err
+		}
+
 	} else if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleWorker) {
 		// on worker, see if master is able to run kubeadm
 		// if it is, run kubeadm token create and use the token to
@@ -361,7 +380,7 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) 
 
 		// run kubeadm join on worker machine
 		_, err = RunSshCommand(r.Client, machineInstance,
-			KubeadmJoin, map[string]string{"token": token, "master": masterMachine.Spec.SshConfig.Host})
+			KubeadmJoin, map[string]string{"token": string(token[:]), "master": masterMachine.Spec.SshConfig.Host})
 		if err != nil {
 			return err
 		}

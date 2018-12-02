@@ -28,7 +28,7 @@ type sshCommand func(client *ssh.Client, kubeClient client.Client,
 
 func RunSshCommand(kubeClient client.Client,
 	machineInstance *clusterv1alpha1.Machine,
-	command sshCommand, commandArgs map[string]string) (string, error) {
+	command sshCommand, commandArgs map[string]string) ([]byte, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("RunSshCommand()")
 
@@ -44,13 +44,13 @@ func RunSshCommand(kubeClient client.Client,
 	if err != nil {
 		log.Error(err,
 			"could not find object secret", "secret", sshConfig.Secret)
-		return "", err
+		return nil, err
 	}
 
 	addr := fmt.Sprintf("%v:%v", sshConfig.Host, sshConfig.Port)
 	sshClient, err := ssh.NewClient(addr, sshConfig.Username, secret.Data["private-key"])
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	proxyIp, present := os.LookupEnv("CMA_NEXUS_PROXY_IP")
@@ -73,11 +73,7 @@ func RunSshCommand(kubeClient client.Client,
 		}
 	}
 
-	if output == nil {
-		return "", err
-	} else {
-		return string(output[:]), err
-	}
+	return output, err
 }
 
 var IpAddr sshCommand = func(client *ssh.Client, kubeClient client.Client,
@@ -504,4 +500,44 @@ var KubeadmJoin = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	return nil, nil
+}
+
+var GetKubeConfig = func(client *ssh.Client, kubeClient client.Client,
+	machineInstance *clusterv1alpha1.Machine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("Get kubeconfig")
+
+	bout := bufio.NewWriter(os.Stdout)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stdout writer")
+		}
+	}(bout)
+
+	berr := bufio.NewWriter(os.Stderr)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stderr writer")
+		}
+	}(berr)
+
+	cr := ssh.CommandRunner{
+		Stdout: bout,
+		Stderr: berr,
+	}
+
+	// kubeadm check
+	kubeconfig, err := cr.GetOutput(
+		client.Client,
+		ssh.Command{Cmd: "cat /etc/kubernetes/admin.conf"},
+	)
+	if err != nil {
+		log.Error(err, "error getting kubeconfig")
+		return nil, err
+	}
+
+	return kubeconfig, nil
 }
