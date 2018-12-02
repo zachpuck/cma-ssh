@@ -1,10 +1,10 @@
 package ssh
 
 import (
+	"golang.org/x/crypto/ssh"
 	"io"
 	"net"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
-	"golang.org/x/crypto/ssh"
 )
 
 // Client contains the underlying net.Conn and an ssh.Client for the conn.
@@ -64,7 +64,6 @@ func (c *CommandRunner) GetOutput(client *ssh.Client, cmd Command) ([]byte, erro
 	return c.execWithOutput(client, cmd)
 }
 
-
 func (c *CommandRunner) exec(client *ssh.Client, cmd Command) error {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("ssh exec()")
@@ -108,5 +107,5 @@ func (c *CommandRunner) execWithOutput(client *ssh.Client, cmd Command) ([]byte,
 	session.Stdin = cmd.Stdin
 	session.Stderr = c.Stderr
 	out, err := session.Output(cmd.Cmd)
-	return out,nil
+	return out, nil
 }

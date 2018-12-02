@@ -1,0 +1,14 @@
+apiVersion: v1
+appVersion: 0.1.0
+description: A Helm chart for CMA SSH provisioner
+name: cma-ssh
+version: 0.1.0
+keywords:
+- cma
+- ssh
+home: https://github.com/samsung-cnct/cma-ssh
+sources:
+- https://github.com/samsung-cnct/cma-ssh
+maintainers:
+- name: maratoid
+  email: maratoid@gmail.com

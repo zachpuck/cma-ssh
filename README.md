@@ -1,4 +1,17 @@
-Andrew's local setup for testing ssh
+### Build:
+
+Build for local OSX dev:
+
+```
+make -f build/Makefile darwin
+```
+
+CRDs are generated in `./crd`  
+RBAC is generated in `./rbac`
+
+Helm chart under `./deployments/helm/cma-ssh` gets updated with the right CRDs and RBAC
+
+### Andrew's local setup for testing ssh
 
 create a centos7 virtualbox vm with host-only networking
 

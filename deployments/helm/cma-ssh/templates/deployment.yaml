@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cma-ssh.fullname" . }}
+  labels:
+    helm.sh/chart: {{ include "cma-ssh.chart" . }}
+    app.kubernetes.io/name: {{ include "cma-ssh.name" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | replace "+" "_" | trunc 63 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "cma-ssh.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "cma-ssh.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      {{- if .Values.rbac }}
+      serviceAccountName: {{ include "cma-ssh.name" . }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.images.operator.repository }}:{{ .Values.images.operator.tag }}"
+          imagePullPolicy: {{ .Values.images.operator.pullPolicy }}
+          env:
+            - name: CMA_NEXUS_PROXY_IP
+              value: "{{ .Values.airgapProxyIp }}"
+            - name: CMA_BOOTSTRAP_IMAGE
+              value: "{{ .Values.images.bootstrap.repository }}:{{ .Values.images.bootstrap.tag }}"
+          command: ["./cma-ssh"]
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}

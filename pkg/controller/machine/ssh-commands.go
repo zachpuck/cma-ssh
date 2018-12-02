@@ -28,7 +28,7 @@ type sshCommand func(client *ssh.Client, kubeClient client.Client,
 
 func RunSshCommand(kubeClient client.Client,
 	machineInstance *clusterv1alpha1.Machine,
-	command sshCommand, commandArgs map[string]string) (string, error)  {
+	command sshCommand, commandArgs map[string]string) (string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("RunSshCommand()")
 
@@ -53,13 +53,13 @@ func RunSshCommand(kubeClient client.Client,
 		return "", err
 	}
 
-	proxyIp, present := os.LookupEnv("CMA_NEXUS_IP")
+	proxyIp, present := os.LookupEnv("CMA_NEXUS_PROXY_IP")
 	if !present {
 		// TODO: this is not great...
 		proxyIp = "182.195.81.113"
 	}
 
-	templateInfo := boostrapConfigInfo {
+	templateInfo := boostrapConfigInfo{
 		ProxyIp: proxyIp,
 	}
 
@@ -80,8 +80,7 @@ func RunSshCommand(kubeClient client.Client,
 	}
 }
 
-
-var IpAddr sshCommand = func (client *ssh.Client, kubeClient client.Client,
+var IpAddr sshCommand = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.Machine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
 	cr := &ssh.CommandRunner{}
@@ -92,7 +91,7 @@ var IpAddr sshCommand = func (client *ssh.Client, kubeClient client.Client,
 	)
 }
 
-var InstallNginx = func (client *ssh.Client, kubeClient client.Client,
+var InstallNginx = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.Machine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
 	logf.SetLogger(logf.ZapLogger(false))
@@ -105,7 +104,7 @@ var InstallNginx = func (client *ssh.Client, kubeClient client.Client,
 
 	nginxConf, err := asset.Assets.Open("/etc/nginx/nginx.conf")
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 
 	buf, err := ioutil.ReadAll(nginxConf)
@@ -158,7 +157,7 @@ var InstallNginx = func (client *ssh.Client, kubeClient client.Client,
 		client.Client,
 		ssh.Command{Cmd: "cat - > /etc/yum.repos.d/centos7.repo", Stdin: bytes.NewReader(configParsedCentos.Bytes())},
 		ssh.Command{Cmd: "yum install nginx -y"},
-		ssh.Command{Cmd: "cat - > /etc/nginx/nginx.conf", Stdin:  bytes.NewReader(configParsedNginx.Bytes())},
+		ssh.Command{Cmd: "cat - > /etc/nginx/nginx.conf", Stdin: bytes.NewReader(configParsedNginx.Bytes())},
 		ssh.Command{Cmd: "systemctl restart nginx"},
 		ssh.Command{Cmd: "systemctl enable nginx"},
 	)
@@ -166,7 +165,7 @@ var InstallNginx = func (client *ssh.Client, kubeClient client.Client,
 	return nil, err
 }
 
-var InstallDocker = func (client *ssh.Client, kubeClient client.Client,
+var InstallDocker = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.Machine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
 	logf.SetLogger(logf.ZapLogger(false))
@@ -187,7 +186,6 @@ var InstallDocker = func (client *ssh.Client, kubeClient client.Client,
 			log.Error(err, "could not flush os.Stderr writer")
 		}
 	}(berr)
-
 
 	cr := ssh.CommandRunner{
 		Stdout: bout,
@@ -232,7 +230,7 @@ var InstallDocker = func (client *ssh.Client, kubeClient client.Client,
 	)
 }
 
-var InstallKubernetes = func (client *ssh.Client, kubeClient client.Client,
+var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.Machine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
 	logf.SetLogger(logf.ZapLogger(false))
@@ -311,9 +309,9 @@ var InstallKubernetes = func (client *ssh.Client, kubeClient client.Client,
 	err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "docker cp " + string(bootstrapImageId[:]) +
-			":/rpms/" + clusterInstance.Spec.KubernetesVersion + " /etc/kubernetes/rpms"},
+			":/resources/rpms/" + clusterInstance.Spec.KubernetesVersion + " /etc/kubernetes/rpms"},
 		ssh.Command{Cmd: "docker cp " + string(bootstrapImageId[:]) +
-			":/yaml/kube-flannel.yml /etc/kubernetes/kube-flannel.yml"  },
+			":/resources/yaml/kube-flannel.yml /etc/kubernetes/kube-flannel.yml"},
 		ssh.Command{Cmd: "createrepo /etc/kubernetes/rpms"},
 		ssh.Command{Cmd: "cat - > /etc/yum.repos.d/kubernetes-local.repo", Stdin: k8sRepo},
 		ssh.Command{Cmd: "yum --disablerepo='*' --enablerepo=kubernetes-local -y install kubelet"},
@@ -332,7 +330,7 @@ var InstallKubernetes = func (client *ssh.Client, kubeClient client.Client,
 	return nil, nil
 }
 
-var KubeadmInit = func (client *ssh.Client, kubeClient client.Client,
+var KubeadmInit = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.Machine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
 	logf.SetLogger(logf.ZapLogger(false))
@@ -382,7 +380,7 @@ var KubeadmInit = func (client *ssh.Client, kubeClient client.Client,
 	return nil, nil
 }
 
-var CheckKubeadm = func (client *ssh.Client, kubeClient client.Client,
+var CheckKubeadm = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.Machine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
 	logf.SetLogger(logf.ZapLogger(false))
@@ -422,7 +420,7 @@ var CheckKubeadm = func (client *ssh.Client, kubeClient client.Client,
 	return nil, nil
 }
 
-var KubeadmTokenCreate = func (client *ssh.Client, kubeClient client.Client,
+var KubeadmTokenCreate = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.Machine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
 	logf.SetLogger(logf.ZapLogger(false))
@@ -462,7 +460,7 @@ var KubeadmTokenCreate = func (client *ssh.Client, kubeClient client.Client,
 	return token, nil
 }
 
-var KubeadmJoin = func (client *ssh.Client, kubeClient client.Client,
+var KubeadmJoin = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.Machine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
 	logf.SetLogger(logf.ZapLogger(false))
@@ -485,7 +483,7 @@ var KubeadmJoin = func (client *ssh.Client, kubeClient client.Client,
 	}(berr)
 
 	token := commandArgs["token"]
-	master := commandArgs["master"]+ ":" + common.ApiEnpointPort
+	master := commandArgs["master"] + ":" + common.ApiEnpointPort
 
 	cr := ssh.CommandRunner{
 		Stdout: bout,

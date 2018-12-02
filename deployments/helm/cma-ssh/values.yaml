@@ -1,0 +1,30 @@
+replicaCount: 1
+images:
+   operator:
+      repository: quay.io/samsung_cnct/cma-ssh
+      tag: 0.1.0
+      pullPolicy: IfNotPresent
+   bootstrap:
+      repository: quay.io/samsung_cnct/cma-ssh-bootstrap
+      tag: 0.1.0
+      pullPolicy: IfNotPresent
+
+# airgap proxy ip
+airgapProxyIp: '182.195.81.113'
+
+# short resource name override
+nameOverride: ''
+
+# long resource name override
+fullnameOverride: ''
+
+# keep CRDs installed after a release deletion
+keepCRDs: false
+
+# install RBAC resources
+rbac: true
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

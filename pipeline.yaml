@@ -1,0 +1,20 @@
+type: chart
+builds:
+  - image: samsung_cnct/cma-ssh
+    context: cma-ssh
+    chart: cma-ssh
+    tagValue: images.operator.tag
+    dockerContext: .
+  - image: samsung_cnct/cma-ssh-bootstrap
+    context: bootstrap
+    chart: cma-ssh
+    tagValue: images.bootstrap.tag
+    dockerContext: .
+deployments:
+  - chart: cma-ssh
+    timeout: 600
+    retries: 2
+    setAppVersion: true
+    release: cma-ssh
+prod:
+  doDeploy: none

@@ -88,4 +88,3 @@ func GetMaster(machines []clusterv1alpha1.Machine) (*clusterv1alpha1.Machine, er
 
 	return nil, fmt.Errorf("could not find master node")
 }
-

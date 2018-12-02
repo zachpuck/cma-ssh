@@ -1,0 +1,12 @@
+{{ $root := . }}
+{{- if .Values.keepCRDs }}
+{{- range tuple "CRD-protected/cluster_v1alpha1_cluster.yaml" "CRD-protected/cluster_v1alpha1_machine.yaml" }}
+---
+{{ tpl ($root.Files.Get .) $root }}
+{{- end }}
+{{- else }}
+{{- range tuple "CRD/cluster_v1alpha1_cluster.yaml" "CRD/cluster_v1alpha1_machine.yaml" }}
+---
+{{ tpl ($root.Files.Get .) $root }}
+{{- end }}
+{{- end }}
