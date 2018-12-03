@@ -28,6 +28,23 @@ helm install deployments/helm/cma-ssh --name cma-ssh --set images.bootstrap.tag=
 
 Yum repo will be served on `http://<NODE-IP>:30005`
 
+If you are running locally with VMs and a minikube cluster hosting the bootstrap repo, your `NODE-IP` is no going to be accessible from virtual machines.
+
+Run
+
+```
+socat -v tcp-listen:30005,fork tcp:<NODE-IP>:30005 &
+```
+
+to forward all tcp traffic from your ip over to host-only adapter of minkiube on `NODE-IP`
+
+kill background socat process with
+
+```
+kill -9 $(ps | grep [s]ocat | awk '{ print $1 }')
+```
+
+
 ### Andrew's local setup for testing ssh
 
 create a centos7 virtualbox vm with host-only networking
