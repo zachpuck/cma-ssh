@@ -209,6 +209,7 @@ var InstallNginx = func(client *ssh.Client, kubeClient client.Client,
 		ssh.Command{Cmd: "cat - > /etc/nginx/nginx.conf", Stdin: bytes.NewReader(configParsedNginx.Bytes())},
 		ssh.Command{Cmd: "systemctl restart nginx"},
 		ssh.Command{Cmd: "systemctl enable nginx"},
+		ssh.Command{Cmd: "echo -e '\n127.0.0.1   registry-1.docker.io gcr.io k8s.gcr.io quay.io\n' >> /etc/hosts"},
 	)
 
 	return nil, err
