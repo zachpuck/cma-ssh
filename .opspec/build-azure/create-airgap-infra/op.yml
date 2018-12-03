@@ -1,0 +1,73 @@
+name: build-azure/create-airgap-infra
+description: create 3 test nodes in azure for airgap environment
+inputs:
+  subscriptionId:
+    string:
+      constraints: { minLength: 1 }
+      description: id of azure subscription
+  loginId:
+    string:
+      constraints: { minLength: 1 }
+      description: id of user, service principal, or app to login with
+  loginSecret:
+    string:
+      constraints: { minLength: 1 }
+      description: secret of user, service principal, or app to login with
+      isSecret: true
+  name:
+    string:
+      constraints: { minLength: 1 }
+      description: name of the api management service
+  location:
+    string:
+      constraints: { minLength: 1 }
+      description: location of the api management service
+      default: westus
+  loginType:
+    string:
+      constraints: { minLength: 1 }
+      default: sp
+  loginTenantId:
+    string:
+      constraints: { minLength: 1 }
+  sshKeyValue:
+    file:
+      description: ssh public key value for provisioned vm
+  sshPrivateKey:
+    file:
+      description: ssh private key for provisioned vm
+outputs:
+  controlPlaneIP:
+    string:
+      description: public ip address of control plane
+  nodeIP:
+    string:
+      description: public ip address of node
+  nginxIP:
+    string:
+      description: public ip of nginx proxy
+version: 0.0.1
+run:
+  serial:
+  - container:
+      image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
+      cmd: [ /cmd.sh ]
+      dirs:
+        /nginx-configs:
+      files:
+        /cmd.sh:
+        /sshKeyValue: $(sshKeyValue)
+        /privateKey: $(sshPrivateKey)
+        /controlPlaneIP: $(controlPlaneIP)
+        /nodeIP: $(nodeIP)
+        /nginxIP: $(nginxIP)
+      envVars:
+        subscriptionId:
+        loginId:
+        loginSecret:
+        loginTenantId:
+        loginType:
+        resourceGroup: $(name)-group
+        name:
+        image: CentOS
+        adminUsername: centos

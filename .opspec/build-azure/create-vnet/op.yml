@@ -1,0 +1,52 @@
+name: build-azure/create-vnet
+description: create a virtual network in azure
+inputs:
+  subscriptionId:
+    string:
+      constraints: { minLength: 1 }
+      description: id of azure subscription
+  loginId:
+    string:
+      constraints: { minLength: 1 }
+      description: id of user, service principal, or app to login with
+  loginSecret:
+    string:
+      constraints: { minLength: 1 }
+      description: secret of user, service principal, or app to login with
+      isSecret: true
+  name:
+    string:
+      constraints: { minLength: 1 }
+      description: name of the api management service
+  location:
+    string:
+      constraints: { minLength: 1 }
+      description: location of the api management service
+      default: westus
+  loginType:
+    string:
+      constraints: { minLength: 1 }
+      default: sp
+  loginTenantId:
+    string:
+      constraints: { minLength: 1 }
+outputs:
+  subnetID:
+    string:
+      description: default subnet ID of the recently created vnet
+version: 0.0.1
+run:
+  container:
+    image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
+    cmd: [ /cmd.sh ]
+    files:
+      /cmd.sh:
+      /subnetID: $(subnetID)
+    envVars:
+      subscriptionId:
+      loginId:
+      loginSecret:
+      loginTenantId:
+      loginType:
+      resourceGroup: $(name)-group
+      name:
