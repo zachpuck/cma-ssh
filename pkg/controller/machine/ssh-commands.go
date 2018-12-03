@@ -83,9 +83,9 @@ func RunSshCommand(kubeClient client.Client,
 	if err != nil {
 		switch err.(type) {
 		case *crypto.ExitMissingError:
-			log.Error(err, "command exited without status", "command")
+			log.Error(err, "command exited without status", "command", command)
 		case *crypto.ExitError:
-			log.Error(err, "command exited with failing status")
+			log.Error(err, "command exited with failing status", "command", command)
 		}
 	}
 
@@ -241,15 +241,6 @@ var InstallDocker = func(client *ssh.Client, kubeClient client.Client,
 		Stderr: berr,
 	}
 
-	isDockerInstalled, err := cr.GetOutput(client.Client, ssh.Command{Cmd: "rpm -qa 'docker*'"})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(isDockerInstalled) > 0 {
-		return nil, nil
-	}
-
 	dockerConf, err := asset.Assets.Open("/etc/docker/daemon.json")
 	if err != nil {
 		return nil, err
@@ -271,7 +262,10 @@ var InstallDocker = func(client *ssh.Client, kubeClient client.Client,
 	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
 	return nil, cr.Run(
 		client.Client,
-		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " docker -y"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " audit -y"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " device-mapper-persistent-data -y"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " lvm2 -y"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " docker-ce docker-ce-selinux -y"},
 		ssh.Command{Cmd: "mkdir -p /etc/docker"},
 		ssh.Command{Cmd: "cat - > /etc/docker/daemon.json", Stdin: bytes.NewReader(configParsedDocker.Bytes())},
 		ssh.Command{Cmd: "mkdir -p /etc/systemd/system/docker.service.d"},
@@ -334,25 +328,20 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 		return nil, err
 	}
 
-	// run docker copy commands and kubernetes install commands
+	// run kubernetes install commands
 	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
 	k8sVersion := clusterInstance.Spec.KubernetesVersion
-	err = cr.Run(
+	return nil, cr.Run(
 		client.Client,
-		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubelet-" + k8sVersion},
-		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubectl-" + k8sVersion},
-		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubeadm-" + k8sVersion},
 		ssh.Command{Cmd: "cat - > /etc/sysctl.d/k8s.conf", Stdin: k8sConf},
 		ssh.Command{Cmd: "sysctl --system"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubelet-" + k8sVersion + " -y"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubectl-" + k8sVersion + " -y"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubeadm-" + k8sVersion + " -y"},
+		ssh.Command{Cmd: "sed -i 's/cgroup-driver=systemd/cgroup-driver=cgroupfs/g' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf"},
 		ssh.Command{Cmd: "systemctl enable kubelet"},
-		ssh.Command{Cmd: "systemctl start kubelet"},
+		ssh.Command{Cmd: "systemctl restart kubelet"},
 	)
-	if err != nil {
-		log.Error(err, "error running docker copy and kubernetes install")
-		return nil, err
-	}
-
-	return nil, nil
 }
 
 var KubeadmInit = func(client *ssh.Client, kubeClient client.Client,
@@ -391,20 +380,14 @@ var KubeadmInit = func(client *ssh.Client, kubeClient client.Client,
 
 	// kubeadm init
 	bootstrapRepoUrl := "http://" + templateData.BootstrapIp + ":" + templateData.BootstrapPort
-	err = cr.Run(
+	return nil, cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "kubeadm init --pod-network-cidr=" +
 			clusterInstance.Spec.ClusterNetwork.Pods.CIDRBlock +
-			"--kubernetes-version=" + clusterInstance.Spec.KubernetesVersion},
+			" --kubernetes-version=" + clusterInstance.Spec.KubernetesVersion},
 		ssh.Command{Cmd: "wget --directory-prefix=/etc/kubernetes " + bootstrapRepoUrl + "/download/kube-flannel.yml"},
 		ssh.Command{Cmd: "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f /etc/kubernetes/kube-flannel.yml --force=true"},
 	)
-	if err != nil {
-		log.Error(err, "error kubeadm init")
-		return nil, err
-	}
-
-	return nil, nil
 }
 
 var CheckKubeadm = func(client *ssh.Client, kubeClient client.Client,
@@ -435,16 +418,10 @@ var CheckKubeadm = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// kubeadm check
-	err := cr.Run(
+	return nil, cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "which kubeadm"},
 	)
-	if err != nil {
-		log.Error(err, "error kubeadm check")
-		return nil, err
-	}
-
-	return nil, nil
 }
 
 var KubeadmTokenCreate = func(client *ssh.Client, kubeClient client.Client,

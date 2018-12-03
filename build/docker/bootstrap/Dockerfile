@@ -7,8 +7,10 @@ RUN yum update -y \
 
 # all baked kubernetes versions
 ARG K8S_VERSIONS="1.10.6 1.11.2"
-# helm version
+# helm versions
 ARG HELM_VERSIONS="v2.11.0"
+# docker version
+ARG DOCKER_VERSION="17.03.3.ce-1.el7"
 
 # add docker repo, add kubernetes repo
 RUN yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo \
@@ -25,9 +27,10 @@ RUN helmversions=($HELM_VERSIONS); k8sversions=($K8S_VERSIONS); for ver in ${ver
     && for ver in ${k8sversions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/k8s-${ver} kubeadm-${ver}; done \
     && for ver in ${k8sversions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/k8s-${ver} kubelet-${ver}; done \
     && for ver in ${k8sversions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/k8s-${ver} kubernetes-cni; done \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker audit \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker device-mapper-persistent-data \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker lvm2 \
-    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker-ce \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker-ce-${DOCKER_VERSION} docker-ce-selinux-${DOCKER_VERSION} \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/nginx nginx \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/curl curl \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/wget wget \

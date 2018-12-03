@@ -33,7 +33,7 @@ If you are running locally with VMs and a minikube cluster hosting the bootstrap
 Run
 
 ```
-socat -v tcp-listen:30005,fork tcp:<NODE-IP>:30005 &
+socat tcp-listen:30005,fork tcp:<NODE-IP>:30005 &
 ```
 
 to forward all tcp traffic from your ip over to host-only adapter of minkiube on `NODE-IP`
