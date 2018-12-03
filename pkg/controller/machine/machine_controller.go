@@ -269,10 +269,15 @@ func (r *ReconcileMachine) updateStatus(machineInstance *clusterv1alpha1.Machine
 	machineFreshInstance.Status.KubernetesVersion = machineInstance.Status.KubernetesVersion
 	machineFreshInstance.Status.LastUpdated = &metav1.Time{Time: time.Now()}
 
+	err = r.Update(context.Background(), machineFreshInstance)
+	if err != nil {
+		return err
+	}
+
 	r.Eventf(machineFreshInstance, eventType,
 		string(event), string(eventMessage), args...)
 
-	return r.Update(context.Background(), machineFreshInstance)
+	return nil
 }
 
 func getCluster(c client.Client, namespace string, clusterName string) (*clusterv1alpha1.Cluster, error) {
@@ -295,8 +300,14 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) 
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller preBootstrap()")
 
+	// Setup bootstrap repo
+	_, err := RunSshCommand(r.Client, machineInstance, InstallBootstrapRepo, make(map[string]string))
+	if err != nil {
+		return err
+	}
+
 	// install local nginx proxy
-	_, err := RunSshCommand(r.Client, machineInstance, InstallNginx, make(map[string]string))
+	_, err = RunSshCommand(r.Client, machineInstance, InstallNginx, make(map[string]string))
 	if err != nil {
 		return err
 	}
@@ -455,13 +466,11 @@ func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 
 	// start bootstrap command (or pre upgrade etc)
 	opResult := make(chan error)
-	defer close(opResult)
-
 	timer := time.NewTimer(10 * time.Minute)
-	defer timer.Stop()
 
 	go func(ch chan<- error) {
 		ch <- op(r, machineInstance)
+		close(opResult)
 	}(opResult)
 
 	go func() {
@@ -482,6 +491,7 @@ func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 				if err != nil {
 					log.Error(err, "could not update status of machine", "machine", machineInstance)
 				}
+				timer.Stop()
 				return
 			case err := <-opResult:
 				// if finished with error

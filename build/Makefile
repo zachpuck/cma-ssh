@@ -91,15 +91,23 @@ new-dep:
 dep-ensure:
 	$(DEPCMD) ensure
 
-# Build the docker image
-docker-build:
+docker-build-operator:
 	docker build $(PROJECTDIR) -f $(PROJECTDIR)/build/docker/cma-ssh/Dockerfile -t $(DOCKERTAG)
-	docker build $(PROJECTDIR) -f $(PROJECTDIR)/build/docker/bootstrap/Dockerfile -t $(BOOTSTRAPDOCKERTAG)
+
+docker-build-bootstrap:
+	docker build $(PROJECTDIR)/build/docker/bootstrap -f $(PROJECTDIR)/build/docker/bootstrap/Dockerfile -t $(BOOTSTRAPDOCKERTAG)
+
+# Build the docker image
+docker-build: docker-build-operator docker-build-bootstrap
+
+docker-push-operator:
+	docker push ${DOCKERTAG}
+
+docker-push-bootstrap:
+	docker push ${BOOTSTRAPDOCKERTAG}
 
 # Push the docker image
-docker-push:
-	docker push ${DOCKERTAG}
-	docker push ${BOOTSTRAPDOCKERTAG}
+docker-push: docker-push-bootstrap docker-push-operator
 	@echo Install chart with local tags:
 	@echo helm install deployments/helm/cma-ssh --name cma-ssh \\
 	@echo --set images.operator.tag=$(VERSIONFILE)-local \\

@@ -19,7 +19,9 @@ import (
 )
 
 type boostrapConfigInfo struct {
-	ProxyIp string
+	ProxyIp       string
+	BootstrapIp   string
+	BootstrapPort string
 }
 
 type sshCommand func(client *ssh.Client, kubeClient client.Client,
@@ -59,8 +61,22 @@ func RunSshCommand(kubeClient client.Client,
 		proxyIp = "182.195.81.113"
 	}
 
+	bootstrapIp, present := os.LookupEnv("CMA_BOOTSTRAP_IP")
+	if !present {
+		// TODO: this is not great...
+		bootstrapIp = "192.168.64.24"
+	}
+
+	bootstrapPort, present := os.LookupEnv("CMA_BOOTSTRAP_PORT")
+	if !present {
+		// TODO: this is not great...
+		bootstrapPort = "30005"
+	}
+
 	templateInfo := boostrapConfigInfo{
-		ProxyIp: proxyIp,
+		ProxyIp:       proxyIp,
+		BootstrapIp:   bootstrapIp,
+		BootstrapPort: bootstrapPort,
 	}
 
 	output, err := command(sshClient, kubeClient, machineInstance, templateInfo, commandArgs)
@@ -87,45 +103,27 @@ var IpAddr sshCommand = func(client *ssh.Client, kubeClient client.Client,
 	)
 }
 
-var InstallNginx = func(client *ssh.Client, kubeClient client.Client,
+var InstallBootstrapRepo = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.Machine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
 	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("Install nginx command")
+	log := logf.Log.WithName("Install bootstrap repo command")
 
-	centosConf, err := asset.Assets.Open("/etc/yum.repos.d/centos7.repo")
-	if err != nil {
-		return nil, err
-	}
-
-	nginxConf, err := asset.Assets.Open("/etc/nginx/nginx.conf")
+	bootstrapConf, err := asset.Assets.Open("/etc/yum.repos.d/bootstrap.repo")
 	if err != nil {
 		return nil, err
 	}
 
-	buf, err := ioutil.ReadAll(nginxConf)
+	buf, err := ioutil.ReadAll(bootstrapConf)
 	if err != nil {
 		return nil, err
 	}
-	configTemplateNginx, err := template.New("nginx-config").Parse(string(buf[:]))
+	configTemplateBootstrap, err := template.New("bootstrap-config").Parse(string(buf[:]))
 	if err != nil {
 		return nil, err
 	}
-	var configParsedNginx bytes.Buffer
-	if err := configTemplateNginx.Execute(&configParsedNginx, templateData); err != nil {
-		return nil, err
-	}
-
-	buf, err = ioutil.ReadAll(centosConf)
-	if err != nil {
-		return nil, err
-	}
-	configTemplateCentos, err := template.New("centos-config").Parse(string(buf[:]))
-	if err != nil {
-		return nil, err
-	}
-	var configParsedCentos bytes.Buffer
-	if err := configTemplateCentos.Execute(&configParsedCentos, templateData); err != nil {
+	var configParsedBootstrap bytes.Buffer
+	if err := configTemplateBootstrap.Execute(&configParsedBootstrap, templateData); err != nil {
 		return nil, err
 	}
 
@@ -149,10 +147,65 @@ var InstallNginx = func(client *ssh.Client, kubeClient client.Client,
 		Stderr: berr,
 	}
 
+	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
 	err = cr.Run(
 		client.Client,
-		ssh.Command{Cmd: "cat - > /etc/yum.repos.d/centos7.repo", Stdin: bytes.NewReader(configParsedCentos.Bytes())},
-		ssh.Command{Cmd: "yum install nginx -y"},
+		ssh.Command{Cmd: "cat - > /etc/yum.repos.d/" + bootstrapRepoName + ".repo",
+			Stdin: bytes.NewReader(configParsedBootstrap.Bytes())},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " wget -y"},
+	)
+
+	return nil, err
+}
+
+var InstallNginx = func(client *ssh.Client, kubeClient client.Client,
+	machineInstance *clusterv1alpha1.Machine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("Install nginx command")
+
+	nginxConf, err := asset.Assets.Open("/etc/nginx/nginx.conf")
+	if err != nil {
+		return nil, err
+	}
+
+	buf, err := ioutil.ReadAll(nginxConf)
+	if err != nil {
+		return nil, err
+	}
+	configTemplateNginx, err := template.New("nginx-config").Parse(string(buf[:]))
+	if err != nil {
+		return nil, err
+	}
+	var configParsedNginx bytes.Buffer
+	if err := configTemplateNginx.Execute(&configParsedNginx, templateData); err != nil {
+		return nil, err
+	}
+
+	bout := bufio.NewWriter(os.Stdout)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stdout writer")
+		}
+	}(bout)
+	berr := bufio.NewWriter(os.Stderr)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stderr writer")
+		}
+	}(berr)
+
+	cr := ssh.CommandRunner{
+		Stdout: bout,
+		Stderr: berr,
+	}
+
+	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
+	err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " nginx -y"},
 		ssh.Command{Cmd: "cat - > /etc/nginx/nginx.conf", Stdin: bytes.NewReader(configParsedNginx.Bytes())},
 		ssh.Command{Cmd: "systemctl restart nginx"},
 		ssh.Command{Cmd: "systemctl enable nginx"},
@@ -215,8 +268,10 @@ var InstallDocker = func(client *ssh.Client, kubeClient client.Client,
 		return nil, err
 	}
 
+	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
 	return nil, cr.Run(
 		client.Client,
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " docker -y"},
 		ssh.Command{Cmd: "mkdir -p /etc/docker"},
 		ssh.Command{Cmd: "cat - > /etc/docker/daemon.json", Stdin: bytes.NewReader(configParsedDocker.Bytes())},
 		ssh.Command{Cmd: "mkdir -p /etc/systemd/system/docker.service.d"},
@@ -265,32 +320,10 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 		return nil, err
 	}
 
-	bootstrapImage, present := os.LookupEnv("CMA_BOOTSTRAP_IMAGE")
-	if !present {
-		// TODO: this is not great...
-		bootstrapImage = "quay.io/samsung_cnct/cma-ssh-bootstrap:latest"
-	}
-
-	// pull bootstrap image and get a docker image id to copy from
-	bootstrapImageId, err := cr.GetOutput(
-		client.Client,
-		ssh.Command{Cmd: "docker create " + bootstrapImage})
-	if err != nil {
-		log.Error(err, "error pulling boostrap image")
-		return nil, err
-	}
-
 	// get the kubernetes version to use
 	clusterInstance, err := getCluster(kubeClient, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
 	if err != nil {
 		log.Error(err, "error getting cluster instance")
-		return nil, err
-	}
-
-	// read in kubernetes local repo source
-	k8sRepo, err := asset.Assets.Open("/etc/yum.repos.d/kubernetes-local.repo")
-	if err != nil {
-		log.Error(err, "error reading kubernetes yum repo config")
 		return nil, err
 	}
 
@@ -302,17 +335,13 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// run docker copy commands and kubernetes install commands
+	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
+	k8sVersion := clusterInstance.Spec.KubernetesVersion
 	err = cr.Run(
 		client.Client,
-		ssh.Command{Cmd: "docker cp " + string(bootstrapImageId[:]) +
-			":/resources/rpms/" + clusterInstance.Spec.KubernetesVersion + " /etc/kubernetes/rpms"},
-		ssh.Command{Cmd: "docker cp " + string(bootstrapImageId[:]) +
-			":/resources/yaml/kube-flannel.yml /etc/kubernetes/kube-flannel.yml"},
-		ssh.Command{Cmd: "createrepo /etc/kubernetes/rpms"},
-		ssh.Command{Cmd: "cat - > /etc/yum.repos.d/kubernetes-local.repo", Stdin: k8sRepo},
-		ssh.Command{Cmd: "yum --disablerepo='*' --enablerepo=kubernetes-local -y install kubelet"},
-		ssh.Command{Cmd: "yum --disablerepo='*' --enablerepo=kubernetes-local -y install kubectl"},
-		ssh.Command{Cmd: "yum --disablerepo='*' --enablerepo=kubernetes-local -y install kubeadm"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubelet-" + k8sVersion},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubectl-" + k8sVersion},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubeadm-" + k8sVersion},
 		ssh.Command{Cmd: "cat - > /etc/sysctl.d/k8s.conf", Stdin: k8sConf},
 		ssh.Command{Cmd: "sysctl --system"},
 		ssh.Command{Cmd: "systemctl enable kubelet"},
@@ -361,11 +390,13 @@ var KubeadmInit = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// kubeadm init
+	bootstrapRepoUrl := "http://" + templateData.BootstrapIp + ":" + templateData.BootstrapPort
 	err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "kubeadm init --pod-network-cidr=" +
 			clusterInstance.Spec.ClusterNetwork.Pods.CIDRBlock +
 			"--kubernetes-version=" + clusterInstance.Spec.KubernetesVersion},
+		ssh.Command{Cmd: "wget --directory-prefix=/etc/kubernetes " + bootstrapRepoUrl + "/download/kube-flannel.yml"},
 		ssh.Command{Cmd: "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f /etc/kubernetes/kube-flannel.yml --force=true"},
 	)
 	if err != nil {

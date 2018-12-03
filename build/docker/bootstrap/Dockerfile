@@ -1,6 +1,5 @@
-FROM centos:7 as builder
+FROM centos:7 as downloader
 
-# setup sudo and other tools (for testing only)
 RUN yum update -y \
     && yum install epel-release -y \
     && yum install yum-utils wget -y \
@@ -9,7 +8,7 @@ RUN yum update -y \
 # all baked kubernetes versions
 ARG K8S_VERSIONS="1.10.6 1.11.2"
 # helm version
-ARG HELM_VERSION=v2.11.0
+ARG HELM_VERSIONS="v2.11.0"
 
 # add kubernetes repo
 RUN echo -e '[kubernetes]\n\
@@ -26,20 +25,37 @@ RUN mkdir -p /var/tmp/yaml \
     && mkdir -p /var/tmp/rpm
 
 # donwload all k8s rpms and helm
-RUN versions=($K8S_VERSIONS); for ver in ${versions[*]}; do mkdir -p /var/tmp/${ver}; done \
-    && for ver in ${versions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/${ver} kubectl-${ver}; done \
-    && for ver in ${versions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/${ver} kubeadm-${ver}; done \
-    && for ver in ${versions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/${ver} kubelet-${ver}; done \
-    && for ver in ${versions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/${ver} kubernetes-cni; done \
+RUN helmversions=($HELM_VERSIONS); k8sversions=($K8S_VERSIONS); for ver in ${versions[*]}; do mkdir -p /var/tmp/${ver}; done \
+    && for ver in ${k8sversions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/k8s-${ver} kubectl-${ver}; done \
+    && for ver in ${k8sversions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/k8s-${ver} kubeadm-${ver}; done \
+    && for ver in ${k8sversions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/k8s-${ver} kubelet-${ver}; done \
+    && for ver in ${k8sversions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/k8s-${ver} kubernetes-cni; done \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/nginx nginx \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/curl curl \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/wget wget \
     && wget --directory-prefix=/var/tmp/yaml https://raw.githubusercontent.com/coreos/flannel/v0.10.0/Documentation/kube-flannel.yml \
-    && wget --directory-prefix=/var/tmp/bin https://storage.googleapis.com/kubernetes-helm/helm-${HELM_VERSION}-linux-amd64.tar.gz
+    && for ver in ${helmversions[*]}; do wget --directory-prefix=/var/tmp/bin/${ver} https://storage.googleapis.com/kubernetes-helm/helm-${ver}-linux-amd64.tar.gz; done
 
-FROM centos:7.4.1708
+# application image
+FROM centos:7
 
-RUN mkdir -p /resources/yaml \
-    && mkdir -p /resources/rpms \
-    && mkdir -p /resources/bin
+RUN yum -y install epel-release && \
+    yum -y update && \
+    yum -y install createrepo yum-utils nginx && \
+    yum clean all
 
-COPY --from=builder /var/tmp/rpm /resources/rpms
-COPY --from=builder /var/tmp/yaml /resources/yaml
-COPY --from=builder /var/tmp/bin /resources/bin
+RUN mkdir /yum && \
+    chmod 777 /yum && \
+    mkdir -p /static && \
+    chmod 777 /static
+
+
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY --from=downloader /var/tmp/rpm/ /yum
+COPY --from=downloader /var/tmp/yaml/ /static
+COPY --from=downloader /var/tmp/bin/ /static
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod 700 /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]

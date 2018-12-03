@@ -2,13 +2,13 @@ package k8sutil
 
 import (
 	"context"
+	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func GetSecretList(c client.Client, options *client.ListOptions) ([]corev1.Secret, error) {

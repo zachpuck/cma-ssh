@@ -6,7 +6,7 @@ metadata:
   name: master
 spec:
   # Add fields here
-  clusterref: cluster-sample
+  clusterref: cluster
   roles:
     - etcd
     - master
@@ -24,7 +24,7 @@ metadata:
   name: worker
 spec:
   # Add fields here
-  clusterref: cluster-sample
+  clusterref: cluster
   roles:
   - worker
   sshconfig:

@@ -4,7 +4,7 @@ builds:
     context: cma-ssh
     chart: cma-ssh
     tagValue: images.operator.tag
-    dockerContext: .
+    dockerContext: build/docker/bootstrap
   - image: samsung_cnct/cma-ssh-bootstrap
     context: bootstrap
     chart: cma-ssh

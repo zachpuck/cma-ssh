@@ -9,8 +9,13 @@ images:
       tag: 0.1.0
       pullPolicy: IfNotPresent
 
-# airgap proxy ip
-airgapProxyIp: '182.195.81.113'
+# installation settings
+install:
+   operator: true
+   bootstrap: true
+   bootstrapPort: 30005
+   bootstrapIp: '192.168.64.24'
+   airgapProxyIp: '182.195.81.113'
 
 # short resource name override
 nameOverride: ''
