@@ -11,6 +11,23 @@ RBAC is generated in `./rbac`
 
 Helm chart under `./deployments/helm/cma-ssh` gets updated with the right CRDs and RBAC
 
+### using bootstrap yum repo
+
+Build docker containers
+
+```
+make -f build/Makefile docker-build
+make -f build/Makefile docker-push
+```
+
+Install boostrap proxy into the fake command cluster:
+
+```
+helm install deployments/helm/cma-ssh --name cma-ssh --set images.bootstrap.tag=0.1.4-local --set install.operator=false
+```
+
+Yum repo will be served on `http://<NODE-IP>:30005`
+
 ### Andrew's local setup for testing ssh
 
 create a centos7 virtualbox vm with host-only networking
