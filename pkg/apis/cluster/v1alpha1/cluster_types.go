@@ -47,7 +47,7 @@ type ClusterNetworkingConfig struct {
 
 // NetworkRanges represents ranges of network addresses.
 type NetworkRanges struct {
-	CIDRBlocks []string `json:"cidrBlocks"`
+	CIDRBlock string `json:"cidrBlock"`
 }
 
 // ClusterStatus defines the observed state of Cluster

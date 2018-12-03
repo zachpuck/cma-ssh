@@ -1,0 +1,22 @@
+{{- if .Values.install.bootstrap }}
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: {{ include "cma-ssh.name" . }}-bootstrap
+    helm.sh/chart: {{ include "cma-ssh.chart" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | replace "+" "_" | trunc 63 }}
+  name: {{ include "cma-ssh.fullname" . }}-bootstrap
+spec:
+  # Provides options for the service so chart users have the full choice
+  type: NodePort
+  ports:
+    - targetPort: 80
+      port: 80
+      nodePort: {{ .Values.install.bootstrapPort }}
+  selector:
+    app: {{ include "cma-ssh.name" . }}-bootstrap
+    release: {{ .Release.Name }}
+{{- end }}

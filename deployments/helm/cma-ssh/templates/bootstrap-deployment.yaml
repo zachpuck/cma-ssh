@@ -1,0 +1,46 @@
+{{- if .Values.install.bootstrap }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cma-ssh.fullname" . }}-bootstrap
+  labels:
+    helm.sh/chart: {{ include "cma-ssh.chart" . }}
+    app.kubernetes.io/name: {{ include "cma-ssh.name" . }}-bootstrap
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | replace "+" "_" | trunc 63 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "cma-ssh.name" . }}-bootstrap
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "cma-ssh.name" . }}-bootstrap
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}-bootstrap
+          image: "{{ .Values.images.bootstrap.repository }}:{{ .Values.images.bootstrap.tag }}"
+          imagePullPolicy: {{ .Values.images.bootstrap.pullPolicy }}
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          command: ["./entrypoint.sh"]
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+{{- end }}

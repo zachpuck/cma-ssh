@@ -208,10 +208,15 @@ func (r *ReconcileCluster) updateStatus(clusterInstance *clusterv1alpha1.Cluster
 	clusterFreshInstance.Status.APIEndpoint = clusterInstance.Status.APIEndpoint
 	clusterFreshInstance.ObjectMeta.Finalizers = clusterInstance.ObjectMeta.Finalizers
 
+	err = r.Update(context.Background(), clusterFreshInstance)
+	if err != nil {
+		return err
+	}
+
 	r.Eventf(clusterFreshInstance, eventType,
 		string(event), string(eventMessage), args...)
 
-	return r.Update(context.Background(), clusterFreshInstance)
+	return nil
 }
 
 func getClusterMachineList(c client.Client, clusterName string) ([]clusterv1alpha1.Machine, error) {

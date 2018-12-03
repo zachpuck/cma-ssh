@@ -1,0 +1,70 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: clusters.cluster.sds.samsung.com
+spec:
+  group: cluster.sds.samsung.com
+  names:
+    kind: Cluster
+    plural: clusters
+  scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          type: object
+        spec:
+          properties:
+            clusterNetwork:
+              properties:
+                pods:
+                  properties:
+                    cidrBlock:
+                      type: string
+                  required:
+                  - cidrBlock
+                  type: object
+                serviceDomain:
+                  type: string
+                services:
+                  properties:
+                    cidrBlock:
+                      type: string
+                  required:
+                  - cidrBlock
+                  type: object
+              required:
+              - services
+              - pods
+              - serviceDomain
+              type: object
+            kubernetesVersion:
+              type: string
+          required:
+          - clusterNetwork
+          - kubernetesVersion
+          type: object
+        status:
+          properties:
+            apiendpoint:
+              type: string
+            lastUpdated:
+              format: date-time
+              type: string
+            phase:
+              type: string
+          type: object
+  version: v1alpha1
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

@@ -1,0 +1,15 @@
+apiVersion: cluster.sds.samsung.com/v1alpha1
+kind: Cluster
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: cluster
+spec:
+  # Add fields here
+  clusterNetwork:
+    services:
+      cidrBlock: "10.96.0.0/12"
+    pods:
+      cidrBlock: "10.244.0.0/16"
+    serviceDomain: "cluster.local"
+  kubernetesVersion: 1.10.6

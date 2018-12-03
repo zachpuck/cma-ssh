@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 )
@@ -74,4 +75,16 @@ func RemoveString(slice []string, s string) (result []string) {
 		result = append(result, item)
 	}
 	return
+}
+
+func GetMaster(machines []clusterv1alpha1.Machine) (*clusterv1alpha1.Machine, error) {
+	for _, item := range machines {
+		for _, role := range item.Spec.Roles {
+			if role == common.MachineRoleMaster {
+				return &item, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("could not find master node")
 }

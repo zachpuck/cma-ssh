@@ -18,10 +18,11 @@ bin
 !vendor/**/zz_generated.*
 
 # editor and IDE paraphernalia
-.idea
-*.swp
-*.swo
-*~
+*.out
+/cma-ssh
+.idea/
+dist/
+Go_build_*
 
 #opctl
 args.yml

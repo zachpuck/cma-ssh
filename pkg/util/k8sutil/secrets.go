@@ -2,10 +2,12 @@ package k8sutil
 
 import (
 	"context"
-	"github.com/cloudflare/cfssl/log"
+	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
@@ -75,6 +77,9 @@ func CreateSecret(c client.Client, secret *corev1.Secret) error {
 }
 
 func GetSSHSecret(c client.Client, name string, namespace string) ([]byte, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("k8sutil secrets GetSSHSecret()")
+
 	secretResult, err := GetSecret(c, name, namespace)
 	if secretResult.Type != corev1.SecretTypeOpaque {
 		log.Error(err, "secret is not of type ", corev1.SecretTypeOpaque, ", but rather is of type -->", secretResult.Type, "<--")
@@ -120,30 +125,36 @@ func DeleteKubeconfigSecret(c client.Client, name string, namespace string) erro
 	return DeleteSecret(c, name, namespace)
 }
 
-func CreateKubeconfigSecret(c client.Client, name string, namespace string, kubeconfig []byte) error {
+func CreateKubeconfigSecret(c client.Client, clusterInstance *clusterv1alpha1.Cluster,
+	scheme *runtime.Scheme, kubeconfig []byte) error {
+
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("k8sutil secrets CreateKubeconfigSecret()")
-
-	labelMap := make(map[string]string)
-	labelMap["cmassh"] = "true"
-	labelMap["kubeconfig"] = "true"
 
 	dataMap := make(map[string][]byte)
 	dataMap[corev1.ServiceAccountKubeconfigKey] = kubeconfig
 
 	secret := &corev1.Secret{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      name + "-kubeconfig",
-			Namespace: namespace,
-			Labels:    labelMap,
+			Name:      clusterInstance.GetName() + "-kubeconfig",
+			Namespace: clusterInstance.GetNamespace(),
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: dataMap,
 	}
 
-	err := CreateSecret(c, secret)
+	err := controllerutil.SetControllerReference(clusterInstance, secret, scheme)
 	if err != nil {
-		log.Error(err, "failed to create kubeconfig secret for cluster in ", "namespace", namespace)
+		log.Error(err, "failed to set controller reference on secret",
+			"controller", clusterInstance,
+			"secret", secret)
+		return err
+	}
+
+	err = CreateSecret(c, secret)
+	if err != nil {
+		log.Error(err, "failed to create kubeconfig secret",
+			"secret", secret)
 		return err
 	}
 

@@ -1,10 +1,9 @@
 package ssh
 
 import (
+	"golang.org/x/crypto/ssh"
 	"io"
 	"net"
-
-	"golang.org/x/crypto/ssh"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
@@ -61,38 +60,52 @@ func (c *CommandRunner) Run(client *ssh.Client, cmds ...Command) error {
 	return c.err
 }
 
-const proxy = "http://192.168.99.1:3128"
-
-var proxyEnvs = []string{"http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY"}
+func (c *CommandRunner) GetOutput(client *ssh.Client, cmd Command) ([]byte, error) {
+	return c.execWithOutput(client, cmd)
+}
 
 func (c *CommandRunner) exec(client *ssh.Client, cmd Command) error {
 	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("pkg/ssh: exec")
+	log := logf.Log.WithName("ssh exec()")
 
-	log.Info("running command on remote host", cmd, client.RemoteAddr())
 	session, err := client.NewSession()
 	if err != nil {
 		return err
 	}
-	defer session.Close()
-
-	for _, proxyEnv := range proxyEnvs {
-		if err := session.Setenv(proxyEnv, proxy); err != nil {
-			log.Error(err, "make sure AcceptEnv is set for remote host in /etc/ssh/sshd_config", proxyEnv)
+	defer func(session *ssh.Session) {
+		err := session.Close()
+		if err != nil {
+			log.Error(err, "Could not close session after command", "command", cmd)
 		}
-	}
+	}(session)
 
 	session.Stdin = cmd.Stdin
 	session.Stdout = c.Stdout
 	session.Stderr = c.Stderr
-	if err := session.Run(cmd.Cmd); err != nil {
-		switch e := err.(type) {
-		case *ssh.ExitMissingError:
-			log.Info("comand exitted without status", e)
-		case *ssh.ExitError:
-			log.Info("command unsuccessful", e.String())
-		}
+	err = session.Run(cmd.Cmd)
+	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func (c *CommandRunner) execWithOutput(client *ssh.Client, cmd Command) ([]byte, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("ssh execWithOutput()")
+
+	session, err := client.NewSession()
+	if err != nil {
+		return nil, err
+	}
+	defer func(session *ssh.Session) {
+		err := session.Close()
+		if err != nil {
+			log.Error(err, "Could not close session after command", "command", cmd)
+		}
+	}(session)
+
+	session.Stdin = cmd.Stdin
+	session.Stderr = c.Stderr
+	out, err := session.Output(cmd.Cmd)
+	return out, nil
 }
