@@ -37,7 +37,7 @@ inputs:
   k8sVersion:
     string:
       constraints: { minLength: 1 }
-      default: 1.11.4
+      default: 1.11.5
   clusterAccountId:
     string:
       constraints: { minLength: 1 }

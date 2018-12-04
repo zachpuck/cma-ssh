@@ -1,0 +1,51 @@
+name: build-azure/create-ssh-secret
+description: creates an ssh secret the client clusters
+inputs:
+  name:
+    string:
+      constraints: { minLength: 1 }
+      description: name of test environment
+  kubeConfig:
+    string:
+      constraints: { minLength: 1 }
+      description: kubeConfig for aks cluster
+  secretYaml:
+    file:
+      description: secret yaml file to be applied
+      default: /secret.yaml
+  sshPrivateKey:
+    file:
+      description: ssh private key
+run:
+  serial:
+    - op:
+        ref: github.com/opspec-pkgs/base64.encode#1.1.0
+        inputs:
+          rawValue: $(sshPrivateKey)
+        outputs:
+          encodedValue:
+    - op:
+        ref: github.com/opspec-pkgs/envsubst#2.0.0
+        inputs:
+          template: $(secretYaml)
+          variables:
+            {
+              privateKey: $(encodedValue),
+              name: $(name)
+            }
+        outputs:
+          result:
+    - container:
+        image: { ref: 'opspecpkgs/k8s.configuration.apply:2.1.0' }
+        cmd: [ /cmd.sh ]
+        files:
+          /cmd.sh:
+          /root/.kube/config: $(kubeConfig)
+        envVars:
+          namespace: $(name)
+    - op:
+        ref: github.com/opspec-pkgs/k8s.configuration.apply#2.1.0
+        inputs:
+          configuration: $(result)
+          kubeConfig:
+          namespace: $(name)

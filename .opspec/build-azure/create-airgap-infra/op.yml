@@ -36,6 +36,10 @@ inputs:
   sshPrivateKey:
     file:
       description: ssh private key for provisioned vm
+  dockerConfigs:
+    dir:
+      description: docker config files
+      default: /docker-configs
 outputs:
   controlPlaneIP:
     string:
@@ -43,31 +47,61 @@ outputs:
   nodeIP:
     string:
       description: public ip address of node
-  nginxIP:
+  proxyIP:
     string:
-      description: public ip of nginx proxy
+      description: public ip of proxy
 version: 0.0.1
 run:
   serial:
-  - container:
-      image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
-      cmd: [ /cmd.sh ]
-      dirs:
-        /nginx-configs:
-      files:
-        /cmd.sh:
-        /sshKeyValue: $(sshKeyValue)
-        /privateKey: $(sshPrivateKey)
-        /controlPlaneIP: $(controlPlaneIP)
-        /nodeIP: $(nodeIP)
-        /nginxIP: $(nginxIP)
-      envVars:
-        subscriptionId:
-        loginId:
-        loginSecret:
-        loginTenantId:
-        loginType:
-        resourceGroup: $(name)-group
-        name:
-        image: CentOS
-        adminUsername: centos
+    - container:
+        image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
+        cmd: [ /cmd.sh ]
+        files:
+          /cmd.sh:
+          /sshKeyValue: $(sshKeyValue)
+          /privateKey: $(sshPrivateKey)
+          /controlPlaneIP: $(controlPlaneIP)
+          /nodeIP: $(nodeIP)
+          /proxyIP: $(proxyIP)
+        envVars:
+          subscriptionId:
+          loginId:
+          loginSecret:
+          loginTenantId:
+          loginType:
+          resourceGroup: $(name)-group
+          name:
+          image: CentOS
+          adminUsername: centos
+    - container:
+        image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
+        cmd: [ /enable-root.sh ]
+        dirs:
+          /docker-configs: $(dockerConfigs)
+        files:
+          /enable-root.sh:
+          /privateKey: $(sshPrivateKey)
+        envVars:
+          subscriptionId:
+          loginId:
+          loginSecret:
+          loginTenantId:
+          loginType:
+          resourceGroup: $(name)-group
+          name:
+    - container:
+        image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
+        cmd: [ /setup-docker.sh ]
+        dirs:
+          /docker-configs: $(dockerConfigs)
+        files:
+          /setup-docker.sh:
+          /privateKey: $(sshPrivateKey)
+        envVars:
+          subscriptionId:
+          loginId:
+          loginSecret:
+          loginTenantId:
+          loginType:
+          resourceGroup: $(name)-group
+          name:
