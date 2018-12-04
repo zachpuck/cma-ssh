@@ -56,8 +56,6 @@ run:
     - container:
         image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
         cmd: [ /cmd.sh ]
-        dirs:
-          /nginx-configs:
         files:
           /cmd.sh:
           /sshKeyValue: $(sshKeyValue)
@@ -75,6 +73,22 @@ run:
           name:
           image: CentOS
           adminUsername: centos
+    - container:
+        image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
+        cmd: [ /enable-root.sh ]
+        dirs:
+          /docker-configs: $(dockerConfigs)
+        files:
+          /enable-root.sh:
+          /privateKey: $(sshPrivateKey)
+        envVars:
+          subscriptionId:
+          loginId:
+          loginSecret:
+          loginTenantId:
+          loginType:
+          resourceGroup: $(name)-group
+          name:
     - container:
         image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
         cmd: [ /setup-docker.sh ]
