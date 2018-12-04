@@ -37,12 +37,9 @@ run:
           result:
     - container:
         image: { ref: 'opspecpkgs/k8s.configuration.apply:2.1.0' }
-        cmd:
-          - sh
-          - -ce
-          - |
-            kubectl create namespace $namespace
+        cmd: [ /cmd.sh ]
         files:
+          /cmd.sh:
           /root/.kube/config: $(kubeConfig)
         envVars:
           namespace: $(name)

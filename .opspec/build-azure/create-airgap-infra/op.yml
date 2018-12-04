@@ -36,10 +36,10 @@ inputs:
   sshPrivateKey:
     file:
       description: ssh private key for provisioned vm
-  nginxConfigs:
+  dockerConfigs:
     dir:
-      description: nginx config files
-      default: /nginx-configs
+      description: docker config files
+      default: /docker-configs
 outputs:
   controlPlaneIP:
     string:
@@ -47,9 +47,9 @@ outputs:
   nodeIP:
     string:
       description: public ip address of node
-  nginxIP:
+  proxyIP:
     string:
-      description: public ip of nginx proxy
+      description: public ip of proxy
 version: 0.0.1
 run:
   serial:
@@ -64,7 +64,7 @@ run:
           /privateKey: $(sshPrivateKey)
           /controlPlaneIP: $(controlPlaneIP)
           /nodeIP: $(nodeIP)
-          /nginxIP: $(nginxIP)
+          /proxyIP: $(proxyIP)
         envVars:
           subscriptionId:
           loginId:
@@ -75,23 +75,13 @@ run:
           name:
           image: CentOS
           adminUsername: centos
-    - op:
-        ref: github.com/opspec-pkgs/envsubst-dir#2.0.0
-        inputs:
-          templates: $(nginxConfigs)
-          variables:
-            {
-              proxyPassIP: $(nginxIP)
-            }
-        outputs:
-          result:
     - container:
         image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
-        cmd: [ /setup-nginx.sh ]
+        cmd: [ /setup-docker.sh ]
         dirs:
-          /nginx-configs: $(result)
+          /docker-configs: $(dockerConfigs)
         files:
-          /setup-nginx.sh:
+          /setup-docker.sh:
           /privateKey: $(sshPrivateKey)
         envVars:
           subscriptionId:

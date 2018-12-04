@@ -23,13 +23,13 @@ echo "setting default subscription"
 az account set --subscription "$subscriptionId"
 ### end login
 
-echo "checking for existing nginx proxy"
+echo "checking for existing proxy"
 if [ "$(az vm show --resource-group "$resourceGroup" --name "$name-proxy")" != "" ]
 then
-  echo "found exiting nginx proxy"
+  echo "found exiting proxy"
   az vm show -g $resourceGroup -n $name-proxy -d --query publicIps --out tsv > /nginxIP
 else
-    echo "creating nginx proxy vm"
+    echo "creating proxy vm"
     az vm create -n $name-proxy \
     -g $resourceGroup \
     --image $image \
