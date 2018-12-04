@@ -49,6 +49,7 @@ inputs:
     string:
       constraints: { minLength: 1 }
       description: password of clusterAccountId
+
 outputs:
   controlPlaneIP:
     string:
@@ -59,54 +60,72 @@ outputs:
 version: 0.0.1
 run:
   serial:
+#  - op:
+#      ref: github.com/opspec-pkgs/azure.group.create#2.1.0
+#      inputs:
+#        loginId:
+#        loginSecret:
+#        name: $(name)-group
+#        subscriptionId:
+#        location:
+#        loginTenantId:
+#        loginType:
+#  - op:
+#      ref: build-azure/create-vnet
+#      inputs:
+#        subscriptionId:
+#        loginId:
+#        loginSecret:
+#        loginTenantId:
+#        loginType:
+#        location:
+#        name:
+#      outputs:
+#        subnetID:
+#  # creates a cmc cluster in azure using aks
+#  - op:
+#      ref: build-azure/create-aks
+#      inputs:
+#        subscriptionId:
+#        loginId:
+#        loginSecret:
+#        name:
+#        location:
+#        loginType:
+#        loginTenantId:
+#        sshKeyValue:
+#        k8sVersion:
+#        clusterAccountId:
+#        clusterAccountSecret:
+#        vnetSubnetID: $(subnetID)
+#  # create test vms and nginx proxy
+#  - op:
+#      ref: build-azure/create-airgap-infra
+#      inputs:
+#        subscriptionId:
+#        loginId:
+#        loginSecret:
+#        name:
+#        location:
+#        loginType:
+#        loginTenantId:
+#        sshKeyValue:
+#        sshPrivateKey:
   - op:
-      ref: github.com/opspec-pkgs/azure.group.create#2.1.0
+      ref: github.com/opspec-pkgs/azure.aks.get-kubeconfig#1.1.0
       inputs:
         loginId:
         loginSecret:
-        name: $(name)-group
-        subscriptionId:
-        location:
-        loginTenantId:
-        loginType:
-  - op:
-      ref: build-azure/create-vnet
-      inputs:
-        subscriptionId:
-        loginId:
-        loginSecret:
-        loginTenantId:
-        loginType:
-        location:
         name:
+        resourceGroup: $(name)-group
+        subscriptionId:
+        loginTenantId:
+        loginType:
       outputs:
-        subnetID:
-  # creates a cmc cluster in azure using aks
+        kubeConfig:
   - op:
-      ref: build-azure/create-aks
+      ref: build-azure/create-ssh-secret
       inputs:
-        subscriptionId:
-        loginId:
-        loginSecret:
         name:
-        location:
-        loginType:
-        loginTenantId:
-        sshKeyValue:
-        k8sVersion:
-        clusterAccountId:
-        clusterAccountSecret:
-        vnetSubnetID: $(subnetID)
-  # create test vms and nginx proxy
-  - op:
-      ref: build-azure/create-airgap-infra
-      inputs:
-        subscriptionId:
-        loginId:
-        loginSecret:
-        name:
-        location:
-        loginType:
-        loginTenantId:
-        sshKeyValue:
+        kubeConfig:
         sshPrivateKey:
