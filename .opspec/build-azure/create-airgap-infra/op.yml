@@ -36,6 +36,10 @@ inputs:
   sshPrivateKey:
     file:
       description: ssh private key for provisioned vm
+  nginxConfigs:
+    dir:
+      description: nginx config files
+      default: /nginx-configs
 outputs:
   controlPlaneIP:
     string:
@@ -49,25 +53,51 @@ outputs:
 version: 0.0.1
 run:
   serial:
-  - container:
-      image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
-      cmd: [ /cmd.sh ]
-      dirs:
-        /nginx-configs:
-      files:
-        /cmd.sh:
-        /sshKeyValue: $(sshKeyValue)
-        /privateKey: $(sshPrivateKey)
-        /controlPlaneIP: $(controlPlaneIP)
-        /nodeIP: $(nodeIP)
-        /nginxIP: $(nginxIP)
-      envVars:
-        subscriptionId:
-        loginId:
-        loginSecret:
-        loginTenantId:
-        loginType:
-        resourceGroup: $(name)-group
-        name:
-        image: CentOS
-        adminUsername: centos
+    - container:
+        image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
+        cmd: [ /cmd.sh ]
+        dirs:
+          /nginx-configs:
+        files:
+          /cmd.sh:
+          /sshKeyValue: $(sshKeyValue)
+          /privateKey: $(sshPrivateKey)
+          /controlPlaneIP: $(controlPlaneIP)
+          /nodeIP: $(nodeIP)
+          /nginxIP: $(nginxIP)
+        envVars:
+          subscriptionId:
+          loginId:
+          loginSecret:
+          loginTenantId:
+          loginType:
+          resourceGroup: $(name)-group
+          name:
+          image: CentOS
+          adminUsername: centos
+    - op:
+        ref: github.com/opspec-pkgs/envsubst-dir#2.0.0
+        inputs:
+          templates: $(nginxConfigs)
+          variables:
+            {
+              proxyPassIP: $(nginxIP)
+            }
+        outputs:
+          result:
+    - container:
+        image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
+        cmd: [ /setup-nginx.sh ]
+        dirs:
+          /nginx-configs: $(result)
+        files:
+          /setup-nginx.sh:
+          /privateKey: $(sshPrivateKey)
+        envVars:
+          subscriptionId:
+          loginId:
+          loginSecret:
+          loginTenantId:
+          loginType:
+          resourceGroup: $(name)-group
+          name:

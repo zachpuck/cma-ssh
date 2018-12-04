@@ -92,31 +92,3 @@ fi
 #az network nsg rule create -n kubernetesAPIAccess -g $resourceGroup --nsg-name $name-cpNSG  --priority 101 --destination-port-ranges 443 > /dev/null
 
 # TODO: remove SSH inbound ports from control plane and node
-
-echo "get nginx public IP"
-nginxIP=$(az vm show -g $resourceGroup -n $name-proxy -d --query publicIps --out tsv)
-
-echo "envsubst default.conf"
-apk update && apk add gettext
-export proxyPassIP=$nginxIP
-envsubst  '${proxyPassIP}' </nginx-configs/default.conf
-
-echo "install nginx"
-ssh -o "StrictHostKeyChecking no" -i /privateKey centos@$nginxIP \
-    'export TERM=xterm;
-    sudo sed -i /etc/selinux/config -r -e "s/^SELINUX=.*/SELINUX=disabled/g";
-    sudo setenforce 0;
-    sudo yum install -y epel-release;
-    sudo yum install -y nginx'
-
-echo "copy nginx-configs config files to proxy"
-scp -i /privateKey -r  /nginx-configs centos@$nginxIP:~/
-
-echo "start nginx service"
-ssh -o "StrictHostKeyChecking no" -i /privateKey centos@$nginxIP \
-    'export TERM=xterm;
-    sudo mv ~/nginx-configs/nginx.conf /etc/nginx;
-    sudo mv ~/nginx-configs/* /etc/nginx/conf.d;
-    sudo chown root:root /etc/nginx/nginx.conf;
-    sudo chown root:root /etc/nginx/conf.d/*;
-    sudo systemctl start nginx'
