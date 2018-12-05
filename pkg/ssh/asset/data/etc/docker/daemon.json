@@ -1,14 +1,14 @@
 {
-	"insecure-registries": [
-   		"docker",
-		"docker.io",
-		"registry-1.docker.io",
-		"gcr.io",
-		"k8s.gcr.io",
-		"quay.io",
-		"{{.ProxyIp}}:9401",
-		"{{.ProxyIp}}:9402",
-		"{{.ProxyIp}}:9403",
-		"{{.ProxyIp}}:9404"
-	]
+  "insecure-registries": [
+    "docker",
+    "docker.io",
+    "registry-1.docker.io",
+    "gcr.io",
+    "k8s.gcr.io",
+    "quay.io",
+    "{{.ProxyIp}}:9401",
+    "{{.ProxyIp}}:9402",
+    "{{.ProxyIp}}:9403",
+    "{{.ProxyIp}}:9404"
+  ]
 }

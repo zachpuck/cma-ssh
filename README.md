@@ -34,6 +34,7 @@ Run
 
 ```
 socat tcp-listen:30005,fork tcp:<NODE-IP>:30005 &
+CMA_BOOTSTRAP_IP=<YOUR-DEV-MACHINE-IP>
 ```
 
 to forward all tcp traffic from your ip over to host-only adapter of minkiube on `NODE-IP`

@@ -370,23 +370,19 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) 
 			return err
 		}
 
+		var token []byte
 		for {
 			// check if kubeadm is available
-			_, err = RunSshCommand(r.Client, masterMachine, CheckKubeadm, make(map[string]string))
+			// run kubeadm create token on master machine, get token back
+			token, err = RunSshCommand(r.Client, masterMachine, KubeadmTokenCreate, make(map[string]string))
 			if err != nil {
-				log.Info("Waiting for kubeadm to be available on master machine",
+				log.Info("Waiting for kubeadm to be able to create a token",
 					"machine", masterMachine)
 				time.Sleep(3 * time.Second)
 			} else {
 				// break out of wait loop
 				break
 			}
-		}
-
-		// run kubeadm create token on master machine, get token back
-		token, err := RunSshCommand(r.Client, masterMachine, KubeadmTokenCreate, make(map[string]string))
-		if err != nil {
-			return err
 		}
 
 		// run kubeadm join on worker machine

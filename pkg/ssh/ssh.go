@@ -1,10 +1,10 @@
 package ssh
 
 import (
+	"bytes"
 	"golang.org/x/crypto/ssh"
 	"io"
 	"net"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 // Client contains the underlying net.Conn and an ssh.Client for the conn.
@@ -65,18 +65,13 @@ func (c *CommandRunner) GetOutput(client *ssh.Client, cmd Command) ([]byte, erro
 }
 
 func (c *CommandRunner) exec(client *ssh.Client, cmd Command) error {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("ssh exec()")
 
 	session, err := client.NewSession()
 	if err != nil {
 		return err
 	}
 	defer func(session *ssh.Session) {
-		err := session.Close()
-		if err != nil {
-			log.Error(err, "Could not close session after command", "command", cmd)
-		}
+		_ = session.Close()
 	}(session)
 
 	session.Stdin = cmd.Stdin
@@ -90,22 +85,17 @@ func (c *CommandRunner) exec(client *ssh.Client, cmd Command) error {
 }
 
 func (c *CommandRunner) execWithOutput(client *ssh.Client, cmd Command) ([]byte, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("ssh execWithOutput()")
 
 	session, err := client.NewSession()
 	if err != nil {
 		return nil, err
 	}
 	defer func(session *ssh.Session) {
-		err := session.Close()
-		if err != nil {
-			log.Error(err, "Could not close session after command", "command", cmd)
-		}
+		_ = session.Close()
 	}(session)
 
 	session.Stdin = cmd.Stdin
 	session.Stderr = c.Stderr
 	out, err := session.Output(cmd.Cmd)
-	return out, nil
+	return bytes.TrimSpace(out), nil
 }

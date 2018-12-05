@@ -12,6 +12,7 @@ images:
 # installation settings
 install:
    operator: true
+   crds: true
    bootstrap: true
    bootstrapPort: 30005
    bootstrapIp: '192.168.64.24'

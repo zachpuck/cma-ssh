@@ -11,24 +11,24 @@ spec:
     - etcd
     - master
   sshconfig:
-    host: 192.168.0.113
+    host: 192.168.1.170
     port: 22
     username: root
     secret: ssh-key
-#---
-#apiVersion: cluster.sds.samsung.com/v1alpha1
-#kind: Machine
-#metadata:
-#  labels:
-#    controller-tools.k8s.io: "1.0"
-#  name: worker
-#spec:
-#  # Add fields here
-#  clusterref: cluster
-#  roles:
-#  - worker
-#  sshconfig:
-#    host: 192.168.0.112
-#    port: 22
-#    username: root
-#    secret: ssh-key
+---
+apiVersion: cluster.sds.samsung.com/v1alpha1
+kind: Machine
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: worker
+spec:
+  # Add fields here
+  clusterref: cluster
+  roles:
+  - worker
+  sshconfig:
+    host: 192.168.1.166
+    port: 22
+    username: root
+    secret: ssh-key
