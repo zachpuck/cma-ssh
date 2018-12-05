@@ -1,4 +1,4 @@
-FROM centos:7 as downloader
+FROM centos:7.4.1708 as downloader
 
 RUN yum update -y \
     && yum install epel-release -y \
@@ -37,7 +37,7 @@ RUN helmversions=($HELM_VERSIONS); k8sversions=($K8S_VERSIONS); for ver in ${ver
     && for ver in ${helmversions[*]}; do wget --directory-prefix=/var/tmp/bin/${ver} https://storage.googleapis.com/kubernetes-helm/helm-${ver}-linux-amd64.tar.gz; done
 
 # application image
-FROM centos:7
+FROM centos:7.4.1708
 
 RUN yum -y install epel-release && \
     yum -y update && \
