@@ -1,8 +1,33 @@
+cma-ssh OPCTL README
+
 # opctl
 
 requires [opctl](https://opctl.io/docs/getting-started/opctl.html) installed
 
-# usage
+# Working with Azure
+
+2. create the ssh key pair (requires rsa and 2048 bit)
+    **no password**
+    `ssh-keygen -t rsa -b 2048 -f id_rsa`
+    
+1. create `args.yml` file
+    ```
+    touch .opspec/args.yml
+    ```
+    paste provided inputs in args file.
+
+2. run `opctl run build-azure` and wait for completion (about 10 to 15 minutes on first run)
+    *this can be run multiple times
+    
+    the kubeconfig for the cluster will be output to the repo's home directory named `<cluster-name>-kubeconfig.yaml`
+
+3) example helm install: `helm install deployments/helm/cma-ssh --name cma-ssh --set install.operator=false --set images.operator.tag=0.1.12-local --set images.bootstrap.tag=0.1.12-local --set install.bootstrapIp=10.240.0.6 --set install.airgapProxyIp=10.240.0.7`
+
+4) locally start operator `CMA_BOOTSTRAP_IP=10.240.0.6 CMA_NEXUS_PROXY_IP=10.240.0.7 ./cma-ssh`
+
+
+
+## older - local debug
 
 from repo root directory:
 
