@@ -34,7 +34,7 @@ spec:
             - name: CMA_BOOTSTRAP_IP
               value: "{{ .Values.install.bootstrapIp }}"
             - name: CMA_BOOTSTRAP_PORT
-              value: {{ .Values.install.bootstrapPort }}
+              value: "{{ .Values.install.bootstrapPort }}"
           command: ["./cma-ssh"]
           resources:
 {{ toYaml .Values.resources | indent 12 }}
