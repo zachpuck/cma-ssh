@@ -36,10 +36,11 @@ inputs:
   sshPrivateKey:
     file:
       description: ssh private key for provisioned vm
-  dockerConfigs:
-    dir:
-      description: docker config files
-      default: /docker-configs
+  centosImageVersion:
+    string:
+      constraints: { minLength: 1 }
+      description: version of centos to install (format publisher:Offer:Sku:Version)
+      default: OpenLogic:CentOS:7.4:latest
 version: 0.0.1
 run:
   serial:
@@ -72,14 +73,12 @@ run:
           loginType:
           resourceGroup: $(name)-group
           name:
-          image: CentOS
+          image: $(centosImageVersion)
           adminUsername: centos
           uuid:
     - container:
         image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
         cmd: [ /enable-root.sh ]
-        dirs:
-          /docker-configs: $(dockerConfigs)
         files:
           /enable-root.sh:
           /privateKey: $(sshPrivateKey)
