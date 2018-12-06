@@ -1,0 +1,15 @@
+name: build-azure/install-tiller
+description: install tiller on a cluster
+inputs:
+  kubeConfig:
+    file:
+      description: kubeconfig file for the target environment
+run:
+  serial:
+  - container:
+      image: { ref: 'dtzar/helm-kubectl' }
+      cmd: [ /cmd.sh ]
+      files:
+        /tiller.yaml:
+        /cmd.sh:
+        /root/.kube/config: $(kubeConfig)

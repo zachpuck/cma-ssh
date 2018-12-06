@@ -66,6 +66,7 @@ run:
       loginType:
       resourceGroup: $(name)-group
       name:
+      location:
       k8sVersion:
       clusterAccountId:
       clusterAccountSecret:

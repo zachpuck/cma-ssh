@@ -49,7 +49,11 @@ inputs:
     string:
       constraints: { minLength: 1 }
       description: password of clusterAccountId
-
+  centosImageVersion:
+    string:
+      constraints: { minLength: 1 }
+      description: version of centos to install (format publisher:Offer:Sku:Version)
+      default: OpenLogic:CentOS:7.4:latest
 outputs:
   controlPlaneIP:
     string:
@@ -111,6 +115,7 @@ run:
         loginTenantId:
         sshKeyValue:
         sshPrivateKey:
+        centosImageVersion:
   - op:
       ref: github.com/opspec-pkgs/azure.aks.get-kubeconfig#1.1.0
       inputs:
@@ -129,3 +134,7 @@ run:
         name:
         kubeConfig:
         sshPrivateKey:
+  - op:
+      ref: build-azure/install-tiller
+      inputs:
+        kubeConfig:

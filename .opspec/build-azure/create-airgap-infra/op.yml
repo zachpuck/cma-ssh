@@ -40,6 +40,11 @@ inputs:
     dir:
       description: docker config files
       default: /docker-configs
+  centosImageVersion:
+    string:
+      constraints: { minLength: 1 }
+      description: version of centos to install (format publisher:Offer:Sku:Version)
+      default: OpenLogic:CentOS:7.4:latest
 outputs:
   controlPlaneIP:
     string:
@@ -71,7 +76,7 @@ run:
           loginType:
           resourceGroup: $(name)-group
           name:
-          image: CentOS
+          image: $(centosImageVersion)
           adminUsername: centos
     - container:
         image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
