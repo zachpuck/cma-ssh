@@ -36,10 +36,6 @@ inputs:
   sshPrivateKey:
     file:
       description: ssh private key for provisioned vm
-  dockerConfigs:
-    dir:
-      description: docker config files
-      default: /docker-configs
 version: 0.0.1
 run:
   serial:
@@ -78,8 +74,6 @@ run:
     - container:
         image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
         cmd: [ /enable-root.sh ]
-        dirs:
-          /docker-configs: $(dockerConfigs)
         files:
           /enable-root.sh:
           /privateKey: $(sshPrivateKey)
