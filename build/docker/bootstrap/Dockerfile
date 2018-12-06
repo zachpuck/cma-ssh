@@ -1,4 +1,4 @@
-FROM centos:7 as downloader
+FROM centos:7.4.1708 as downloader
 
 RUN yum update -y \
     && yum install epel-release -y \
@@ -13,8 +13,7 @@ ARG HELM_VERSIONS="v2.11.0"
 ARG DOCKER_VERSION="17.03.3.ce-1.el7"
 
 # add docker repo, add kubernetes repo
-RUN yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo \
-    && yum-config-manager --add-repo https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+RUN yum-config-manager --add-repo https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
 
 # pre create folders
 RUN mkdir -p /var/tmp/yaml \
@@ -30,7 +29,7 @@ RUN helmversions=($HELM_VERSIONS); k8sversions=($K8S_VERSIONS); for ver in ${ver
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker audit \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker device-mapper-persistent-data \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker lvm2 \
-    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker-ce-${DOCKER_VERSION} docker-ce-selinux-${DOCKER_VERSION} \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/nginx nginx \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/curl curl \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/wget wget \
@@ -38,7 +37,7 @@ RUN helmversions=($HELM_VERSIONS); k8sversions=($K8S_VERSIONS); for ver in ${ver
     && for ver in ${helmversions[*]}; do wget --directory-prefix=/var/tmp/bin/${ver} https://storage.googleapis.com/kubernetes-helm/helm-${ver}-linux-amd64.tar.gz; done
 
 # application image
-FROM centos:7
+FROM centos:7.4.1708
 
 RUN yum -y install epel-release && \
     yum -y update && \

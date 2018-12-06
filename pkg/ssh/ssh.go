@@ -1,10 +1,10 @@
 package ssh
 
 import (
+	"bytes"
 	"golang.org/x/crypto/ssh"
 	"io"
 	"net"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 // Client contains the underlying net.Conn and an ssh.Client for the conn.
@@ -40,9 +40,10 @@ func NewClient(address, user string, privateKey []byte) (*Client, error) {
 }
 
 type CommandRunner struct {
-	Stdout io.Writer
-	Stderr io.Writer
-	err    error
+	Stdout     io.Writer
+	Stderr     io.Writer
+	err        error
+	currentCmd string
 }
 
 type Command struct {
@@ -50,62 +51,48 @@ type Command struct {
 	Stdin io.Reader
 }
 
-func (c *CommandRunner) Run(client *ssh.Client, cmds ...Command) error {
+func (c *CommandRunner) Run(client *ssh.Client, cmds ...Command) (string, error) {
 	for _, cmd := range cmds {
 		if c.err != nil {
-			return c.err
+			return c.currentCmd, c.err
 		}
-		c.err = c.exec(client, cmd)
+		c.currentCmd, c.err = c.exec(client, cmd)
 	}
-	return c.err
+	return c.currentCmd, c.err
 }
 
-func (c *CommandRunner) GetOutput(client *ssh.Client, cmd Command) ([]byte, error) {
+func (c *CommandRunner) GetOutput(client *ssh.Client, cmd Command) ([]byte, string, error) {
 	return c.execWithOutput(client, cmd)
 }
 
-func (c *CommandRunner) exec(client *ssh.Client, cmd Command) error {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("ssh exec()")
+func (c *CommandRunner) exec(client *ssh.Client, cmd Command) (string, error) {
 
 	session, err := client.NewSession()
 	if err != nil {
-		return err
+		return cmd.Cmd, err
 	}
-	defer func(session *ssh.Session) {
-		err := session.Close()
-		if err != nil {
-			log.Error(err, "Could not close session after command", "command", cmd)
-		}
-	}(session)
+	defer session.Close()
 
 	session.Stdin = cmd.Stdin
 	session.Stdout = c.Stdout
 	session.Stderr = c.Stderr
 	err = session.Run(cmd.Cmd)
 	if err != nil {
-		return err
+		return cmd.Cmd, err
 	}
-	return nil
+	return cmd.Cmd, nil
 }
 
-func (c *CommandRunner) execWithOutput(client *ssh.Client, cmd Command) ([]byte, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("ssh execWithOutput()")
+func (c *CommandRunner) execWithOutput(client *ssh.Client, cmd Command) ([]byte, string, error) {
 
 	session, err := client.NewSession()
 	if err != nil {
-		return nil, err
+		return nil, cmd.Cmd, err
 	}
-	defer func(session *ssh.Session) {
-		err := session.Close()
-		if err != nil {
-			log.Error(err, "Could not close session after command", "command", cmd)
-		}
-	}(session)
+	defer session.Close()
 
 	session.Stdin = cmd.Stdin
 	session.Stderr = c.Stderr
 	out, err := session.Output(cmd.Cmd)
-	return out, nil
+	return bytes.TrimSpace(out), cmd.Cmd, nil
 }
