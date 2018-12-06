@@ -1,0 +1,94 @@
+name: create-vm
+description: create vm with no internet access
+inputs:
+  subscriptionId:
+    string:
+      constraints: { minLength: 1 }
+      description: id of azure subscription
+  loginId:
+    string:
+      constraints: { minLength: 1 }
+      description: id of user, service principal, or app to login with
+  loginSecret:
+    string:
+      constraints: { minLength: 1 }
+      description: secret of user, service principal, or app to login with
+      isSecret: true
+  name:
+    string:
+      constraints: { minLength: 1 }
+      description: name of the api management service
+  location:
+    string:
+      constraints: { minLength: 1 }
+      description: location of the api management service
+      default: westus
+  loginType:
+    string:
+      constraints: { minLength: 1 }
+      default: sp
+  loginTenantId:
+    string:
+      constraints: { minLength: 1 }
+  sshKeyValue:
+    file:
+      description: ssh public key value for provisioned vm
+  sshPrivateKey:
+    file:
+      description: ssh private key for provisioned vm
+  dockerConfigs:
+    dir:
+      description: docker config files
+      default: /docker-configs
+version: 0.0.1
+run:
+  serial:
+    - op:
+        ref: github.com/opspec-pkgs/uuid.v4.generate#1.1.0
+        outputs:
+          uuid:
+    - op:
+        ref: github.com/opspec-pkgs/azure.group.create#2.1.0
+        inputs:
+          loginId:
+          loginSecret:
+          name: $(name)-group
+          subscriptionId:
+          location:
+          loginTenantId:
+          loginType:
+    - container:
+        image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
+        cmd: [ /cmd.sh ]
+        files:
+          /cmd.sh:
+          /sshKeyValue: $(sshKeyValue)
+          /privateKey: $(sshPrivateKey)
+        envVars:
+          subscriptionId:
+          loginId:
+          loginSecret:
+          loginTenantId:
+          loginType:
+          resourceGroup: $(name)-group
+          name:
+          image: CentOS
+          adminUsername: centos
+          uuid:
+    - container:
+        image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
+        cmd: [ /enable-root.sh ]
+        dirs:
+          /docker-configs: $(dockerConfigs)
+        files:
+          /enable-root.sh:
+          /privateKey: $(sshPrivateKey)
+        envVars:
+          subscriptionId:
+          loginId:
+          loginSecret:
+          loginTenantId:
+          loginType:
+          resourceGroup: $(name)-group
+          name:
+          uuid:
