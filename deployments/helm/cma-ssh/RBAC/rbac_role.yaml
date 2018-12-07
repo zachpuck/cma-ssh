@@ -14,17 +14,6 @@ rules:
   - cluster.sds.samsung.com
   resources:
   - clusters
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - machine.sds.samsung.com
-  resources:
   - machines
   verbs:
   - get
@@ -50,17 +39,6 @@ rules:
   - machine.sds.samsung.com
   resources:
   - machines
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - cluster.sds.samsung.com
-  resources:
   - clusters
   verbs:
   - get
