@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/samsung-cnct/cma-ssh/pkg/util/k8sutil"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"time"
 
 	"github.com/masterminds/semver"
@@ -122,7 +121,7 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 			log.Error(err, "could not find cluster "+machineInstance.Spec.ClusterRef)
 
 			machineInstance.Status.Phase = common.ErrorMachinePhase
-			err = r.updateStatus(machineInstance, false, corev1.EventTypeWarning, common.ErrResourceFailed,
+			err = r.updateStatus(machineInstance, corev1.EventTypeWarning, common.ErrResourceFailed,
 				common.MessageResourceFailed, machineInstance.GetName())
 			if err != nil {
 				log.Error(err, "could not update status of object machine", "machine", machineInstance)
@@ -199,7 +198,7 @@ func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.Machine
 	if util.ContainsString(machineInstance.Finalizers, clusterv1alpha1.MachineFinalizer) {
 		// update status to "deleting"
 		machineInstance.Status.Phase = common.DeletingMachinePhase
-		err := r.updateStatus(machineInstance, false, corev1.EventTypeNormal,
+		err := r.updateStatus(machineInstance, corev1.EventTypeNormal,
 			common.ResourceStateChange, common.MessageResourceStateChange,
 			machineInstance.GetName(), common.DeletingMachinePhase)
 		if err != nil {
@@ -225,7 +224,7 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.Machin
 
 	// update status to "upgrading"
 	machineInstance.Status.Phase = common.UpgradingMachinePhase
-	err := r.updateStatus(machineInstance, false, corev1.EventTypeNormal,
+	err := r.updateStatus(machineInstance, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.UpgradingMachinePhase)
 	if err != nil {
@@ -255,7 +254,7 @@ func (r *ReconcileMachine) handleCreate(machineInstance *clusterv1alpha1.Machine
 
 	// update status to "creating"
 	machineInstance.Status.Phase = common.ProvisioningMachinePhase
-	err := r.updateStatus(machineInstance, true, corev1.EventTypeNormal,
+	err := r.updateStatus(machineInstance, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.ProvisioningMachinePhase)
 	if err != nil {
@@ -269,7 +268,7 @@ func (r *ReconcileMachine) handleCreate(machineInstance *clusterv1alpha1.Machine
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileMachine) updateStatus(machineInstance *clusterv1alpha1.Machine, setControllerRef bool, eventType string,
+func (r *ReconcileMachine) updateStatus(machineInstance *clusterv1alpha1.Machine, eventType string,
 	event common.ControllerEvents, eventMessage common.ControllerEvents, args ...interface{}) error {
 
 	machineFreshInstance := &clusterv1alpha1.Machine{}
@@ -287,18 +286,6 @@ func (r *ReconcileMachine) updateStatus(machineInstance *clusterv1alpha1.Machine
 	machineFreshInstance.Status.Phase = machineInstance.Status.Phase
 	machineFreshInstance.Status.KubernetesVersion = machineInstance.Status.KubernetesVersion
 	machineFreshInstance.Status.LastUpdated = &metav1.Time{Time: time.Now()}
-
-	if setControllerRef {
-		clusterInstance, err := getCluster(r.Client, machineFreshInstance.GetNamespace(), machineFreshInstance.Spec.ClusterRef)
-		if err != nil {
-			return err
-		}
-
-		err = controllerutil.SetControllerReference(clusterInstance, machineFreshInstance, r.scheme)
-		if err != nil {
-			return err
-		}
-	}
 
 	err = r.Update(context.Background(), machineFreshInstance)
 	if err != nil {
@@ -434,7 +421,7 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) 
 	machineInstance.Status.Phase = common.ReadyMachinePhase
 	machineInstance.Status.KubernetesVersion = clusterInstance.Spec.KubernetesVersion
 
-	err = r.updateStatus(machineInstance, false, corev1.EventTypeNormal,
+	err = r.updateStatus(machineInstance, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.ReadyMachinePhase)
 	if err != nil {
@@ -456,7 +443,7 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (s
 	machineInstance.Status.Phase = common.ReadyMachinePhase
 	machineInstance.Status.KubernetesVersion = clusterInstance.Spec.KubernetesVersion
 
-	err = r.updateStatus(machineInstance, false, corev1.EventTypeNormal,
+	err = r.updateStatus(machineInstance, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.ReadyMachinePhase)
 	if err != nil {
@@ -478,7 +465,7 @@ func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (st
 
 	machineInstance.Finalizers =
 		util.RemoveString(machineInstance.Finalizers, clusterv1alpha1.MachineFinalizer)
-	err = r.updateStatus(machineInstance, false, corev1.EventTypeNormal,
+	err = r.updateStatus(machineInstance, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.DeletingMachinePhase)
 	if err != nil {
@@ -528,7 +515,7 @@ func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 
 				// set error status
 				machineInstance.Status.Phase = common.ErrorMachinePhase
-				err := r.updateStatus(machineInstance, false, corev1.EventTypeWarning,
+				err := r.updateStatus(machineInstance, corev1.EventTypeWarning,
 					common.ResourceStateChange, common.MessageResourceStateChange,
 					machineInstance.GetName(), common.ErrorMachinePhase)
 				if err != nil {
@@ -547,7 +534,7 @@ func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 
 			// set error status
 			machineInstance.Status.Phase = common.ErrorMachinePhase
-			err := r.updateStatus(machineInstance, false, corev1.EventTypeWarning,
+			err := r.updateStatus(machineInstance, corev1.EventTypeWarning,
 				common.ResourceStateChange, common.MessageResourceStateChange,
 				machineInstance.GetName(), common.ErrorMachinePhase)
 			if err != nil {

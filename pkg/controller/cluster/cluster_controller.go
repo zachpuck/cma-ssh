@@ -66,10 +66,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.Machine{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &clusterv1alpha1.Cluster{},
-	})
+	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.Machine{}},
+		&handler.EnqueueRequestsFromMapFunc{ToRequests: util.MachineToClusterMapper{Client: mgr.GetClient()}})
 	if err != nil {
 		return err
 	}
@@ -148,15 +146,30 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 				return reconcile.Result{}, err
 			}
 
-			// if no Machines left to be deleted
-			// remove our finalizer from the list and update it.
-			if len(machineList) == 0 {
-				clusterInstance.ObjectMeta.Finalizers =
-					util.RemoveString(clusterInstance.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
-				return reconcile.Result{}, r.Update(context.Background(), clusterInstance)
+			// delete the machines
+			if len(machineList) > 0 {
+				for _, machine := range machineList {
+					if machine.Status.Phase == common.DeletingMachinePhase {
+						continue
+					}
+
+					err = r.Delete(context.Background(), &machine)
+					if err != nil {
+						if !errors.IsNotFound(err) {
+							log.Error(err, "could not delete object machine for object cluster",
+								"machine", machine, "cluster", clusterInstance)
+						}
+					}
+				}
+
+				return reconcile.Result{}, err
 			}
 
-			return reconcile.Result{}, err
+			// if no Machines left to be deleted
+			// remove our finalizer from the list and update it.
+			clusterInstance.ObjectMeta.Finalizers =
+				util.RemoveString(clusterInstance.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
+			return reconcile.Result{}, r.Update(context.Background(), clusterInstance)
 		}
 	}
 
