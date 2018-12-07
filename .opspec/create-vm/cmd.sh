@@ -37,7 +37,7 @@ az vm create -n ${name}-${guid} \
 --subnet $name-subnet \
 --query "publicIpAddress" --output tsv
 
-echo "disabling internet access on control plane"
+echo "disabling internet access on vm"
 az network nsg rule create -n DenyInternetAccess -g $resourceGroup \
     --nsg-name ${name}-${guid}NSG  --priority 4096 \
     --source-address-prefixes VirtualNetwork --source-port-ranges '*' \
