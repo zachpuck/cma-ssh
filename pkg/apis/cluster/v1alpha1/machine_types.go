@@ -37,6 +37,9 @@ type MachineSpec struct {
 
 	Roles []common.MachineRoles `json:"roles,omitempty"`
 
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
 	SshConfig MachineSshConfigInfo `json:"sshconfig,omitempty"`
 }
 
@@ -46,6 +49,8 @@ type MachineSshConfigInfo struct {
 	Username string `json:"username,omitempty"`
 
 	Host string `json:"host,omitempty"`
+
+	PublicHost string `json:"publichost,omitempty"`
 
 	Port uint32 `json:"port,omitempty"`
 

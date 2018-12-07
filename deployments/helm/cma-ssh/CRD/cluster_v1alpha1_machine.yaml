@@ -29,6 +29,8 @@ spec:
           properties:
             clusterref:
               type: string
+            labels:
+              type: object
             roles:
               items:
                 type: string
@@ -40,6 +42,8 @@ spec:
                 port:
                   format: int32
                   type: integer
+                publichost:
+                  type: string
                 secret:
                   type: string
                 username:

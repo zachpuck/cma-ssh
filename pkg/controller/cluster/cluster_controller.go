@@ -23,7 +23,6 @@ import (
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/record"
 	"time"
 
@@ -141,15 +140,19 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			}
 
 			// there is a finalizer so we check if there are any machines left
-			machineList, err := getClusterMachineList(r.Client, clusterInstance.GetName())
+			machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
 			if err != nil {
 				log.Error(err, "could not list Machines for object cluster", "cluster", clusterInstance)
 				return reconcile.Result{}, err
 			}
 
-			// if there are still machines pending deletion, requeue
+			// delete the machines
 			if len(machineList) > 0 {
 				for _, machine := range machineList {
+					if machine.Status.Phase == common.DeletingMachinePhase {
+						continue
+					}
+
 					err = r.Delete(context.Background(), &machine)
 					if err != nil {
 						if !errors.IsNotFound(err) {
@@ -170,7 +173,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 	}
 
-	machineList, err := getClusterMachineList(r.Client, clusterInstance.GetName())
+	machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
 	if err != nil {
 		log.Error(err, "could not list Machines")
 		return reconcile.Result{}, err
@@ -217,24 +220,4 @@ func (r *ReconcileCluster) updateStatus(clusterInstance *clusterv1alpha1.Cluster
 		string(event), string(eventMessage), args...)
 
 	return nil
-}
-
-func getClusterMachineList(c client.Client, clusterName string) ([]clusterv1alpha1.Machine, error) {
-	machineList := &clusterv1alpha1.MachineList{}
-	err := c.List(
-		context.Background(),
-		&client.ListOptions{LabelSelector: labels.Everything()},
-		machineList)
-	if err != nil {
-		return nil, err
-	}
-
-	var clusterMachines []clusterv1alpha1.Machine
-	for _, item := range machineList.Items {
-		if item.Spec.ClusterRef == clusterName {
-			clusterMachines = append(clusterMachines, item)
-		}
-	}
-
-	return clusterMachines, nil
 }

@@ -9,13 +9,16 @@ import (
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"github.com/samsung-cnct/cma-ssh/pkg/ssh"
 	"github.com/samsung-cnct/cma-ssh/pkg/ssh/asset"
+	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	crypto "golang.org/x/crypto/ssh"
 	"io/ioutil"
 	corev1 "k8s.io/api/core/v1"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	"strings"
 	"text/template"
+	"time"
 )
 
 type boostrapConfigInfo struct {
@@ -36,20 +39,30 @@ func RunSshCommand(kubeClient client.Client,
 
 	sshConfig := machineInstance.Spec.SshConfig
 	secret := &corev1.Secret{}
-	err := kubeClient.Get(
-		context.Background(),
-		client.ObjectKey{
-			Namespace: machineInstance.GetNamespace(),
-			Name:      sshConfig.Secret,
-		},
-		secret)
-	if err != nil {
-		log.Error(err,
-			"could not find object secret", "secret", sshConfig.Secret)
-		return nil, "", err
-	}
 
-	addr := fmt.Sprintf("%v:%v", sshConfig.Host, sshConfig.Port)
+	err := util.Retry(20, 3*time.Second, func() error {
+		err := kubeClient.Get(
+			context.Background(),
+			client.ObjectKey{
+				Namespace: machineInstance.GetNamespace(),
+				Name:      sshConfig.Secret,
+			},
+			secret)
+		if err != nil {
+			log.Error(err,
+				"could not find ssh key secret for machine "+machineInstance.GetName())
+			return err
+		}
+		return nil
+	})
+
+	var host string
+	if len(sshConfig.PublicHost) > 0 {
+		host = sshConfig.PublicHost
+	} else {
+		host = sshConfig.Host
+	}
+	addr := fmt.Sprintf("%v:%v", host, sshConfig.Port)
 	sshClient, err := ssh.NewClient(addr, sshConfig.Username, secret.Data["private-key"])
 	if err != nil {
 		return nil, "", err
@@ -83,9 +96,9 @@ func RunSshCommand(kubeClient client.Client,
 	if err != nil {
 		switch err.(type) {
 		case *crypto.ExitMissingError:
-			log.Error(err, "command exited without status")
+			log.Error(err, "command "+cmd+" exited without status")
 		case *crypto.ExitError:
-			log.Error(err, "command exited with failing status", "output", string(output[:]))
+			log.Error(err, "command "+cmd+" exited with failing status", "output", string(output[:]))
 		}
 	}
 
@@ -202,15 +215,30 @@ var InstallNginx = func(client *ssh.Client, kubeClient client.Client,
 		Stderr: berr,
 	}
 
+	// get the lowercased hostname for /etc/host
+	hostname, cmd, err := cr.GetOutput(
+		client.Client,
+		ssh.Command{Cmd: "hostname"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+	hostnameString := strings.ToLower(string(bytes.TrimSpace(hostname)[:]))
+
 	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
-	cmd, err := cr.Run(
+	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " nginx -y"},
 		ssh.Command{Cmd: "cat - > /etc/nginx/nginx.conf", Stdin: bytes.NewReader(configParsedNginx.Bytes())},
 		ssh.Command{Cmd: "systemctl daemon-reload"},
 		ssh.Command{Cmd: "systemctl restart nginx"},
 		ssh.Command{Cmd: "systemctl enable nginx"},
+		ssh.Command{Cmd: "systemctl stop firewalld"},
+		ssh.Command{Cmd: "systemctl disable firewalld"},
 		ssh.Command{Cmd: "echo -e '\n127.0.0.1   registry-1.docker.io gcr.io k8s.gcr.io quay.io\n' >> /etc/hosts"},
+		ssh.Command{Cmd: "echo -e '" + templateData.ProxyIp + " sds.redii.net\n' >> /etc/hosts"},
+		ssh.Command{Cmd: "echo -e '" + machineInstance.Spec.SshConfig.Host + " " +
+			hostnameString + "\n' >> /etc/hosts"},
 	)
 
 	return nil, cmd, err
@@ -264,9 +292,6 @@ var InstallDocker = func(client *ssh.Client, kubeClient client.Client,
 	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
 	cmd, err := cr.Run(
 		client.Client,
-		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " audit -y"},
-		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " device-mapper-persistent-data -y"},
-		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " lvm2 -y"},
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " docker -y"},
 		ssh.Command{Cmd: "sed -i 's/native.cgroupdriver=cgroupfs/native.cgroupdriver=systemd/g' /usr/lib/systemd/system/docker.service"},
 		ssh.Command{Cmd: "mkdir -p /etc/docker"},
@@ -397,41 +422,29 @@ var KubeadmInit = func(client *ssh.Client, kubeClient client.Client,
 		ssh.Command{Cmd: "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f /etc/kubernetes/kube-flannel.yml --force=true"},
 	)
 
-	return nil, cmd, err
-}
-
-var CheckKubeadm = func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
-	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("Check kubeadm command")
-
-	bout := bufio.NewWriter(os.Stdout)
-	defer func(w *bufio.Writer) {
-		err := w.Flush()
-		if err != nil {
-			log.Error(err, "could not flush os.Stdout writer")
-		}
-	}(bout)
-
-	berr := bufio.NewWriter(os.Stderr)
-	defer func(w *bufio.Writer) {
-		err := w.Flush()
-		if err != nil {
-			log.Error(err, "could not flush os.Stderr writer")
-		}
-	}(berr)
-
-	cr := ssh.CommandRunner{
-		Stdout: bout,
-		Stderr: berr,
-	}
-
-	// kubeadm check
-	cmd, err := cr.Run(
+	// get the lowercased hostname for /etc/host
+	hostname, cmd, err := cr.GetOutput(
 		client.Client,
-		ssh.Command{Cmd: "which kubeadm"},
+		ssh.Command{Cmd: "hostname"},
 	)
+	if err != nil {
+		return nil, cmd, err
+	}
+	hostnameString := strings.ToLower(string(bytes.TrimSpace(hostname)[:]))
+
+	err = util.Retry(20, 3*time.Second, func() error {
+		for k, v := range machineInstance.Spec.Labels {
+			cmd, err = cr.Run(
+				client.Client,
+				ssh.Command{Cmd: "kubectl --kubeconfig /etc/kubernetes/kubelet.conf label node " +
+					hostnameString + " " + k + "=" + v},
+			)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 
 	return nil, cmd, err
 }
@@ -509,6 +522,30 @@ var KubeadmJoin = func(client *ssh.Client, kubeClient client.Client,
 			master},
 	)
 
+	// get the lowercased hostname for /etc/host
+	hostname, cmd, err := cr.GetOutput(
+		client.Client,
+		ssh.Command{Cmd: "hostname"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+	hostnameString := strings.ToLower(string(bytes.TrimSpace(hostname)[:]))
+
+	err = util.Retry(20, 3*time.Second, func() error {
+		for k, v := range machineInstance.Spec.Labels {
+			cmd, err = cr.Run(
+				client.Client,
+				ssh.Command{Cmd: "kubectl --kubeconfig /etc/kubernetes/kubelet.conf label node " +
+					hostnameString + " " + k + "=" + v},
+			)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
 	return nil, cmd, err
 }
 
@@ -544,4 +581,175 @@ var GetKubeConfig = func(client *ssh.Client, kubeClient client.Client,
 		client.Client,
 		ssh.Command{Cmd: "cat /etc/kubernetes/admin.conf"},
 	)
+}
+
+var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
+	machineInstance *clusterv1alpha1.Machine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("delete node command")
+
+	bout := bufio.NewWriter(os.Stdout)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stdout writer")
+		}
+	}(bout)
+
+	berr := bufio.NewWriter(os.Stderr)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stderr writer")
+		}
+	}(berr)
+
+	cr := ssh.CommandRunner{
+		Stdout: bout,
+		Stderr: berr,
+	}
+
+	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
+
+	// check if kubelet is installed, uninstall
+	log.Info("Checking wget for " + machineInstance.GetName())
+	cmd, err := cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " wget"},
+	)
+	if err == nil {
+		log.Info("Deleting wget for " + machineInstance.GetName())
+		cmd, err = cr.Run(
+			client.Client,
+			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " wget -y"},
+		)
+		if err != nil {
+			return nil, cmd, err
+		}
+	}
+
+	// check if kubeadm ins installed, uninstall
+	log.Info("Checking kubeadm for " + machineInstance.GetName())
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubeadm"},
+	)
+	if err == nil {
+		log.Info("Deleting kubeadm for " + machineInstance.GetName())
+		cmd, err = cr.Run(
+			client.Client,
+			ssh.Command{Cmd: "kubeadm reset"},
+		)
+		if err != nil {
+			return nil, cmd, err
+		}
+
+		cmd, err = cr.Run(
+			client.Client,
+			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubeadm -y"},
+		)
+		if err != nil {
+			return nil, cmd, err
+		}
+	}
+
+	// check if kubelet is installed, uninstall
+	log.Info("Checking kubelet for " + machineInstance.GetName())
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubelet"},
+	)
+	if err == nil {
+		log.Info("Deleting kubelet for " + machineInstance.GetName())
+		cmd, err = cr.Run(
+			client.Client,
+			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubelet -y"},
+		)
+		if err != nil {
+			return nil, cmd, err
+		}
+	}
+
+	// check if cni is installed, uninstall
+	log.Info("Checking cni for " + machineInstance.GetName())
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubernetes-cni"},
+	)
+	if err == nil {
+		log.Info("Deleting cni for " + machineInstance.GetName())
+		cmd, err = cr.Run(
+			client.Client,
+			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubernetes-cni -y"},
+		)
+		if err != nil {
+			return nil, cmd, err
+		}
+	}
+
+	// check if kubectl is installed, uninstall
+	log.Info("Checking kubectl for " + machineInstance.GetName())
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubectl"},
+	)
+	if err == nil {
+		log.Info("Deleting kubectl for " + machineInstance.GetName())
+		cmd, err = cr.Run(
+			client.Client,
+			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubectl -y"},
+		)
+		if err != nil {
+			return nil, cmd, err
+		}
+	}
+
+	// check if docker is installed, uninstall
+	log.Info("Checking docker for " + machineInstance.GetName())
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " docker"},
+	)
+	if err == nil {
+		log.Info("Deleting docker for " + machineInstance.GetName())
+		cmd, err = cr.Run(
+			client.Client,
+			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " docker -y"},
+			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " docker-client -y"},
+			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " docker-common -y"},
+		)
+		if err != nil {
+			return nil, cmd, err
+		}
+	}
+
+	// check if nginx is installed, uninstall
+	log.Info("Checking nginx for " + machineInstance.GetName())
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " nginx"},
+	)
+	if err == nil {
+		log.Info("Deleting nginx for " + machineInstance.GetName())
+		cmd, err = cr.Run(
+			client.Client,
+			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " nginx -y"},
+		)
+		if err != nil {
+			return nil, cmd, err
+		}
+	}
+
+	// delete bootstrap repo file
+	log.Info("Deleting repo file for " + machineInstance.GetName())
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "rm -f /etc/yum.repos.d/" + bootstrapRepoName + ".repo"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+
+	return nil, cmd, nil
 }
