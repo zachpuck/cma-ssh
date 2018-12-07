@@ -333,11 +333,16 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// selinux disable
+	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
 	cmd, err := cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "if [ $(getenforce) != 'Disabled' ]; then setenforce 0; fi"},
 		ssh.Command{Cmd: "sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config"},
 		ssh.Command{Cmd: "swapoff -a"},
+		ssh.Command{Cmd: "if grep -Pq '^/dev/mapper/centos-swap' /etc/fstab; then " +
+			"sed -ri.bak-$(date +%Y%m%dT%H%M%S) 's/(.*centos-swap.*)/#\\1/' /etc/fstab; fi"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " conntrack -y"},
+		ssh.Command{Cmd: "modprobe br_netfilter"},
 	)
 	if err != nil {
 		return nil, cmd, err
@@ -358,7 +363,6 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// run kubernetes install commands
-	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
 	bootstrapRepoUrl := "http://" + templateData.BootstrapIp + ":" + templateData.BootstrapPort
 	k8sVersion := clusterInstance.Spec.KubernetesVersion
 	cmd, err = cr.Run(
@@ -369,6 +373,7 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubectl-" + k8sVersion + " -y"},
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubeadm-" + k8sVersion + " -y"},
 		ssh.Command{Cmd: "sed -i 's/cgroup-driver=cgroupfs/cgroup-driver=systemd/g' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf"},
+		ssh.Command{Cmd: "sed -i 's/cgroup-driver=systemd/cgroup-driver=systemd --runtime-cgroups=\\/systemd\\/system.slice --kubelet-cgroups=\\/systemd\\/system.slice/g' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf"},
 		ssh.Command{Cmd: "mkdir -p /etc/kubernetes/"},
 		ssh.Command{Cmd: "wget --output-document=/etc/kubernetes/kube-flannel.yml " + bootstrapRepoUrl + "/download/kube-flannel.yml"},
 		ssh.Command{Cmd: "systemctl daemon-reload"},
@@ -741,11 +746,50 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 		}
 	}
 
+	// check if conntrack is installed, uninstall
+	log.Info("Checking conntrack for " + machineInstance.GetName())
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " conntrack"},
+	)
+	if err == nil {
+		log.Info("Deleting conntrack for " + machineInstance.GetName())
+		cmd, err = cr.Run(
+			client.Client,
+			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " conntrack -y"},
+		)
+		if err != nil {
+			return nil, cmd, err
+		}
+	}
+
 	// delete bootstrap repo file
 	log.Info("Deleting repo file for " + machineInstance.GetName())
 	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "rm -f /etc/yum.repos.d/" + bootstrapRepoName + ".repo"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+
+	// delete folders
+	log.Info("Deleting folders " + machineInstance.GetName())
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "rm -rf /etc/cni"},
+		ssh.Command{Cmd: "rm -rf /etc/docker"},
+		ssh.Command{Cmd: "rm -rf /etc/nginx"},
+		ssh.Command{Cmd: "rm -rf /etc/sysconfig/docker"},
+		ssh.Command{Cmd: "rm -rf /etc/ethertypes"},
+		ssh.Command{Cmd: "rm -rf /etc/kubernetes"},
+		ssh.Command{Cmd: "rm -rf /etc/systemd/system/kubelet.service.d"},
+		ssh.Command{Cmd: "rm -rf /var/lib/cni"},
+		ssh.Command{Cmd: "rm -rf /var/lib/docker"},
+		ssh.Command{Cmd: "rm -rf /var/lib/dockershim"},
+		ssh.Command{Cmd: "rm -rf /var/lib/etcd"},
+		ssh.Command{Cmd: "rm -rf /var/lib/etcd2"},
+		ssh.Command{Cmd: "rm -rf /var/lib/kubelet"},
 	)
 	if err != nil {
 		return nil, cmd, err
