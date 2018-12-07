@@ -9,13 +9,16 @@ import (
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"github.com/samsung-cnct/cma-ssh/pkg/ssh"
 	"github.com/samsung-cnct/cma-ssh/pkg/ssh/asset"
+	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	crypto "golang.org/x/crypto/ssh"
 	"io/ioutil"
 	corev1 "k8s.io/api/core/v1"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	"strings"
 	"text/template"
+	"time"
 )
 
 type boostrapConfigInfo struct {
@@ -36,18 +39,22 @@ func RunSshCommand(kubeClient client.Client,
 
 	sshConfig := machineInstance.Spec.SshConfig
 	secret := &corev1.Secret{}
-	err := kubeClient.Get(
-		context.Background(),
-		client.ObjectKey{
-			Namespace: machineInstance.GetNamespace(),
-			Name:      sshConfig.Secret,
-		},
-		secret)
-	if err != nil {
-		log.Error(err,
-			"could not find object secret", "secret", sshConfig.Secret)
-		return nil, "", err
-	}
+
+	err := util.Retry(20, 3*time.Second, func() error {
+		err := kubeClient.Get(
+			context.Background(),
+			client.ObjectKey{
+				Namespace: machineInstance.GetNamespace(),
+				Name:      sshConfig.Secret,
+			},
+			secret)
+		if err != nil {
+			log.Error(err,
+				"could not find ssh key secret for machine "+machineInstance.GetName())
+			return err
+		}
+		return nil
+	})
 
 	var host string
 	if len(sshConfig.PublicHost) > 0 {
@@ -208,15 +215,30 @@ var InstallNginx = func(client *ssh.Client, kubeClient client.Client,
 		Stderr: berr,
 	}
 
+	// get the lowercased hostname for /etc/host
+	hostname, cmd, err := cr.GetOutput(
+		client.Client,
+		ssh.Command{Cmd: "hostname"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+	hostnameString := strings.ToLower(string(bytes.TrimSpace(hostname)[:]))
+
 	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
-	cmd, err := cr.Run(
+	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " nginx -y"},
 		ssh.Command{Cmd: "cat - > /etc/nginx/nginx.conf", Stdin: bytes.NewReader(configParsedNginx.Bytes())},
 		ssh.Command{Cmd: "systemctl daemon-reload"},
 		ssh.Command{Cmd: "systemctl restart nginx"},
 		ssh.Command{Cmd: "systemctl enable nginx"},
+		ssh.Command{Cmd: "systemctl stop firewalld"},
+		ssh.Command{Cmd: "systemctl disable firewalld"},
 		ssh.Command{Cmd: "echo -e '\n127.0.0.1   registry-1.docker.io gcr.io k8s.gcr.io quay.io\n' >> /etc/hosts"},
+		ssh.Command{Cmd: "echo -e '" + templateData.ProxyIp + " sds.redii.net\n' >> /etc/hosts"},
+		ssh.Command{Cmd: "echo -e '" + machineInstance.Spec.SshConfig.Host + " " +
+			hostnameString + "\n' >> /etc/hosts"},
 	)
 
 	return nil, cmd, err
@@ -400,6 +422,30 @@ var KubeadmInit = func(client *ssh.Client, kubeClient client.Client,
 		ssh.Command{Cmd: "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f /etc/kubernetes/kube-flannel.yml --force=true"},
 	)
 
+	// get the lowercased hostname for /etc/host
+	hostname, cmd, err := cr.GetOutput(
+		client.Client,
+		ssh.Command{Cmd: "hostname"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+	hostnameString := strings.ToLower(string(bytes.TrimSpace(hostname)[:]))
+
+	err = util.Retry(20, 3*time.Second, func() error {
+		for k, v := range machineInstance.Spec.Labels {
+			cmd, err = cr.Run(
+				client.Client,
+				ssh.Command{Cmd: "kubectl --kubeconfig /etc/kubernetes/kubelet.conf label node " +
+					hostnameString + " " + k + "=" + v},
+			)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
 	return nil, cmd, err
 }
 
@@ -475,6 +521,30 @@ var KubeadmJoin = func(client *ssh.Client, kubeClient client.Client,
 			" --ignore-preflight-errors=all --discovery-token-unsafe-skip-ca-verification " +
 			master},
 	)
+
+	// get the lowercased hostname for /etc/host
+	hostname, cmd, err := cr.GetOutput(
+		client.Client,
+		ssh.Command{Cmd: "hostname"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+	hostnameString := strings.ToLower(string(bytes.TrimSpace(hostname)[:]))
+
+	err = util.Retry(20, 3*time.Second, func() error {
+		for k, v := range machineInstance.Spec.Labels {
+			cmd, err = cr.Run(
+				client.Client,
+				ssh.Command{Cmd: "kubectl --kubeconfig /etc/kubernetes/kubelet.conf label node " +
+					hostnameString + " " + k + "=" + v},
+			)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 
 	return nil, cmd, err
 }
@@ -646,6 +716,8 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 		cmd, err = cr.Run(
 			client.Client,
 			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " docker -y"},
+			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " docker-client -y"},
+			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " docker-common -y"},
 		)
 		if err != nil {
 			return nil, cmd, err

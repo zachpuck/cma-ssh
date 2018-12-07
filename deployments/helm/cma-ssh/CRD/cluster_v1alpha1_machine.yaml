@@ -29,6 +29,8 @@ spec:
           properties:
             clusterref:
               type: string
+            labels:
+              type: object
             roles:
               items:
                 type: string

@@ -10,7 +10,7 @@ ARG K8S_VERSIONS="1.10.6 1.11.2"
 # helm versions
 ARG HELM_VERSIONS="v2.11.0"
 # docker version
-ARG DOCKER_VERSION="17.03.3.ce-1.el7"
+ARG DOCKER_VERSION="1.13.1-75.git8633870.el7.centos"
 
 # add docker repo, add kubernetes repo
 RUN yum-config-manager --add-repo https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
@@ -33,7 +33,9 @@ RUN helmversions=($HELM_VERSIONS); k8sversions=($K8S_VERSIONS); for ver in ${ver
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker libsemanage \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker device-mapper-persistent-data \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker lvm2 \
-    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker-${DOCKER_VERSION} \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker-client-${DOCKER_VERSION} \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker-common-${DOCKER_VERSION} \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/nginx nginx \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/curl curl \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/wget wget \

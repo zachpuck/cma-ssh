@@ -10,6 +10,8 @@ spec:
   roles:
     - etcd
     - master
+  labels:
+    role: controlPlane
   sshconfig:
     publichost: 13.64.100.33
     host: 10.240.0.8
@@ -28,6 +30,8 @@ spec:
   clusterref: cluster
   roles:
   - worker
+  labels:
+    role: worker
   sshconfig:
     publichost: 40.78.16.250
     host: 10.240.0.9

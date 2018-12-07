@@ -157,6 +157,8 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 				return r.handleUpgrade(machineInstance, clusterInstance)
 			}
 
+		} else if machineInstance.Status.Phase == common.ErrorMachinePhase {
+			return reconcile.Result{}, nil
 		} else {
 			return r.handleCreate(machineInstance, clusterInstance)
 		}
@@ -389,20 +391,19 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) 
 		}
 
 		var token []byte
-		for {
+		err = util.Retry(20, 3*time.Second, func() error {
 			// run kubeadm create token on master machine, get token back
 			log.Info("Trying to get kubeadm token from master...")
 			token, cmd, err = RunSshCommand(r.Client, masterMachine, KubeadmTokenCreate, make(map[string]string))
 			if err != nil {
 				log.Info("Waiting for kubeadm to be able to create a token",
 					"machine", masterMachine)
-				time.Sleep(3 * time.Second)
-			} else {
-				// break out of wait loop
-				log.Info("Got master kubeadm token: " + string(token[:]))
-				break
+				return err
 			}
-		}
+
+			log.Info("Got master kubeadm token: " + string(token[:]))
+			return nil
+		})
 
 		// run kubeadm join on worker machine
 		_, cmd, err = RunSshCommand(r.Client, machineInstance,

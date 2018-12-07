@@ -3,11 +3,11 @@ images:
    operator:
       repository: quay.io/samsung_cnct/cma-ssh
       tag: 0.1.0
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
    bootstrap:
       repository: quay.io/samsung_cnct/cma-ssh-bootstrap
       tag: 0.1.0
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
 
 # installation settings
 install:
