@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/samsung-cnct/cma-ssh/pkg/util/k8sutil"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"time"
 
 	"github.com/masterminds/semver"
@@ -121,7 +122,7 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 			log.Error(err, "could not find cluster "+machineInstance.Spec.ClusterRef)
 
 			machineInstance.Status.Phase = common.ErrorMachinePhase
-			err = r.updateStatus(machineInstance, corev1.EventTypeWarning, common.ErrResourceFailed,
+			err = r.updateStatus(machineInstance, false, corev1.EventTypeWarning, common.ErrResourceFailed,
 				common.MessageResourceFailed, machineInstance.GetName())
 			if err != nil {
 				log.Error(err, "could not update status of object machine", "machine", machineInstance)
@@ -134,7 +135,7 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	if machineInstance.ObjectMeta.DeletionTimestamp.IsZero() {
+	if machineInstance.DeletionTimestamp.IsZero() {
 		// object being created or upgraded
 		if machineInstance.Status.Phase == common.ReadyMachinePhase {
 			// build semvers
@@ -172,14 +173,33 @@ func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.Machine
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller handleDelete()")
 
+	// requeue, unless we are in ready or error state
 	if machineInstance.Status.Phase == common.DeletingMachinePhase {
+		log.Info("Delete: Already deleting...")
 		return reconcile.Result{}, nil
 	}
 
-	if util.ContainsString(machineInstance.ObjectMeta.Finalizers, clusterv1alpha1.MachineFinalizer) {
+	// get cluster status to determine whether we should proceed
+	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
+	if err != nil {
+		log.Error(err, "could not list Machines")
+		return reconcile.Result{}, err
+	}
+
+	if !util.IsReadyForDeletion(machineList) {
+		log.Info("Delete: Waiting for cluster to finish reconciling")
+		return reconcile.Result{Requeue: true}, nil
+	}
+
+	if util.ContainsString(machineInstance.Finalizers, clusterv1alpha1.MachineFinalizer) {
 		// update status to "deleting"
 		machineInstance.Status.Phase = common.DeletingMachinePhase
-		err := r.updateStatus(machineInstance, corev1.EventTypeNormal,
+		err := r.updateStatus(machineInstance, false, corev1.EventTypeNormal,
 			common.ResourceStateChange, common.MessageResourceStateChange,
 			machineInstance.GetName(), common.DeletingMachinePhase)
 		if err != nil {
@@ -188,7 +208,7 @@ func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.Machine
 		}
 
 		// start delete process
-		r.backgroundRunner(doDelete, machineInstance, "handleUpgrade")
+		r.backgroundRunner(doDelete, machineInstance, "handleDelete")
 
 	}
 
@@ -205,7 +225,7 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.Machin
 
 	// update status to "upgrading"
 	machineInstance.Status.Phase = common.UpgradingMachinePhase
-	err := r.updateStatus(machineInstance, corev1.EventTypeNormal,
+	err := r.updateStatus(machineInstance, false, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.UpgradingMachinePhase)
 	if err != nil {
@@ -227,16 +247,15 @@ func (r *ReconcileMachine) handleCreate(machineInstance *clusterv1alpha1.Machine
 		return reconcile.Result{}, nil
 	}
 
-	// The object is not being deleted, add the finalizer
-	if !util.ContainsString(machineInstance.ObjectMeta.Finalizers, clusterv1alpha1.MachineFinalizer) {
-		machineInstance.ObjectMeta.Finalizers =
-			append(machineInstance.ObjectMeta.Finalizers, clusterv1alpha1.MachineFinalizer)
-
+	// Add the finalizer
+	if !util.ContainsString(machineInstance.Finalizers, clusterv1alpha1.MachineFinalizer) {
+		machineInstance.Finalizers =
+			append(machineInstance.Finalizers, clusterv1alpha1.MachineFinalizer)
 	}
 
 	// update status to "creating"
 	machineInstance.Status.Phase = common.ProvisioningMachinePhase
-	err := r.updateStatus(machineInstance, corev1.EventTypeNormal,
+	err := r.updateStatus(machineInstance, true, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.ProvisioningMachinePhase)
 	if err != nil {
@@ -250,7 +269,7 @@ func (r *ReconcileMachine) handleCreate(machineInstance *clusterv1alpha1.Machine
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileMachine) updateStatus(machineInstance *clusterv1alpha1.Machine, eventType string,
+func (r *ReconcileMachine) updateStatus(machineInstance *clusterv1alpha1.Machine, setControllerRef bool, eventType string,
 	event common.ControllerEvents, eventMessage common.ControllerEvents, args ...interface{}) error {
 
 	machineFreshInstance := &clusterv1alpha1.Machine{}
@@ -264,9 +283,22 @@ func (r *ReconcileMachine) updateStatus(machineInstance *clusterv1alpha1.Machine
 		return err
 	}
 
+	machineFreshInstance.Finalizers = machineInstance.Finalizers
 	machineFreshInstance.Status.Phase = machineInstance.Status.Phase
 	machineFreshInstance.Status.KubernetesVersion = machineInstance.Status.KubernetesVersion
 	machineFreshInstance.Status.LastUpdated = &metav1.Time{Time: time.Now()}
+
+	if setControllerRef {
+		clusterInstance, err := getCluster(r.Client, machineFreshInstance.GetNamespace(), machineFreshInstance.Spec.ClusterRef)
+		if err != nil {
+			return err
+		}
+
+		err = controllerutil.SetControllerReference(clusterInstance, machineFreshInstance, r.scheme)
+		if err != nil {
+			return err
+		}
+	}
 
 	err = r.Update(context.Background(), machineFreshInstance)
 	if err != nil {
@@ -371,8 +403,8 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) 
 
 		var token []byte
 		for {
-			// check if kubeadm is available
 			// run kubeadm create token on master machine, get token back
+			log.Info("Trying to get kubeadm token from master...")
 			token, cmd, err = RunSshCommand(r.Client, masterMachine, KubeadmTokenCreate, make(map[string]string))
 			if err != nil {
 				log.Info("Waiting for kubeadm to be able to create a token",
@@ -380,6 +412,7 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) 
 				time.Sleep(3 * time.Second)
 			} else {
 				// break out of wait loop
+				log.Info("Got master kubeadm token: " + string(token[:]))
 				break
 			}
 		}
@@ -401,7 +434,7 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) 
 	machineInstance.Status.Phase = common.ReadyMachinePhase
 	machineInstance.Status.KubernetesVersion = clusterInstance.Spec.KubernetesVersion
 
-	err = r.updateStatus(machineInstance, corev1.EventTypeNormal,
+	err = r.updateStatus(machineInstance, false, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.ReadyMachinePhase)
 	if err != nil {
@@ -423,7 +456,7 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (s
 	machineInstance.Status.Phase = common.ReadyMachinePhase
 	machineInstance.Status.KubernetesVersion = clusterInstance.Spec.KubernetesVersion
 
-	err = r.updateStatus(machineInstance, corev1.EventTypeNormal,
+	err = r.updateStatus(machineInstance, false, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.ReadyMachinePhase)
 	if err != nil {
@@ -433,22 +466,23 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (s
 }
 
 func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (string, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("machine Controller doDelete()")
 
-	// TODO: run kubernetes physical node delete here
-	machineFreshInstance := &clusterv1alpha1.Machine{}
-	err := r.Get(
-		context.Background(),
-		client.ObjectKey{
-			Namespace: machineInstance.GetNamespace(),
-			Name:      machineInstance.GetName(),
-		}, machineFreshInstance)
+	log.Info("Starting Delete for machine " + machineInstance.GetName())
+	// run delete command
+	_, cmd, err := RunSshCommand(r.Client, machineInstance, DeleteNode, make(map[string]string))
 	if err != nil {
-		return "get machine instance", err
+		return cmd, err
 	}
-	machineFreshInstance.ObjectMeta.Finalizers =
-		util.RemoveString(machineFreshInstance.ObjectMeta.Finalizers, clusterv1alpha1.MachineFinalizer)
-	if err := r.Update(context.Background(), machineFreshInstance); err != nil {
-		return "Update()", err
+
+	machineInstance.Finalizers =
+		util.RemoveString(machineInstance.Finalizers, clusterv1alpha1.MachineFinalizer)
+	err = r.updateStatus(machineInstance, false, corev1.EventTypeNormal,
+		common.ResourceStateChange, common.MessageResourceStateChange,
+		machineInstance.GetName(), common.DeletingMachinePhase)
+	if err != nil {
+		return "updateStatus()", err
 	}
 
 	return "doDelete()", nil
@@ -475,43 +509,51 @@ func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 	}(opResult)
 
 	go func() {
-		for {
-			select {
-			// cluster operation timeouts shouldn't take longer than 10 minutes
-			case <-timer.C:
-				err := fmt.Errorf("operation %s timed out for machine %s",
-					operationName, machineInstance.GetNamespace())
-				log.Error(err, "Provisioning operation timed out for object machine",
-					"machine", machineInstance)
+		timedOut := false
+		select {
+		// cluster operation timeouts shouldn't take longer than 10 minutes
+		case <-timer.C:
+			err := fmt.Errorf("operation %s timed out for machine %s",
+				operationName, machineInstance.GetNamespace())
+			log.Error(err, "Provisioning operation timed out for object machine",
+				"machine", machineInstance)
+
+			timer.Stop()
+			timedOut = true
+		case result := <-opResult:
+			// if finished with error
+			if result.Err != nil {
+				log.Error(result.Err, "could not complete object machine pre-start step of "+operationName,
+					"machine", machineInstance, "command", result.Cmd)
 
 				// set error status
 				machineInstance.Status.Phase = common.ErrorMachinePhase
-				err = r.updateStatus(machineInstance, corev1.EventTypeWarning,
+				err := r.updateStatus(machineInstance, false, corev1.EventTypeWarning,
 					common.ResourceStateChange, common.MessageResourceStateChange,
 					machineInstance.GetName(), common.ErrorMachinePhase)
 				if err != nil {
 					log.Error(err, "could not update status of machine", "machine", machineInstance)
 				}
-				timer.Stop()
-				return
-			case result := <-opResult:
-				// if finished with error
-				if result.Err != nil {
-					log.Error(result.Err, "could not complete object machine pre-start step of "+operationName,
-						"machine", machineInstance, "command", result.Cmd)
-
-					// set error status
-					machineInstance.Status.Phase = common.ErrorMachinePhase
-					err := r.updateStatus(machineInstance, corev1.EventTypeWarning,
-						common.ResourceStateChange, common.MessageResourceStateChange,
-						machineInstance.GetName(), common.ErrorMachinePhase)
-					if err != nil {
-						log.Error(err, "could not update status of machine", "machine", machineInstance)
-					}
-				}
-
-				return
 			}
 		}
+
+		// if timed out, wait for operation to complete
+		if timedOut {
+			select {
+			case result := <-opResult:
+				log.Error(result.Err, "Timed out object machine pre-start step of "+operationName,
+					"machine", machineInstance, "command", result.Cmd)
+			}
+
+			// set error status
+			machineInstance.Status.Phase = common.ErrorMachinePhase
+			err := r.updateStatus(machineInstance, false, corev1.EventTypeWarning,
+				common.ResourceStateChange, common.MessageResourceStateChange,
+				machineInstance.GetName(), common.ErrorMachinePhase)
+			if err != nil {
+				log.Error(err, "could not update status of machine", "machine", machineInstance)
+			}
+		}
+
 	}()
 }

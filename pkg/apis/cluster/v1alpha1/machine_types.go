@@ -47,6 +47,8 @@ type MachineSshConfigInfo struct {
 
 	Host string `json:"host,omitempty"`
 
+	PublicHost string `json:"publichost,omitempty"`
+
 	Port uint32 `json:"port,omitempty"`
 
 	Secret string `json:"secret,omitempty"`

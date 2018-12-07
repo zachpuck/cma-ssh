@@ -5,6 +5,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	"io"
 	"net"
+	"time"
 )
 
 // Client contains the underlying net.Conn and an ssh.Client for the conn.
@@ -30,6 +31,7 @@ func NewClient(address, user string, privateKey []byte) (*Client, error) {
 			ssh.PublicKeys(signer),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         10 * time.Minute,
 	})
 	if err != nil {
 		return nil, err
@@ -53,10 +55,10 @@ type Command struct {
 
 func (c *CommandRunner) Run(client *ssh.Client, cmds ...Command) (string, error) {
 	for _, cmd := range cmds {
+		c.currentCmd, c.err = c.exec(client, cmd)
 		if c.err != nil {
 			return c.currentCmd, c.err
 		}
-		c.currentCmd, c.err = c.exec(client, cmd)
 	}
 	return c.currentCmd, c.err
 }
@@ -76,11 +78,7 @@ func (c *CommandRunner) exec(client *ssh.Client, cmd Command) (string, error) {
 	session.Stdin = cmd.Stdin
 	session.Stdout = c.Stdout
 	session.Stderr = c.Stderr
-	err = session.Run(cmd.Cmd)
-	if err != nil {
-		return cmd.Cmd, err
-	}
-	return cmd.Cmd, nil
+	return cmd.Cmd, session.Run(cmd.Cmd)
 }
 
 func (c *CommandRunner) execWithOutput(client *ssh.Client, cmd Command) ([]byte, string, error) {
@@ -94,5 +92,5 @@ func (c *CommandRunner) execWithOutput(client *ssh.Client, cmd Command) ([]byte,
 	session.Stdin = cmd.Stdin
 	session.Stderr = c.Stderr
 	out, err := session.Output(cmd.Cmd)
-	return bytes.TrimSpace(out), cmd.Cmd, nil
+	return bytes.TrimSpace(out), cmd.Cmd, err
 }

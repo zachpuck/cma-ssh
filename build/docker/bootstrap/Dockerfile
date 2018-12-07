@@ -27,6 +27,10 @@ RUN helmversions=($HELM_VERSIONS); k8sversions=($K8S_VERSIONS); for ver in ${ver
     && for ver in ${k8sversions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/k8s-${ver} kubelet-${ver}; done \
     && for ver in ${k8sversions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/k8s-${ver} kubernetes-cni; done \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker audit \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker audit-libs \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker libselinux \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker libsepol \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker libsemanage \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker device-mapper-persistent-data \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker lvm2 \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker \

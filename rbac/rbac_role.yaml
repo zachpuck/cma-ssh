@@ -19,7 +19,7 @@ rules:
 - apiGroups:
   - machine.sds.samsung.com
   resources:
-  - clusters
+  - machines
   verbs:
   - get
   - list

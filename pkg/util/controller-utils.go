@@ -1,10 +1,33 @@
 package util
 
 import (
+	"context"
 	"fmt"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
+	"k8s.io/apimachinery/pkg/labels"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+func GetClusterMachineList(c client.Client, clusterName string) ([]clusterv1alpha1.Machine, error) {
+	machineList := &clusterv1alpha1.MachineList{}
+	err := c.List(
+		context.Background(),
+		&client.ListOptions{LabelSelector: labels.Everything()},
+		machineList)
+	if err != nil {
+		return nil, err
+	}
+
+	var clusterMachines []clusterv1alpha1.Machine
+	for _, item := range machineList.Items {
+		if item.Spec.ClusterRef == clusterName {
+			clusterMachines = append(clusterMachines, item)
+		}
+	}
+
+	return clusterMachines, nil
+}
 
 // returns overall cluster status and api enpoint if available
 func GetStatus(machines []clusterv1alpha1.Machine) (common.ClusterStatusPhase, string) {
@@ -36,6 +59,26 @@ func GetStatus(machines []clusterv1alpha1.Machine) (common.ClusterStatusPhase, s
 	}
 
 	return common.RunningClusterPhase, apiEndpoint
+}
+
+// similar to GetStatus(), but returns true for whether its ok to proceed with machine deletion
+// Deletion is ok when none of the machines in the cluster are in Creating or Upgrading state
+func IsReadyForDeletion(machines []clusterv1alpha1.Machine) bool {
+
+	if len(machines) == 0 {
+		return true
+	}
+
+	if ContainsStatuses(machines,
+		[]common.MachineStatusPhase{
+			common.ProvisioningMachinePhase,
+			common.UpgradingMachinePhase,
+			"",
+		}) {
+		return false
+	}
+
+	return true
 }
 
 func ContainsStatuses(machines []clusterv1alpha1.Machine, ss []common.MachineStatusPhase) bool {

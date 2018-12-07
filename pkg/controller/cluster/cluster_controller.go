@@ -23,7 +23,6 @@ import (
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/record"
 	"time"
 
@@ -67,8 +66,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.Machine{}},
-		&handler.EnqueueRequestsFromMapFunc{ToRequests: util.MachineToClusterMapper{Client: mgr.GetClient()}})
+	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.Machine{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &clusterv1alpha1.Cluster{},
+	})
 	if err != nil {
 		return err
 	}
@@ -89,7 +90,7 @@ type ReconcileCluster struct {
 // and what is in the Cluster.Spec
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=cluster.sds.samsung.com,resources=clusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=machine.sds.samsung.com,resources=clusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=machine.sds.samsung.com,resources=machines,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	logf.SetLogger(logf.ZapLogger(false))
@@ -141,36 +142,25 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			}
 
 			// there is a finalizer so we check if there are any machines left
-			machineList, err := getClusterMachineList(r.Client, clusterInstance.GetName())
+			machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
 			if err != nil {
 				log.Error(err, "could not list Machines for object cluster", "cluster", clusterInstance)
 				return reconcile.Result{}, err
 			}
 
-			// if there are still machines pending deletion, requeue
-			if len(machineList) > 0 {
-				for _, machine := range machineList {
-					err = r.Delete(context.Background(), &machine)
-					if err != nil {
-						if !errors.IsNotFound(err) {
-							log.Error(err, "could not delete object machine for object cluster",
-								"machine", machine, "cluster", clusterInstance)
-						}
-					}
-				}
-
-				return reconcile.Result{}, err
-			}
-
 			// if no Machines left to be deleted
 			// remove our finalizer from the list and update it.
-			clusterInstance.ObjectMeta.Finalizers =
-				util.RemoveString(clusterInstance.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
-			return reconcile.Result{}, r.Update(context.Background(), clusterInstance)
+			if len(machineList) == 0 {
+				clusterInstance.ObjectMeta.Finalizers =
+					util.RemoveString(clusterInstance.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
+				return reconcile.Result{}, r.Update(context.Background(), clusterInstance)
+			}
+
+			return reconcile.Result{}, err
 		}
 	}
 
-	machineList, err := getClusterMachineList(r.Client, clusterInstance.GetName())
+	machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
 	if err != nil {
 		log.Error(err, "could not list Machines")
 		return reconcile.Result{}, err
@@ -217,24 +207,4 @@ func (r *ReconcileCluster) updateStatus(clusterInstance *clusterv1alpha1.Cluster
 		string(event), string(eventMessage), args...)
 
 	return nil
-}
-
-func getClusterMachineList(c client.Client, clusterName string) ([]clusterv1alpha1.Machine, error) {
-	machineList := &clusterv1alpha1.MachineList{}
-	err := c.List(
-		context.Background(),
-		&client.ListOptions{LabelSelector: labels.Everything()},
-		machineList)
-	if err != nil {
-		return nil, err
-	}
-
-	var clusterMachines []clusterv1alpha1.Machine
-	for _, item := range machineList.Items {
-		if item.Spec.ClusterRef == clusterName {
-			clusterMachines = append(clusterMachines, item)
-		}
-	}
-
-	return clusterMachines, nil
 }
