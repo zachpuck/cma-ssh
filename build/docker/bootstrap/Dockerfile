@@ -33,6 +33,7 @@ RUN helmversions=($HELM_VERSIONS); k8sversions=($K8S_VERSIONS); for ver in ${ver
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker libsemanage \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker device-mapper-persistent-data \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker lvm2 \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker conntrack \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker-${DOCKER_VERSION} \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker-client-${DOCKER_VERSION} \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker-common-${DOCKER_VERSION} \
