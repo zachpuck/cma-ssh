@@ -19,5 +19,5 @@ limitations under the License.
 // +k8s:deepcopy-gen=package,register
 // +k8s:conversion-gen=github.com/samsung-cnct/cma-ssh/pkg/apis/cluster
 // +k8s:defaulter-gen=TypeMeta
-// +groupName=cluster.sds.samsung.com
+// +groupName=cluster.cnct.sds.samsung.com
 package v1alpha1
