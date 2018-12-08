@@ -5,7 +5,7 @@ metadata:
   name: rbac-role
 rules:
 - apiGroups:
-  - cluster.sds.samsung.com
+  - cluster.cnct.sds.samsung.com
   resources:
   - clusters
   - machines
@@ -30,7 +30,7 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - machine.sds.samsung.com
+  - machine.cnct.sds.samsung.com
   resources:
   - machines
   - clusters

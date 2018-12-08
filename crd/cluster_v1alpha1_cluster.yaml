@@ -4,9 +4,9 @@ metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: clusters.cluster.sds.samsung.com
+  name: clusters.cluster.cnct.sds.samsung.com
 spec:
-  group: cluster.sds.samsung.com
+  group: cluster.cnct.sds.samsung.com
   names:
     kind: Cluster
     plural: clusters

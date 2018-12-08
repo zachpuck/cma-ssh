@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const ClusterFinalizer = "cluster.cluster.sds.samsung.com"
+const ClusterFinalizer = "cluster.cluster.cnct.sds.samsung.com"
 
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
