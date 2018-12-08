@@ -11,9 +11,9 @@ metadata:
     app.kubernetes.io/version: '{{.Chart.AppVersion | replace "+" "_" | trunc 63}}'
     controller-tools.k8s.io: "1.0"
     helm.sh/chart: '{{include "cma-ssh.chart" .}}'
-  name: clusters.cluster.sds.samsung.com
+  name: clusters.cluster.cnct.sds.samsung.com
 spec:
-  group: cluster.sds.samsung.com
+  group: cluster.cnct.sds.samsung.com
   names:
     kind: Cluster
     plural: clusters

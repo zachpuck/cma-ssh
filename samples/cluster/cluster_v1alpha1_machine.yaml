@@ -1,4 +1,4 @@
-apiVersion: cluster.sds.samsung.com/v1alpha1
+apiVersion: cluster.cnct.sds.samsung.com/v1alpha1
 kind: Machine
 metadata:
   labels:
@@ -19,7 +19,7 @@ spec:
     username: root
     secret: ssh-key
 ---
-apiVersion: cluster.sds.samsung.com/v1alpha1
+apiVersion: cluster.cnct.sds.samsung.com/v1alpha1
 kind: Machine
 metadata:
   labels:

@@ -1,3 +1,3 @@
 version: "1"
-domain: sds.samsung.com
+domain: cnct.sds.samsung.com
 repo: github.com/samsung-cnct/cma-ssh
