@@ -646,7 +646,7 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 		log.Info("Deleting kubeadm for " + machineInstance.GetName())
 		cmd, err = cr.Run(
 			client.Client,
-			ssh.Command{Cmd: "kubeadm reset"},
+			ssh.Command{Cmd: "kubeadm reset -f"},
 		)
 		if err != nil {
 			return nil, cmd, err
@@ -835,26 +835,68 @@ var UpgradeMaster = func(client *ssh.Client, kubeClient client.Client,
 	}
 	k8sVersion := clusterInstance.Spec.KubernetesVersion
 
+	// get the lowercased hostname
+	hostname, cmd, err := cr.GetOutput(
+		client.Client,
+		ssh.Command{Cmd: "hostname"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+	hostnameString := strings.ToLower(string(bytes.TrimSpace(hostname)[:]))
+
 	// get the bootstrap repo name
 	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
 
 	// install the new kubeadm and run upgrade
 	// install new kubelet and kubectl
-	cmd, err := cr.Run(
+	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
-			bootstrapRepoName + " kubeadm-" + k8sVersion + " -y"},
-		ssh.Command{Cmd: "kubeadm upgrade apply v" + k8sVersion + "--feature-gates=CoreDNS=false -y"},
+			bootstrapRepoName + " kubeadm-" + k8sVersion + " -y --disableexcludes=kubernetes"},
+		ssh.Command{Cmd: "kubeadm upgrade apply v" + k8sVersion + " -y"},
+		ssh.Command{Cmd: "kubectl drain " + hostnameString + " --ignore-daemonsets --kubeconfig=/etc/kubernetes/admin.conf"},
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
-			bootstrapRepoName + " kubelet-" + k8sVersion + " -y"},
+			bootstrapRepoName + " kubelet-" + k8sVersion + " -y --disableexcludes=kubernetes"},
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
 			bootstrapRepoName + " kubectl-" + k8sVersion + " -y"},
-		ssh.Command{Cmd: "systemctl daemon-reload"},
-		ssh.Command{Cmd: "systemctl restart kubelet"},
 	)
 	if err != nil {
 		return nil, cmd, err
 	}
+
+	// configure kubelet if needed
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "[ -f /etc/sysconfig/kubelet ]"},
+	)
+
+	if err == nil {
+		cmd, err = cr.Run(
+			client.Client,
+			ssh.Command{Cmd: "sed -i 's/cgroup-driver=cgroupfs/cgroup-driver=systemd/g' " +
+				"/etc/sysconfig/kubelet"},
+			ssh.Command{Cmd: "sed -i 's/cgroup-driver=systemd/cgroup-driver=systemd " +
+				"--runtime-cgroups=\\/systemd\\/system.slice --kubelet-cgroups=\\/systemd\\/system.slice/g' " +
+				"/etc/sysconfig/kubelet"},
+		)
+	} else {
+		cmd, err = cr.Run(
+			client.Client,
+			ssh.Command{Cmd: "echo -n 'KUBELET_EXTRA_ARGS=--cgroup-driver=systemd " +
+				"--runtime-cgroups=/systemd/system.slice --kubelet-cgroups=/systemd/system.slice'"},
+		)
+	}
+	if err != nil {
+		return nil, cmd, err
+	}
+
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "systemctl daemon-reload"},
+		ssh.Command{Cmd: "systemctl restart kubelet"},
+		ssh.Command{Cmd: "kubectl uncordon " + hostnameString + " --kubeconfig=/etc/kubernetes/admin.conf"},
+	)
 
 	return nil, cmd, err
 }
@@ -894,48 +936,37 @@ var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
 	}
 	k8sVersion := clusterInstance.Spec.KubernetesVersion
 
-	// get the bootstrap repo name
-	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
-
-	// install the new kubeadm and kubelet
-	// upgrade node config
-
-	cmd, err := cr.Run(
+	// get the lowercased hostname
+	hostname, cmd, err := cr.GetOutput(
 		client.Client,
-		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
-			bootstrapRepoName + " kubeadm-" + k8sVersion + " -y"},
-		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
-			bootstrapRepoName + " kubectl-" + k8sVersion + " -y"},
-		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
-			bootstrapRepoName + " kubelet-" + k8sVersion + " -y"},
-		ssh.Command{Cmd: "kubeadm upgrade node config --kubelet-version " +
-			"$(kubelet --version | cut -d ' ' -f 2)"},
+		ssh.Command{Cmd: "hostname"},
 	)
 	if err != nil {
 		return nil, cmd, err
 	}
+	hostnameString := strings.ToLower(string(bytes.TrimSpace(hostname)[:]))
 
-	// check to see if config got pulled
+	// get the bootstrap repo name
+	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
+
+	// install the new kubeadm and run upgrade
+	// install new kubelet and kubectl
 	cmd, err = cr.Run(
 		client.Client,
-		ssh.Command{Cmd: "[ -f /var/lib/kubelet/config.yaml ]"},
+		ssh.Command{Cmd: "cat - > /etc/kubernetes/admin.conf",
+			Stdin: bytes.NewReader([]byte(commandArgs["admin.conf"]))},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
+			bootstrapRepoName + " kubeadm-" + k8sVersion + " -y --disableexcludes=kubernetes"},
+		ssh.Command{Cmd: "kubeadm upgrade apply v" + k8sVersion + " -y"},
+		ssh.Command{Cmd: "kubectl drain " + hostnameString + " --kubeconfig=/etc/kubernetes/admin.conf"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
+			bootstrapRepoName + " kubelet-" + k8sVersion + " -y --disableexcludes=kubernetes"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
+			bootstrapRepoName + " kubectl-" + k8sVersion + " -y"},
+		ssh.Command{Cmd: "kubeadm upgrade node config --kubelet-version $(kubelet --version | cut -d ' ' -f 2)"},
 	)
-
 	if err != nil {
-		err = util.Retry(20, 3*time.Second, func() error {
-			log.Info("kubelet config for " + machineInstance.GetName() +
-				" failed to pull down, retrying...")
-			cmd, err = cr.Run(
-				client.Client,
-				ssh.Command{Cmd: "kubeadm alpha phase kubelet config download"},
-			)
-			return err
-		})
-		if err != nil {
-			log.Error(err, "kubelet config for "+machineInstance.GetName()+
-				" failed to pull")
-			return nil, cmd, err
-		}
+		return nil, cmd, err
 	}
 
 	// configure kubelet if needed
@@ -968,6 +999,7 @@ var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
 		client.Client,
 		ssh.Command{Cmd: "systemctl daemon-reload"},
 		ssh.Command{Cmd: "systemctl restart kubelet"},
+		ssh.Command{Cmd: "kubectl uncordon " + hostnameString + " --kubeconfig=/etc/kubernetes/admin.conf"},
 	)
 
 	return nil, cmd, err

@@ -431,13 +431,75 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) 
 }
 
 func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (string, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("machine Controller preBootstrap()")
 
-	// TODO: run kubernetes physical node upgrade here
-
-	// Set status to ready
+	// get the cluster instance
 	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
 	if err != nil {
 		return "getCluster()", err
+	}
+
+	// if master, do the upgrade.
+	// otherwise wait for master to finish upgrade then
+	// proceed with upgrade
+	// master is done upgrading when it is in ready status and
+	// its status kubernetes version matches clusters kubernetes version
+	if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleMaster) {
+		log.Info("running upgrade on master " + machineInstance.GetName())
+		_, cmd, err := RunSshCommand(r.Client, machineInstance,
+			UpgradeMaster, make(map[string]string))
+		if err != nil {
+			return cmd, err
+		}
+
+	} else {
+		log.Info("running upgrade on worker " + machineInstance.GetName())
+		err = util.Retry(20, 3*time.Second, func() error {
+			// get list of machines
+			machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
+			if err != nil {
+				log.Error(err, "could not list Machines")
+				return err
+			}
+
+			masterMachine, err := util.GetMaster(machineList)
+			if err != nil {
+				log.Error(err, "could not get master instance")
+				return err
+			}
+
+			if masterMachine.Status.Phase != common.ReadyMachinePhase {
+				err = fmt.Errorf("master instance %s is not done with upgrade",
+					masterMachine.GetName())
+				log.Error(err, "master not ready, will retry.")
+				return err
+			}
+
+			if masterMachine.Status.KubernetesVersion != clusterInstance.Spec.KubernetesVersion {
+				err = fmt.Errorf("master instance %s is not done with upgrade: "+
+					"current k8s version %s, expecting %s",
+					masterMachine.GetName(), masterMachine.Status.KubernetesVersion,
+					clusterInstance.Spec.KubernetesVersion)
+				log.Error(err, "master not ready, will retry.")
+				return err
+			}
+
+			return nil
+		})
+
+		// get admin kubeconfig
+		kubeConfig, cmd, err := RunSshCommand(r.Client, machineInstance, GetKubeConfig, make(map[string]string))
+		if err != nil {
+			return cmd, err
+		}
+
+		// run node upgrade
+		_, cmd, err = RunSshCommand(r.Client, machineInstance,
+			UpgradeNode, map[string]string{"admin.conf": string(kubeConfig[:])})
+		if err != nil {
+			return cmd, err
+		}
 	}
 
 	machineInstance.Status.Phase = common.ReadyMachinePhase
@@ -449,6 +511,7 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (s
 	if err != nil {
 		return "updateStatus()", err
 	}
+
 	return "doUpgrade()", nil
 }
 
