@@ -81,6 +81,9 @@ func IsReadyForDeletion(machines []clusterv1alpha1.Machine) bool {
 
 	return true
 }
+func IsReadyForUpgrade(machines []clusterv1alpha1.Machine) bool {
+	return IsReadyForDeletion(machines)
+}
 
 func ContainsStatuses(machines []clusterv1alpha1.Machine, ss []common.MachineStatusPhase) bool {
 	for _, item := range machines {
