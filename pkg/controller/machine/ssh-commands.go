@@ -646,10 +646,17 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 		log.Info("Deleting kubeadm for " + machineInstance.GetName())
 		cmd, err = cr.Run(
 			client.Client,
-			ssh.Command{Cmd: "kubeadm reset -f"},
+			ssh.Command{Cmd: "kubeadm reset --force"},
 		)
 		if err != nil {
-			return nil, cmd, err
+			log.Info("kubeadm probably does not understand '--force' flag, trying without.")
+			cmd, err = cr.Run(
+				client.Client,
+				ssh.Command{Cmd: "kubeadm reset"},
+			)
+			if err != nil {
+				return nil, cmd, err
+			}
 		}
 
 		cmd, err = cr.Run(
@@ -865,28 +872,12 @@ var UpgradeMaster = func(client *ssh.Client, kubeClient client.Client,
 		return nil, cmd, err
 	}
 
-	// configure kubelet if needed
+	// configure kubelet
 	cmd, err = cr.Run(
 		client.Client,
-		ssh.Command{Cmd: "[ -f /etc/sysconfig/kubelet ]"},
+		ssh.Command{Cmd: "echo -n 'KUBELET_EXTRA_ARGS=--cgroup-driver=systemd " +
+			"--runtime-cgroups=/systemd/system.slice --kubelet-cgroups=/systemd/system.slice' > /etc/sysconfig/kubelet"},
 	)
-
-	if err == nil {
-		cmd, err = cr.Run(
-			client.Client,
-			ssh.Command{Cmd: "sed -i 's/cgroup-driver=cgroupfs/cgroup-driver=systemd/g' " +
-				"/etc/sysconfig/kubelet"},
-			ssh.Command{Cmd: "sed -i 's/cgroup-driver=systemd/cgroup-driver=systemd " +
-				"--runtime-cgroups=\\/systemd\\/system.slice --kubelet-cgroups=\\/systemd\\/system.slice/g' " +
-				"/etc/sysconfig/kubelet"},
-		)
-	} else {
-		cmd, err = cr.Run(
-			client.Client,
-			ssh.Command{Cmd: "echo -n 'KUBELET_EXTRA_ARGS=--cgroup-driver=systemd " +
-				"--runtime-cgroups=/systemd/system.slice --kubelet-cgroups=/systemd/system.slice'"},
-		)
-	}
 	if err != nil {
 		return nil, cmd, err
 	}
@@ -955,10 +946,10 @@ var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
 		client.Client,
 		ssh.Command{Cmd: "cat - > /etc/kubernetes/admin.conf",
 			Stdin: bytes.NewReader([]byte(commandArgs["admin.conf"]))},
+		ssh.Command{Cmd: "kubectl drain " +
+			hostnameString + " --ignore-daemonsets --kubeconfig=/etc/kubernetes/admin.conf"},
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
 			bootstrapRepoName + " kubeadm-" + k8sVersion + " -y --disableexcludes=kubernetes"},
-		ssh.Command{Cmd: "kubeadm upgrade apply v" + k8sVersion + " -y"},
-		ssh.Command{Cmd: "kubectl drain " + hostnameString + " --kubeconfig=/etc/kubernetes/admin.conf"},
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
 			bootstrapRepoName + " kubelet-" + k8sVersion + " -y --disableexcludes=kubernetes"},
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
@@ -969,28 +960,12 @@ var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
 		return nil, cmd, err
 	}
 
-	// configure kubelet if needed
+	// configure kubelet
 	cmd, err = cr.Run(
 		client.Client,
-		ssh.Command{Cmd: "[ -f /etc/sysconfig/kubelet ]"},
+		ssh.Command{Cmd: "echo -n 'KUBELET_EXTRA_ARGS=--cgroup-driver=systemd " +
+			"--runtime-cgroups=/systemd/system.slice --kubelet-cgroups=/systemd/system.slice' > /etc/sysconfig/kubelet"},
 	)
-
-	if err == nil {
-		cmd, err = cr.Run(
-			client.Client,
-			ssh.Command{Cmd: "sed -i 's/cgroup-driver=cgroupfs/cgroup-driver=systemd/g' " +
-				"/etc/sysconfig/kubelet"},
-			ssh.Command{Cmd: "sed -i 's/cgroup-driver=systemd/cgroup-driver=systemd " +
-				"--runtime-cgroups=\\/systemd\\/system.slice --kubelet-cgroups=\\/systemd\\/system.slice/g' " +
-				"/etc/sysconfig/kubelet"},
-		)
-	} else {
-		cmd, err = cr.Run(
-			client.Client,
-			ssh.Command{Cmd: "echo -n 'KUBELET_EXTRA_ARGS=--cgroup-driver=systemd " +
-				"--runtime-cgroups=/systemd/system.slice --kubelet-cgroups=/systemd/system.slice'"},
-		)
-	}
 	if err != nil {
 		return nil, cmd, err
 	}

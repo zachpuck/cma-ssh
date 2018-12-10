@@ -81,8 +81,31 @@ func IsReadyForDeletion(machines []clusterv1alpha1.Machine) bool {
 
 	return true
 }
-func IsReadyForUpgrade(machines []clusterv1alpha1.Machine) bool {
-	return IsReadyForDeletion(machines)
+
+// similar to GetStatus(), but returns true for whether its ok to proceed with machine upgrade
+// Upgrade is ok when none of the machines in the cluster are in Creating state
+// If some of the machines are in Error state, return an error
+func IsReadyForUpgrade(machines []clusterv1alpha1.Machine) (bool, error) {
+	if len(machines) == 0 {
+		return true, nil
+	}
+
+	if ContainsStatuses(machines,
+		[]common.MachineStatusPhase{
+			common.ProvisioningMachinePhase,
+			"",
+		}) {
+		return false, nil
+	}
+
+	if ContainsStatuses(machines,
+		[]common.MachineStatusPhase{
+			common.ErrorMachinePhase,
+		}) {
+		return false, fmt.Errorf("cannot upgrade, some of the cluster machines are in error state")
+	}
+
+	return true, nil
 }
 
 func ContainsStatuses(machines []clusterv1alpha1.Machine, ss []common.MachineStatusPhase) bool {

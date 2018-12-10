@@ -246,7 +246,14 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.Machin
 		log.Error(err, "could not list Machines")
 		return reconcile.Result{}, err
 	}
-	if !util.IsReadyForUpgrade(machineList) {
+	// if not ok to upgrade with error, return and do not requeue
+	ok, err := util.IsReadyForUpgrade(machineList)
+	if err != nil {
+		log.Error(err, "cannot upgrade")
+		return reconcile.Result{}, nil
+	}
+	// if not ok to upgrade, try later
+	if !ok {
 		log.Info("Upgrade: Waiting for cluster to finish reconciling")
 		return reconcile.Result{Requeue: true}, nil
 	}
@@ -261,7 +268,7 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.Machin
 		return reconcile.Result{}, err
 	}
 
-	// start upgrade process
+	// otherwise start upgrade process
 	r.backgroundRunner(doUpgrade, machineInstance, "handleUpgrade")
 
 	return reconcile.Result{}, nil
@@ -498,26 +505,35 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (s
 			}
 
 			if masterMachine.Status.Phase != common.ReadyMachinePhase {
-				err = fmt.Errorf("master instance %s is not done with upgrade",
-					masterMachine.GetName())
-				log.Error(err, "master not ready, will retry.")
-				return err
+				log.Info("master " + masterMachine.GetName() + " not ready, will retry " + machineInstance.GetName())
+				return fmt.Errorf("master is not ready")
 			}
 
 			if masterMachine.Status.KubernetesVersion != clusterInstance.Spec.KubernetesVersion {
-				err = fmt.Errorf("master instance %s is not done with upgrade: "+
-					"current k8s version %s, expecting %s",
-					masterMachine.GetName(), masterMachine.Status.KubernetesVersion,
-					clusterInstance.Spec.KubernetesVersion)
-				log.Error(err, "master not ready, will retry.")
-				return err
+				log.Info("master " + masterMachine.GetName() +
+					" not done with upgrade, will retry " + machineInstance.GetName())
+				return fmt.Errorf("master is not done with upgrade")
 			}
 
+			log.Info("master phase: " + string(masterMachine.Status.Phase) +
+				" master version: " + masterMachine.Status.KubernetesVersion)
 			return nil
 		})
 
+		machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
+		if err != nil {
+			log.Error(err, "could not list Machines")
+			return "util.GetClusterMachineList", err
+		}
+
+		masterMachine, err := util.GetMaster(machineList)
+		if err != nil {
+			log.Error(err, "could not get master instance")
+			return "util.GetMaster", err
+		}
+
 		// get admin kubeconfig
-		kubeConfig, cmd, err := RunSshCommand(r.Client, machineInstance, GetKubeConfig, make(map[string]string))
+		kubeConfig, cmd, err := RunSshCommand(r.Client, masterMachine, GetKubeConfig, make(map[string]string))
 		if err != nil {
 			return cmd, err
 		}
