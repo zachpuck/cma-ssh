@@ -13,7 +13,8 @@ ARG HELM_VERSIONS="v2.11.0"
 ARG DOCKER_VERSION="1.13.1-75.git8633870.el7.centos"
 
 # add docker repo, add kubernetes repo
-RUN yum-config-manager --add-repo https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+RUN yum-config-manager --add-repo https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64 \
+    && yum update -y
 
 # pre create folders
 RUN mkdir -p /var/tmp/yaml \
@@ -22,21 +23,11 @@ RUN mkdir -p /var/tmp/yaml \
 
 # donwload all k8s rpms and helm
 RUN helmversions=($HELM_VERSIONS); k8sversions=($K8S_VERSIONS); for ver in ${versions[*]}; do mkdir -p /var/tmp/${ver}; done \
-    && for ver in ${k8sversions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/k8s-${ver} kubectl-${ver}; done \
-    && for ver in ${k8sversions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/k8s-${ver} kubeadm-${ver}; done \
-    && for ver in ${k8sversions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/k8s-${ver} kubelet-${ver}; done \
-    && for ver in ${k8sversions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/k8s-${ver} kubernetes-cni; done \
-    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker audit \
-    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker audit-libs \
-    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker libselinux \
-    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker libsepol \
-    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker libsemanage \
-    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker device-mapper-persistent-data \
-    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker lvm2 \
-    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker conntrack \
-    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker-${DOCKER_VERSION} \
-    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker-client-${DOCKER_VERSION} \
-    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker docker-common-${DOCKER_VERSION} \
+    && for ver in ${k8sversions[*]}; do yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/k8s-${ver} \
+        kubectl-${ver} kubeadm-${ver} kubelet-${ver} kubernetes-cni; done \
+    && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/docker audit audit-libs libselinux libsepol libsemanage \
+        device-mapper-persistent-data lvm2  conntrack docker-${DOCKER_VERSION} \
+        docker-client-${DOCKER_VERSION} docker-common-${DOCKER_VERSION} \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/nginx nginx \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/curl curl \
     && yumdownloader --assumeyes --resolve --destdir /var/tmp/rpm/wget wget \
@@ -55,7 +46,6 @@ RUN mkdir /yum && \
     chmod 777 /yum && \
     mkdir -p /static && \
     chmod 777 /static
-
 
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY --from=downloader /var/tmp/rpm/ /yum

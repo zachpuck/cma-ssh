@@ -133,9 +133,12 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
+	// if we are not being deleted
 	if machineInstance.DeletionTimestamp.IsZero() {
-		// object being created or upgraded
 		if machineInstance.Status.Phase == common.ReadyMachinePhase {
+			// Object is currently ready, so we need to check if
+			// the state change came in from cluster version change
+
 			// build semvers
 			machineKuberneteVersion, err := semver.NewVersion(machineInstance.Status.KubernetesVersion)
 			if err != nil {
@@ -151,18 +154,27 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 
 			// if cluster object kubernetes version is not equal to machine kubernetes version,
 			// trigger an upgrade
+			log.Info("Checking cluster version to see if upgrade is needed for " + machineInstance.GetName())
 			if !clusterKuberneteVersion.Equal(machineKuberneteVersion) {
-
+				log.Info("will upgrade " + machineInstance.GetName() + " to " + clusterKuberneteVersion.String())
 				return r.handleUpgrade(machineInstance, clusterInstance)
+			} else {
+				log.Info("No upgrade is needed for " + machineInstance.GetName())
 			}
 
 		} else if machineInstance.Status.Phase == common.ErrorMachinePhase {
+			// if object is in error state, just ignore and move on
+			return reconcile.Result{}, nil
+		} else if machineInstance.Status.Phase == common.UpgradingMachinePhase {
+			// if object is currently updating, ignore and move on
 			return reconcile.Result{}, nil
 		} else {
+			// if not an error, in progress update, or an update request, we must be
+			// creating a new machine. Trigger bootstrap
 			return r.handleCreate(machineInstance, clusterInstance)
 		}
 	} else {
-		// The object is being deleted
+		// The object is being deleted, do a node delete
 		return r.handleDelete(machineInstance)
 	}
 
@@ -173,24 +185,23 @@ func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.Machine
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller handleDelete()")
 
-	// requeue, unless we are in ready or error state
+	// if already deleting, ignore
 	if machineInstance.Status.Phase == common.DeletingMachinePhase {
 		log.Info("Delete: Already deleting...")
 		return reconcile.Result{}, nil
 	}
 
-	// get cluster status to determine whether we should proceed
+	// get cluster status to determine whether we should proceed,
+	// i.e. if there is a create in progress, we wait for it to either finish or error
 	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-
 	machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
 	if err != nil {
 		log.Error(err, "could not list Machines")
 		return reconcile.Result{}, err
 	}
-
 	if !util.IsReadyForDeletion(machineList) {
 		log.Info("Delete: Waiting for cluster to finish reconciling")
 		return reconcile.Result{Requeue: true}, nil
@@ -219,13 +230,37 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.Machin
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller handleUpgrade()")
 
+	// if already upgrading, move on
 	if machineInstance.Status.Phase == common.UpgradingMachinePhase {
 		return reconcile.Result{}, nil
 	}
 
+	// get cluster status to determine whether we should proceed,
+	// i.e. if there is a create in progress, we wait for it to either finish or error
+	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
+	if err != nil {
+		log.Error(err, "could not list Machines")
+		return reconcile.Result{}, err
+	}
+	// if not ok to upgrade with error, return and do not requeue
+	ok, err := util.IsReadyForUpgrade(machineList)
+	if err != nil {
+		log.Error(err, "cannot upgrade")
+		return reconcile.Result{}, nil
+	}
+	// if not ok to upgrade, try later
+	if !ok {
+		log.Info("Upgrade: Waiting for cluster to finish reconciling")
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// update status to "upgrading"
 	machineInstance.Status.Phase = common.UpgradingMachinePhase
-	err := r.updateStatus(machineInstance, corev1.EventTypeNormal,
+	err = r.updateStatus(machineInstance, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.UpgradingMachinePhase)
 	if err != nil {
@@ -233,7 +268,7 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.Machin
 		return reconcile.Result{}, err
 	}
 
-	// start upgrade process
+	// otherwise start upgrade process
 	r.backgroundRunner(doUpgrade, machineInstance, "handleUpgrade")
 
 	return reconcile.Result{}, nil
@@ -255,6 +290,7 @@ func (r *ReconcileMachine) handleCreate(machineInstance *clusterv1alpha1.Machine
 
 	// update status to "creating"
 	machineInstance.Status.Phase = common.ProvisioningMachinePhase
+	machineInstance.Status.KubernetesVersion = clusterInstance.Spec.KubernetesVersion
 	err := r.updateStatus(machineInstance, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.ProvisioningMachinePhase)
@@ -413,14 +449,7 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) 
 	}
 
 	// Set status to ready
-	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
-	if err != nil {
-		return "getCluster()", err
-	}
-
 	machineInstance.Status.Phase = common.ReadyMachinePhase
-	machineInstance.Status.KubernetesVersion = clusterInstance.Spec.KubernetesVersion
-
 	err = r.updateStatus(machineInstance, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.ReadyMachinePhase)
@@ -431,13 +460,84 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) 
 }
 
 func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (string, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("machine Controller doUpgrade()")
 
-	// TODO: run kubernetes physical node upgrade here
-
-	// Set status to ready
+	// get the cluster instance
 	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
 	if err != nil {
 		return "getCluster()", err
+	}
+
+	// if master, do the upgrade.
+	// otherwise wait for master to finish upgrade then
+	// proceed with upgrade
+	// master is done upgrading when it is in ready status and
+	// its status kubernetes version matches clusters kubernetes version
+	if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleMaster) {
+		log.Info("running upgrade on master " + machineInstance.GetName())
+		_, cmd, err := RunSshCommand(r.Client, machineInstance,
+			UpgradeMaster, make(map[string]string))
+		if err != nil {
+			return cmd, err
+		}
+
+	} else {
+		log.Info("running upgrade on worker " + machineInstance.GetName())
+		err = util.Retry(20, 3*time.Second, func() error {
+			// get list of machines
+			machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
+			if err != nil {
+				log.Error(err, "could not list Machines")
+				return err
+			}
+
+			masterMachine, err := util.GetMaster(machineList)
+			if err != nil {
+				log.Error(err, "could not get master instance")
+				return err
+			}
+
+			if masterMachine.Status.Phase != common.ReadyMachinePhase {
+				log.Info("master " + masterMachine.GetName() + " not ready, will retry " + machineInstance.GetName())
+				return fmt.Errorf("master is not ready")
+			}
+
+			if masterMachine.Status.KubernetesVersion != clusterInstance.Spec.KubernetesVersion {
+				log.Info("master " + masterMachine.GetName() +
+					" not done with upgrade, will retry " + machineInstance.GetName())
+				return fmt.Errorf("master is not done with upgrade")
+			}
+
+			log.Info("master phase: " + string(masterMachine.Status.Phase) +
+				" master version: " + masterMachine.Status.KubernetesVersion)
+			return nil
+		})
+
+		machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
+		if err != nil {
+			log.Error(err, "could not list Machines")
+			return "util.GetClusterMachineList", err
+		}
+
+		masterMachine, err := util.GetMaster(machineList)
+		if err != nil {
+			log.Error(err, "could not get master instance")
+			return "util.GetMaster", err
+		}
+
+		// get admin kubeconfig
+		kubeConfig, cmd, err := RunSshCommand(r.Client, masterMachine, GetKubeConfig, make(map[string]string))
+		if err != nil {
+			return cmd, err
+		}
+
+		// run node upgrade
+		_, cmd, err = RunSshCommand(r.Client, machineInstance,
+			UpgradeNode, map[string]string{"admin.conf": string(kubeConfig[:])})
+		if err != nil {
+			return cmd, err
+		}
 	}
 
 	machineInstance.Status.Phase = common.ReadyMachinePhase
@@ -449,6 +549,7 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (s
 	if err != nil {
 		return "updateStatus()", err
 	}
+
 	return "doUpgrade()", nil
 }
 
@@ -457,22 +558,23 @@ func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (st
 	log := logf.Log.WithName("machine Controller doDelete()")
 
 	log.Info("Starting Delete for machine " + machineInstance.GetName())
+
 	// run delete command
 	_, cmd, err := RunSshCommand(r.Client, machineInstance, DeleteNode, make(map[string]string))
 	if err != nil {
-		return cmd, err
+		log.Error(err, "failed to clean up physical node for machine "+machineInstance.GetName()+
+			". Manual cleanup might be required for "+machineInstance.Spec.SshConfig.Host)
 	}
 
 	machineInstance.Finalizers =
 		util.RemoveString(machineInstance.Finalizers, clusterv1alpha1.MachineFinalizer)
-	err = r.updateStatus(machineInstance, corev1.EventTypeNormal,
+	if err := r.updateStatus(machineInstance, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
-		machineInstance.GetName(), common.DeletingMachinePhase)
-	if err != nil {
-		return "updateStatus()", err
+		machineInstance.GetName(), common.DeletingMachinePhase); err != nil {
+		log.Error(err, "failed to update status for machine "+machineInstance.GetName())
 	}
 
-	return "doDelete()", nil
+	return cmd, err
 }
 
 func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
@@ -487,7 +589,7 @@ func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 
 	// start bootstrap command (or pre upgrade etc)
 	opResult := make(chan commandError)
-	timer := time.NewTimer(10 * time.Minute)
+	timer := time.NewTimer(20 * time.Minute)
 
 	go func(ch chan<- commandError) {
 		cmd, err := op(r, machineInstance)

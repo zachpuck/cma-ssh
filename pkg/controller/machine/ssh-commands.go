@@ -348,13 +348,6 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 		return nil, cmd, err
 	}
 
-	// get the kubernetes version to use
-	clusterInstance, err := getCluster(kubeClient, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
-	if err != nil {
-		log.Error(err, "error getting cluster instance")
-		return nil, "", err
-	}
-
 	// read in k8s.conf
 	k8sConf, err := asset.Assets.Open("/etc/sysctl.d/k8s.conf")
 	if err != nil {
@@ -364,7 +357,10 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 
 	// run kubernetes install commands
 	bootstrapRepoUrl := "http://" + templateData.BootstrapIp + ":" + templateData.BootstrapPort
-	k8sVersion := clusterInstance.Spec.KubernetesVersion
+
+	// for creates we use the version from machine status,
+	// that is set as soon as machine starts being created
+	k8sVersion := machineInstance.Status.KubernetesVersion
 	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "cat - > /etc/sysctl.d/k8s.conf", Stdin: k8sConf},
@@ -372,8 +368,10 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubelet-" + k8sVersion + " -y"},
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubectl-" + k8sVersion + " -y"},
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubeadm-" + k8sVersion + " -y"},
-		ssh.Command{Cmd: "sed -i 's/cgroup-driver=cgroupfs/cgroup-driver=systemd/g' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf"},
-		ssh.Command{Cmd: "sed -i 's/cgroup-driver=systemd/cgroup-driver=systemd --runtime-cgroups=\\/systemd\\/system.slice --kubelet-cgroups=\\/systemd\\/system.slice/g' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf"},
+		ssh.Command{Cmd: "sed -i 's/cgroup-driver=cgroupfs/cgroup-driver=systemd/g' " +
+			"/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"},
+		ssh.Command{Cmd: "sed -i 's/cgroup-driver=systemd/cgroup-driver=systemd --runtime-cgroups=\\/systemd\\/system.slice " +
+			"--kubelet-cgroups=\\/systemd\\/system.slice/g' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf"},
 		ssh.Command{Cmd: "mkdir -p /etc/kubernetes/"},
 		ssh.Command{Cmd: "wget --output-document=/etc/kubernetes/kube-flannel.yml " + bootstrapRepoUrl + "/download/kube-flannel.yml"},
 		ssh.Command{Cmd: "systemctl daemon-reload"},
@@ -644,10 +642,17 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 		log.Info("Deleting kubeadm for " + machineInstance.GetName())
 		cmd, err = cr.Run(
 			client.Client,
-			ssh.Command{Cmd: "kubeadm reset"},
+			ssh.Command{Cmd: "kubeadm reset --force"},
 		)
 		if err != nil {
-			return nil, cmd, err
+			log.Info("kubeadm probably does not understand '--force' flag, trying without.")
+			cmd, err = cr.Run(
+				client.Client,
+				ssh.Command{Cmd: "kubeadm reset"},
+			)
+			if err != nil {
+				return nil, cmd, err
+			}
 		}
 
 		cmd, err = cr.Run(
@@ -796,4 +801,179 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	return nil, cmd, nil
+}
+
+var UpgradeMaster = func(client *ssh.Client, kubeClient client.Client,
+	machineInstance *clusterv1alpha1.Machine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("Upgrade master command")
+
+	bout := bufio.NewWriter(os.Stdout)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stdout writer")
+		}
+	}(bout)
+
+	berr := bufio.NewWriter(os.Stderr)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stderr writer")
+		}
+	}(berr)
+
+	cr := ssh.CommandRunner{
+		Stdout: bout,
+		Stderr: berr,
+	}
+
+	// get the kubernetes version to use
+	clusterInstance, err := getCluster(kubeClient, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
+	if err != nil {
+		log.Error(err, "error getting cluster instance")
+		return nil, "", err
+	}
+	// for updates we use the version from cluster, as that is what we are upgrading to
+	k8sVersion := clusterInstance.Spec.KubernetesVersion
+
+	// get the lowercased hostname
+	hostname, cmd, err := cr.GetOutput(
+		client.Client,
+		ssh.Command{Cmd: "hostname"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+	hostnameString := strings.ToLower(string(bytes.TrimSpace(hostname)[:]))
+
+	// get the bootstrap repo name
+	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
+
+	// install the new kubeadm and run upgrade
+	// install new kubelet and kubectl
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
+			bootstrapRepoName + " kubeadm-" + k8sVersion + " -y --disableexcludes=kubernetes"},
+		ssh.Command{Cmd: "kubeadm upgrade apply v" + k8sVersion + " -y"},
+		ssh.Command{Cmd: "kubectl drain " + hostnameString + " --ignore-daemonsets --kubeconfig=/etc/kubernetes/admin.conf"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
+			bootstrapRepoName + " kubelet-" + k8sVersion + " -y --disableexcludes=kubernetes"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
+			bootstrapRepoName + " kubectl-" + k8sVersion + " -y"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+
+	// configure kubelet
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "echo -n 'KUBELET_EXTRA_ARGS=--cgroup-driver=systemd " +
+			"--runtime-cgroups=/systemd/system.slice --kubelet-cgroups=/systemd/system.slice' > /etc/sysconfig/kubelet"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "systemctl daemon-reload"},
+		ssh.Command{Cmd: "systemctl restart kubelet"},
+		ssh.Command{Cmd: "kubectl uncordon " + hostnameString + " --kubeconfig=/etc/kubernetes/admin.conf"},
+	)
+
+	return nil, cmd, err
+}
+
+var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
+	machineInstance *clusterv1alpha1.Machine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("Upgrade node command")
+
+	bout := bufio.NewWriter(os.Stdout)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stdout writer")
+		}
+	}(bout)
+
+	berr := bufio.NewWriter(os.Stderr)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stderr writer")
+		}
+	}(berr)
+
+	cr := ssh.CommandRunner{
+		Stdout: bout,
+		Stderr: berr,
+	}
+
+	// get the kubernetes version to use
+	clusterInstance, err := getCluster(kubeClient, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
+	if err != nil {
+		log.Error(err, "error getting cluster instance")
+		return nil, "", err
+	}
+	// for updates we use the version from cluster, as that is what we are upgrading to
+	k8sVersion := clusterInstance.Spec.KubernetesVersion
+
+	// get the lowercased hostname
+	hostname, cmd, err := cr.GetOutput(
+		client.Client,
+		ssh.Command{Cmd: "hostname"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+	hostnameString := strings.ToLower(string(bytes.TrimSpace(hostname)[:]))
+
+	// get the bootstrap repo name
+	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
+
+	// install the new kubeadm and run upgrade
+	// install new kubelet and kubectl
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "cat - > /etc/kubernetes/admin.conf",
+			Stdin: bytes.NewReader([]byte(commandArgs["admin.conf"]))},
+		ssh.Command{Cmd: "kubectl drain " +
+			hostnameString + " --ignore-daemonsets --kubeconfig=/etc/kubernetes/admin.conf"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
+			bootstrapRepoName + " kubeadm-" + k8sVersion + " -y --disableexcludes=kubernetes"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
+			bootstrapRepoName + " kubelet-" + k8sVersion + " -y --disableexcludes=kubernetes"},
+		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
+			bootstrapRepoName + " kubectl-" + k8sVersion + " -y"},
+		ssh.Command{Cmd: "kubeadm upgrade node config --kubelet-version $(kubelet --version | cut -d ' ' -f 2)"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+
+	// configure kubelet
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "echo -n 'KUBELET_EXTRA_ARGS=--cgroup-driver=systemd " +
+			"--runtime-cgroups=/systemd/system.slice --kubelet-cgroups=/systemd/system.slice' > /etc/sysconfig/kubelet"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "systemctl daemon-reload"},
+		ssh.Command{Cmd: "systemctl restart kubelet"},
+		ssh.Command{Cmd: "kubectl uncordon " + hostnameString + " --kubeconfig=/etc/kubernetes/admin.conf"},
+	)
+
+	return nil, cmd, err
 }
