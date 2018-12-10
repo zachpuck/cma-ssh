@@ -290,6 +290,7 @@ func (r *ReconcileMachine) handleCreate(machineInstance *clusterv1alpha1.Machine
 
 	// update status to "creating"
 	machineInstance.Status.Phase = common.ProvisioningMachinePhase
+	machineInstance.Status.KubernetesVersion = clusterInstance.Spec.KubernetesVersion
 	err := r.updateStatus(machineInstance, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.ProvisioningMachinePhase)
@@ -448,14 +449,7 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) 
 	}
 
 	// Set status to ready
-	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
-	if err != nil {
-		return "getCluster()", err
-	}
-
 	machineInstance.Status.Phase = common.ReadyMachinePhase
-	machineInstance.Status.KubernetesVersion = clusterInstance.Spec.KubernetesVersion
-
 	err = r.updateStatus(machineInstance, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.ReadyMachinePhase)
@@ -595,7 +589,7 @@ func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 
 	// start bootstrap command (or pre upgrade etc)
 	opResult := make(chan commandError)
-	timer := time.NewTimer(10 * time.Minute)
+	timer := time.NewTimer(20 * time.Minute)
 
 	go func(ch chan<- commandError) {
 		cmd, err := op(r, machineInstance)

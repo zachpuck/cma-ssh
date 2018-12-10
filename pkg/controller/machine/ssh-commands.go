@@ -348,13 +348,6 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 		return nil, cmd, err
 	}
 
-	// get the kubernetes version to use
-	clusterInstance, err := getCluster(kubeClient, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
-	if err != nil {
-		log.Error(err, "error getting cluster instance")
-		return nil, "", err
-	}
-
 	// read in k8s.conf
 	k8sConf, err := asset.Assets.Open("/etc/sysctl.d/k8s.conf")
 	if err != nil {
@@ -364,7 +357,10 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 
 	// run kubernetes install commands
 	bootstrapRepoUrl := "http://" + templateData.BootstrapIp + ":" + templateData.BootstrapPort
-	k8sVersion := clusterInstance.Spec.KubernetesVersion
+
+	// for creates we use the version from machine status,
+	// that is set as soon as machine starts being created
+	k8sVersion := machineInstance.Status.KubernetesVersion
 	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "cat - > /etc/sysctl.d/k8s.conf", Stdin: k8sConf},
@@ -840,6 +836,7 @@ var UpgradeMaster = func(client *ssh.Client, kubeClient client.Client,
 		log.Error(err, "error getting cluster instance")
 		return nil, "", err
 	}
+	// for updates we use the version from cluster, as that is what we are upgrading to
 	k8sVersion := clusterInstance.Spec.KubernetesVersion
 
 	// get the lowercased hostname
@@ -925,6 +922,7 @@ var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
 		log.Error(err, "error getting cluster instance")
 		return nil, "", err
 	}
+	// for updates we use the version from cluster, as that is what we are upgrading to
 	k8sVersion := clusterInstance.Spec.KubernetesVersion
 
 	// get the lowercased hostname
