@@ -40,7 +40,7 @@ func RunSshCommand(kubeClient client.Client,
 	sshConfig := machineInstance.Spec.SshConfig
 	secret := &corev1.Secret{}
 
-	err := util.Retry(20, 3*time.Second, func() error {
+	err := util.Retry(60, 10*time.Second, func() error {
 		err := kubeClient.Get(
 			context.Background(),
 			client.ObjectKey{
@@ -435,7 +435,7 @@ var KubeadmInit = func(client *ssh.Client, kubeClient client.Client,
 	}
 	hostnameString := strings.ToLower(string(bytes.TrimSpace(hostname)[:]))
 
-	err = util.Retry(20, 3*time.Second, func() error {
+	err = util.Retry(60, 10*time.Second, func() error {
 		for k, v := range machineInstance.Spec.Labels {
 			cmd, err = cr.Run(
 				client.Client,
@@ -519,7 +519,7 @@ var KubeadmJoin = func(client *ssh.Client, kubeClient client.Client,
 	// kubeadm join
 	cmd, err := cr.Run(
 		client.Client,
-		ssh.Command{Cmd: " kubeadm join --token " +
+		ssh.Command{Cmd: "kubeadm join --token " +
 			token +
 			" --ignore-preflight-errors=all --discovery-token-unsafe-skip-ca-verification " +
 			master},
@@ -535,7 +535,7 @@ var KubeadmJoin = func(client *ssh.Client, kubeClient client.Client,
 	}
 	hostnameString := strings.ToLower(string(bytes.TrimSpace(hostname)[:]))
 
-	err = util.Retry(20, 3*time.Second, func() error {
+	err = util.Retry(60, 10*time.Second, func() error {
 		for k, v := range machineInstance.Spec.Labels {
 			cmd, err = cr.Run(
 				client.Client,
@@ -973,6 +973,58 @@ var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
 		ssh.Command{Cmd: "systemctl daemon-reload"},
 		ssh.Command{Cmd: "systemctl restart kubelet"},
 		ssh.Command{Cmd: "kubectl uncordon " + hostnameString + " --kubeconfig=/etc/kubernetes/admin.conf"},
+	)
+
+	return nil, cmd, err
+}
+
+var DrainAndDeleteNode = func(client *ssh.Client, kubeClient client.Client,
+	machineInstance *clusterv1alpha1.Machine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
+	logf.SetLogger(logf.ZapLogger(false))
+	log := logf.Log.WithName("Upgrade node command")
+
+	bout := bufio.NewWriter(os.Stdout)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stdout writer")
+		}
+	}(bout)
+
+	berr := bufio.NewWriter(os.Stderr)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			log.Error(err, "could not flush os.Stderr writer")
+		}
+	}(berr)
+
+	cr := ssh.CommandRunner{
+		Stdout: bout,
+		Stderr: berr,
+	}
+
+	// get the lowercased hostname
+	hostname, cmd, err := cr.GetOutput(
+		client.Client,
+		ssh.Command{Cmd: "hostname"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+	hostnameString := strings.ToLower(string(bytes.TrimSpace(hostname)[:]))
+
+	// install the new kubeadm and run upgrade
+	// install new kubelet and kubectl
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "cat - > /etc/kubernetes/admin.conf",
+			Stdin: bytes.NewReader([]byte(commandArgs["admin.conf"]))},
+		ssh.Command{Cmd: "kubectl drain " +
+			hostnameString + " --ignore-daemonsets --kubeconfig=/etc/kubernetes/admin.conf"},
+		ssh.Command{Cmd: "kubectl delete node " + hostnameString +
+			" --kubeconfig=/etc/kubernetes/admin.conf"},
 	)
 
 	return nil, cmd, err
