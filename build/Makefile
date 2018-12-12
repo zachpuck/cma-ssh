@@ -59,10 +59,10 @@ manifests:
 	go run $(PROJECTDIR)/vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go rbac --name rbac --output-dir $(PROJECTDIR)/rbac
 	output=$$(kustomize build build/kustomize/rbac/role); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/RBAC/rbac_role.yaml
 	output=$$(kustomize build build/kustomize/rbac/rolebinding); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/RBAC/rbac_role_binding.yaml
-	output=$$(kustomize build build/kustomize/crd/protected/cluster); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/CRD-protected/cluster_v1alpha1_cluster.yaml
-	output=$$(kustomize build build/kustomize/crd/protected/machine); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/CRD-protected/custer_v1alpha1_machine.yaml
-	output=$$(kustomize build build/kustomize/crd/unprotected/cluster); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/CRD/cluster_v1alpha1_cluster.yaml
-	output=$$(kustomize build build/kustomize/crd/unprotected/machine); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/CRD/cluster_v1alpha1_machine.yaml
+	output=$$(kustomize build build/kustomize/crd/protected/cluster); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/CRD-protected/cluster_v1alpha1_cnctcluster.yaml
+	output=$$(kustomize build build/kustomize/crd/protected/machine); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/CRD-protected/custer_v1alpha1_cnctmachine.yaml
+	output=$$(kustomize build build/kustomize/crd/unprotected/cluster); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/CRD/cluster_v1alpha1_cnctcluster.yaml
+	output=$$(kustomize build build/kustomize/crd/unprotected/machine); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/CRD/cluster_v1alpha1_cnctmachine.yaml
 
 # Run go fmt against code
 fmt:

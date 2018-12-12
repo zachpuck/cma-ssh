@@ -1,5 +1,5 @@
 apiVersion: cluster.cnct.sds.samsung.com/v1alpha1
-kind: Cluster
+kind: CnctCluster
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
