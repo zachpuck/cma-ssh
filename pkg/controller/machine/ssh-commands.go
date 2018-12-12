@@ -40,7 +40,7 @@ func RunSshCommand(kubeClient client.Client,
 	sshConfig := machineInstance.Spec.SshConfig
 	secret := &corev1.Secret{}
 
-	err := util.Retry(60, 10*time.Second, func() error {
+	err := util.Retry(120, 10*time.Second, func() error {
 		err := kubeClient.Get(
 			context.Background(),
 			client.ObjectKey{
@@ -435,7 +435,7 @@ var KubeadmInit = func(client *ssh.Client, kubeClient client.Client,
 	}
 	hostnameString := strings.ToLower(string(bytes.TrimSpace(hostname)[:]))
 
-	err = util.Retry(60, 10*time.Second, func() error {
+	err = util.Retry(120, 10*time.Second, func() error {
 		for k, v := range machineInstance.Spec.Labels {
 			cmd, err = cr.Run(
 				client.Client,
@@ -535,7 +535,7 @@ var KubeadmJoin = func(client *ssh.Client, kubeClient client.Client,
 	}
 	hostnameString := strings.ToLower(string(bytes.TrimSpace(hostname)[:]))
 
-	err = util.Retry(60, 10*time.Second, func() error {
+	err = util.Retry(120, 10*time.Second, func() error {
 		for k, v := range machineInstance.Spec.Labels {
 			cmd, err = cr.Run(
 				client.Client,
