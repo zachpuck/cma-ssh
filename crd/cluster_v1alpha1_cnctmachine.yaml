@@ -1,0 +1,70 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: cnctmachines.cluster.cnct.sds.samsung.com
+spec:
+  group: cluster.cnct.sds.samsung.com
+  names:
+    kind: CnctMachine
+    plural: cnctmachines
+  scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          type: object
+        spec:
+          properties:
+            clusterref:
+              type: string
+            labels:
+              type: object
+            roles:
+              items:
+                type: string
+              type: array
+            sshconfig:
+              properties:
+                host:
+                  type: string
+                port:
+                  format: int32
+                  type: integer
+                publichost:
+                  type: string
+                secret:
+                  type: string
+                username:
+                  type: string
+              type: object
+            taints:
+              items:
+                type: object
+              type: array
+          type: object
+        status:
+          properties:
+            kubernetesVersion:
+              type: string
+            lastUpdated:
+              format: date-time
+              type: string
+            phase:
+              type: string
+          required:
+          - kubernetesVersion
+          type: object
+  version: v1alpha1
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
