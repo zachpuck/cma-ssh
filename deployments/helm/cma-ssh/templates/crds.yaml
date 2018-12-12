@@ -1,12 +1,12 @@
 {{- if .Values.install.crds }}
 {{ $root := . }}
 {{- if .Values.keepCRDs }}
-{{- range tuple "CRD-protected/cluster_v1alpha1_cluster.yaml" "CRD-protected/cluster_v1alpha1_machine.yaml" }}
+{{- range tuple "CRD-protected/cluster_v1alpha1_cnctcluster.yaml" "CRD-protected/cluster_v1alpha1_cnctmachine.yaml" }}
 ---
 {{ tpl ($root.Files.Get .) $root }}
 {{- end }}
 {{- else }}
-{{- range tuple "CRD/cluster_v1alpha1_cluster.yaml" "CRD/cluster_v1alpha1_machine.yaml" }}
+{{- range tuple "CRD/cluster_v1alpha1_cnctcluster.yaml" "CRD/cluster_v1alpha1_cnctmachine.yaml" }}
 ---
 {{ tpl ($root.Files.Get .) $root }}
 {{- end }}

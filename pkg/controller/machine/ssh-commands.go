@@ -979,7 +979,7 @@ var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
 }
 
 var DrainAndDeleteNode = func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
+	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("Upgrade node command")

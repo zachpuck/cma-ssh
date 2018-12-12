@@ -11,10 +11,10 @@ metadata:
   name: '{{ include "cma-ssh.name" . }}-rbac-role'
 rules:
 - apiGroups:
-  - cluster.cnct.sds.samsung.com
+  - cnctcluster.cnct.sds.samsung.com
   resources:
-  - clusters
-  - machines
+  - cnctclusters
+  - cnctmachines
   verbs:
   - get
   - list
@@ -36,10 +36,10 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - machine.cnct.sds.samsung.com
+  - cnctmachine.cnct.sds.samsung.com
   resources:
-  - machines
-  - clusters
+  - cnctmachines
+  - cnctclusters
   verbs:
   - get
   - list
