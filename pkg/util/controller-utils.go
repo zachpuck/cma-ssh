@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-func GetClusterMachineList(c client.Client, clusterName string) ([]clusterv1alpha1.Machine, error) {
-	machineList := &clusterv1alpha1.MachineList{}
+func GetClusterMachineList(c client.Client, clusterName string) ([]clusterv1alpha1.CnctMachine, error) {
+	machineList := &clusterv1alpha1.CnctMachineList{}
 	err := c.List(
 		context.Background(),
 		&client.ListOptions{LabelSelector: labels.Everything()},
@@ -20,7 +20,7 @@ func GetClusterMachineList(c client.Client, clusterName string) ([]clusterv1alph
 		return nil, err
 	}
 
-	var clusterMachines []clusterv1alpha1.Machine
+	var clusterMachines []clusterv1alpha1.CnctMachine
 	for _, item := range machineList.Items {
 		if item.Spec.ClusterRef == clusterName {
 			clusterMachines = append(clusterMachines, item)
@@ -31,7 +31,7 @@ func GetClusterMachineList(c client.Client, clusterName string) ([]clusterv1alph
 }
 
 // returns overall cluster status and api enpoint if available
-func GetStatus(machines []clusterv1alpha1.Machine) (common.ClusterStatusPhase, string) {
+func GetStatus(machines []clusterv1alpha1.CnctMachine) (common.ClusterStatusPhase, string) {
 
 	if len(machines) == 0 {
 		return common.UnspecifiedClusterPhase, ""
@@ -64,7 +64,7 @@ func GetStatus(machines []clusterv1alpha1.Machine) (common.ClusterStatusPhase, s
 
 // similar to GetStatus(), but returns true for whether its ok to proceed with machine deletion
 // Deletion is ok when none of the machines in the cluster are in Creating or Upgrading state
-func IsReadyForDeletion(machines []clusterv1alpha1.Machine) bool {
+func IsReadyForDeletion(machines []clusterv1alpha1.CnctMachine) bool {
 
 	if len(machines) == 0 {
 		return true
@@ -85,7 +85,7 @@ func IsReadyForDeletion(machines []clusterv1alpha1.Machine) bool {
 // similar to GetStatus(), but returns true for whether its ok to proceed with machine upgrade
 // Upgrade is ok when none of the machines in the cluster are in Creating state
 // If some of the machines are in Error state, return an error
-func IsReadyForUpgrade(machines []clusterv1alpha1.Machine) (bool, error) {
+func IsReadyForUpgrade(machines []clusterv1alpha1.CnctMachine) (bool, error) {
 	if len(machines) == 0 {
 		return true, nil
 	}
@@ -108,7 +108,7 @@ func IsReadyForUpgrade(machines []clusterv1alpha1.Machine) (bool, error) {
 	return true, nil
 }
 
-func ContainsStatuses(machines []clusterv1alpha1.Machine, ss []common.MachineStatusPhase) bool {
+func ContainsStatuses(machines []clusterv1alpha1.CnctMachine, ss []common.MachineStatusPhase) bool {
 	for _, item := range machines {
 		for _, ssItem := range ss {
 			if item.Status.Phase == ssItem {
@@ -147,7 +147,7 @@ func RemoveString(slice []string, s string) (result []string) {
 	return
 }
 
-func GetMaster(machines []clusterv1alpha1.Machine) (*clusterv1alpha1.Machine, error) {
+func GetMaster(machines []clusterv1alpha1.CnctMachine) (*clusterv1alpha1.CnctMachine, error) {
 	for _, item := range machines {
 		for _, role := range item.Spec.Roles {
 			if role == common.MachineRoleMaster {

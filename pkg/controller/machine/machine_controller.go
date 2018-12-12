@@ -41,7 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-type backgroundMachineOp func(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (string, error)
+type backgroundMachineOp func(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine) (string, error)
 
 // Add creates a new Machine Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -67,12 +67,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Machine
-	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.Machine{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.CnctMachine{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.Cluster{}},
+	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.CnctCluster{}},
 		&handler.EnqueueRequestsFromMapFunc{ToRequests: util.ClusterToMachineMapper{Client: mgr.GetClient()}})
 	if err != nil {
 		return err
@@ -100,7 +100,7 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 	log := logf.Log.WithName("machine Controller Reconcile()")
 
 	// Fetch the Machine machine
-	machineInstance := &clusterv1alpha1.Machine{}
+	machineInstance := &clusterv1alpha1.CnctMachine{}
 	err := r.Get(context.Background(), request.NamespacedName, machineInstance)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -181,7 +181,7 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.Machine) (reconcile.Result, error) {
+func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.CnctMachine) (reconcile.Result, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller handleDelete()")
 
@@ -226,7 +226,7 @@ func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.Machine
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.Machine, clusterInstance *clusterv1alpha1.Cluster) (reconcile.Result, error) {
+func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.CnctMachine, clusterInstance *clusterv1alpha1.CnctCluster) (reconcile.Result, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller handleUpgrade()")
 
@@ -274,7 +274,7 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.Machin
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileMachine) handleCreate(machineInstance *clusterv1alpha1.Machine, clusterInstance *clusterv1alpha1.Cluster) (reconcile.Result, error) {
+func (r *ReconcileMachine) handleCreate(machineInstance *clusterv1alpha1.CnctMachine, clusterInstance *clusterv1alpha1.CnctCluster) (reconcile.Result, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller handleCreate()")
 
@@ -305,10 +305,10 @@ func (r *ReconcileMachine) handleCreate(machineInstance *clusterv1alpha1.Machine
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileMachine) updateStatus(machineInstance *clusterv1alpha1.Machine, eventType string,
+func (r *ReconcileMachine) updateStatus(machineInstance *clusterv1alpha1.CnctMachine, eventType string,
 	event common.ControllerEvents, eventMessage common.ControllerEvents, args ...interface{}) error {
 
-	machineFreshInstance := &clusterv1alpha1.Machine{}
+	machineFreshInstance := &clusterv1alpha1.CnctMachine{}
 	err := r.Get(
 		context.Background(),
 		client.ObjectKey{
@@ -335,14 +335,14 @@ func (r *ReconcileMachine) updateStatus(machineInstance *clusterv1alpha1.Machine
 	return nil
 }
 
-func getCluster(c client.Client, namespace string, clusterName string) (*clusterv1alpha1.Cluster, error) {
+func getCluster(c client.Client, namespace string, clusterName string) (*clusterv1alpha1.CnctCluster, error) {
 
 	clusterKey := client.ObjectKey{
 		Namespace: namespace,
 		Name:      clusterName,
 	}
 
-	clusterInstance := &clusterv1alpha1.Cluster{}
+	clusterInstance := &clusterv1alpha1.CnctCluster{}
 	err := c.Get(context.Background(), clusterKey, clusterInstance)
 	if err != nil {
 		return nil, err
@@ -351,7 +351,7 @@ func getCluster(c client.Client, namespace string, clusterName string) (*cluster
 	return clusterInstance, nil
 }
 
-func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (string, error) {
+func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine) (string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller preBootstrap()")
 
@@ -411,7 +411,7 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) 
 		// otherwise wait for a bit and try again.
 
 		// get machine list
-		machineList := &clusterv1alpha1.MachineList{}
+		machineList := &clusterv1alpha1.CnctMachineList{}
 		err := r.List(
 			context.Background(),
 			&client.ListOptions{LabelSelector: labels.Everything()},
@@ -459,7 +459,7 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) 
 	return "doBootstrap()", err
 }
 
-func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (string, error) {
+func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine) (string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller doUpgrade()")
 
@@ -553,7 +553,7 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (s
 	return "doUpgrade()", nil
 }
 
-func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (string, error) {
+func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine) (string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller doDelete()")
 
@@ -578,7 +578,7 @@ func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.Machine) (st
 }
 
 func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
-	machineInstance *clusterv1alpha1.Machine, operationName string) {
+	machineInstance *clusterv1alpha1.CnctMachine, operationName string) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller backgroundRunner()")
 

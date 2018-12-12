@@ -75,7 +75,7 @@ type MachineStatus struct {
 
 // Machine is the Schema for the machines API
 // +k8s:openapi-gen=true
-type Machine struct {
+type CnctMachine struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
@@ -86,12 +86,12 @@ type Machine struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // MachineList contains a list of Machine
-type MachineList struct {
+type CnctMachineList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Machine `json:"items"`
+	Items           []CnctMachine `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Machine{}, &MachineList{})
+	SchemeBuilder.Register(&CnctMachine{}, &CnctMachineList{})
 }
