@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const MachineFinalizer = "machine.cluster.cnct.sds.samsung.com"
+const MachineFinalizer = "cnctmachine.cluster.cnct.sds.samsung.com"
 
 // MachineSpec defines the desired state of Machine
 type MachineSpec struct {
