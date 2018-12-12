@@ -353,7 +353,7 @@ func getCluster(c client.Client, namespace string, clusterName string) (*cluster
 
 func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine) (string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("machine Controller preBootstrap()")
+	log := logf.Log.WithName("machine Controller doBootstrap()")
 
 	// Setup bootstrap repo
 	_, cmd, err := RunSshCommand(r.Client, machineInstance, InstallBootstrapRepo, make(map[string]string))
@@ -426,7 +426,7 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachi
 		}
 
 		var token []byte
-		err = util.Retry(20, 3*time.Second, func() error {
+		err = util.Retry(60, 10*time.Second, func() error {
 			// run kubeadm create token on master machine, get token back
 			log.Info("Trying to get kubeadm token from master...")
 			token, cmd, err = RunSshCommand(r.Client, masterMachine, KubeadmTokenCreate, make(map[string]string))
@@ -484,7 +484,7 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine
 
 	} else {
 		log.Info("running upgrade on worker " + machineInstance.GetName())
-		err = util.Retry(20, 3*time.Second, func() error {
+		err = util.Retry(60, 10*time.Second, func() error {
 			// get list of machines
 			machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
 			if err != nil {
@@ -558,6 +558,49 @@ func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine)
 	log := logf.Log.WithName("machine Controller doDelete()")
 
 	log.Info("Starting Delete for machine " + machineInstance.GetName())
+
+	// there is a few possibilities here:
+	// 1. Cluster is being deleted. We can just delete this machine
+	// 2. Worker machine is being deleted. We should drain the machine first, and then delete it
+	// 3. Master machine is being deleted. We should issue a warning, and then delete it.
+	// get the cluster instance
+	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
+	if err != nil {
+		return "getCluster()", err
+	}
+
+	// Cluster is NOT being deleted.
+	if clusterInstance.Status.Phase != common.StoppingClusterPhase {
+		// get the master machine
+		machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
+		if err != nil {
+			log.Error(err, "could not list Machines")
+			return "util.GetClusterMachineList", err
+		}
+		masterMachine, err := util.GetMaster(machineList)
+		if err != nil {
+			log.Error(err, "could not get master instance")
+			return "util.GetMaster", err
+		}
+
+		// TODO: this will need to be handled better
+		if masterMachine.GetName() == machineInstance.GetName() {
+			log.Info("WARNING!!! DELETING MASTER, CLUSTER WILL NOT FUNCTION WITHOUT NEW MASTER AND FULL RESET")
+		}
+
+		// get admin kubeconfig
+		kubeConfig, cmd, err := RunSshCommand(r.Client, masterMachine, GetKubeConfig, make(map[string]string))
+		if err != nil {
+			return cmd, err
+		}
+
+		// run node drain
+		_, cmd, err = RunSshCommand(r.Client, machineInstance,
+			DrainAndDeleteNode, map[string]string{"admin.conf": string(kubeConfig[:])})
+		if err != nil {
+			return cmd, err
+		}
+	}
 
 	// run delete command
 	_, cmd, err := RunSshCommand(r.Client, machineInstance, DeleteNode, make(map[string]string))

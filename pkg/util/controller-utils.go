@@ -168,7 +168,7 @@ func Retry(attempts int, sleep time.Duration, fn func() error) error {
 
 		if attempts--; attempts > 0 {
 			time.Sleep(sleep)
-			return Retry(attempts, 2*sleep, fn)
+			return Retry(attempts, sleep, fn)
 		}
 		return err
 	}
