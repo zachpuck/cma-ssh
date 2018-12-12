@@ -17,7 +17,7 @@ spec:
     host: 10.240.0.8
     port: 22
     username: root
-    secret: ssh-key
+    secret: cluster-private-key
 ---
 apiVersion: cluster.cnct.sds.samsung.com/v1alpha1
 kind: CnctMachine
@@ -37,4 +37,4 @@ spec:
     host: 10.240.0.9
     port: 22
     username: root
-    secret: ssh-key
+    secret: cluster-private-key
