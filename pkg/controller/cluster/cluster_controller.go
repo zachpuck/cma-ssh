@@ -61,12 +61,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Cluster
-	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.Cluster{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.CnctCluster{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.Machine{}},
+	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.CnctMachine{}},
 		&handler.EnqueueRequestsFromMapFunc{ToRequests: util.MachineToClusterMapper{Client: mgr.GetClient()}})
 	if err != nil {
 		return err
@@ -94,7 +94,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 	log := logf.Log.WithName("cluster Controller Reconcile()")
 
 	// Fetch the Cluster instance
-	clusterInstance := &clusterv1alpha1.Cluster{}
+	clusterInstance := &clusterv1alpha1.CnctCluster{}
 	err := r.Get(context.Background(), request.NamespacedName, clusterInstance)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -191,10 +191,10 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 	return reconcile.Result{}, err
 }
 
-func (r *ReconcileCluster) updateStatus(clusterInstance *clusterv1alpha1.Cluster, eventType string,
+func (r *ReconcileCluster) updateStatus(clusterInstance *clusterv1alpha1.CnctCluster, eventType string,
 	event common.ControllerEvents, eventMessage common.ControllerEvents, args ...interface{}) error {
 
-	clusterFreshInstance := &clusterv1alpha1.Cluster{}
+	clusterFreshInstance := &clusterv1alpha1.CnctCluster{}
 	err := r.Get(
 		context.Background(),
 		client.ObjectKey{

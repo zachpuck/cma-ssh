@@ -125,7 +125,7 @@ func DeleteKubeconfigSecret(c client.Client, name string, namespace string) erro
 	return DeleteSecret(c, name, namespace)
 }
 
-func CreateKubeconfigSecret(c client.Client, clusterInstance *clusterv1alpha1.Cluster,
+func CreateKubeconfigSecret(c client.Client, clusterInstance *clusterv1alpha1.CnctCluster,
 	scheme *runtime.Scheme, kubeconfig []byte) error {
 
 	logf.SetLogger(logf.ZapLogger(false))

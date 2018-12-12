@@ -21,12 +21,12 @@ func (m MachineToClusterMapper) Map(obj handler.MapObject) []reconcile.Request {
 
 	var res []reconcile.Request
 
-	machine, ok := obj.Object.(*clusterv1alpha1.Machine)
+	machine, ok := obj.Object.(*clusterv1alpha1.CnctMachine)
 	if !ok {
 		return res // This wasn't a Machine
 	}
 
-	clusters := &clusterv1alpha1.ClusterList{}
+	clusters := &clusterv1alpha1.CnctClusterList{}
 	if err := m.List(context.Background(), &client.ListOptions{}, clusters); err != nil {
 		log.Error(err, "could not get list of clusters")
 		return res

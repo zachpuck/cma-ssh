@@ -28,11 +28,11 @@ type boostrapConfigInfo struct {
 }
 
 type sshCommand func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
+	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error)
 
 func RunSshCommand(kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
+	machineInstance *clusterv1alpha1.CnctMachine,
 	command sshCommand, commandArgs map[string]string) ([]byte, string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("RunSshCommand()")
@@ -106,7 +106,7 @@ func RunSshCommand(kubeClient client.Client,
 }
 
 var IpAddr sshCommand = func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
+	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
 	cr := &ssh.CommandRunner{}
 
@@ -117,7 +117,7 @@ var IpAddr sshCommand = func(client *ssh.Client, kubeClient client.Client,
 }
 
 var InstallBootstrapRepo = func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
+	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("Install bootstrap repo command")
@@ -172,7 +172,7 @@ var InstallBootstrapRepo = func(client *ssh.Client, kubeClient client.Client,
 }
 
 var InstallNginx = func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
+	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("Install nginx command")
@@ -245,7 +245,7 @@ var InstallNginx = func(client *ssh.Client, kubeClient client.Client,
 }
 
 var InstallDocker = func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
+	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("Install docker command")
@@ -306,7 +306,7 @@ var InstallDocker = func(client *ssh.Client, kubeClient client.Client,
 }
 
 var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
+	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("Install kubernetes command")
@@ -383,7 +383,7 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 }
 
 var KubeadmInit = func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
+	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("Kubeadm init command")
@@ -453,7 +453,7 @@ var KubeadmInit = func(client *ssh.Client, kubeClient client.Client,
 }
 
 var KubeadmTokenCreate = func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
+	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("Kubeadm token create command")
@@ -487,7 +487,7 @@ var KubeadmTokenCreate = func(client *ssh.Client, kubeClient client.Client,
 }
 
 var KubeadmJoin = func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
+	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("Kubeadm join command")
@@ -553,7 +553,7 @@ var KubeadmJoin = func(client *ssh.Client, kubeClient client.Client,
 }
 
 var GetKubeConfig = func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
+	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("Get kubeconfig")
@@ -587,7 +587,7 @@ var GetKubeConfig = func(client *ssh.Client, kubeClient client.Client,
 }
 
 var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
+	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("delete node command")
@@ -804,7 +804,7 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 }
 
 var UpgradeMaster = func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
+	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("Upgrade master command")
@@ -890,7 +890,7 @@ var UpgradeMaster = func(client *ssh.Client, kubeClient client.Client,
 }
 
 var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.Machine,
+	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("Upgrade node command")
