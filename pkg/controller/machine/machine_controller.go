@@ -426,7 +426,7 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachi
 		}
 
 		var token []byte
-		err = util.Retry(60, 10*time.Second, func() error {
+		err = util.Retry(120, 10*time.Second, func() error {
 			// run kubeadm create token on master machine, get token back
 			log.Info("Trying to get kubeadm token from master...")
 			token, cmd, err = RunSshCommand(r.Client, masterMachine, KubeadmTokenCreate, make(map[string]string))
@@ -484,7 +484,7 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine
 
 	} else {
 		log.Info("running upgrade on worker " + machineInstance.GetName())
-		err = util.Retry(60, 10*time.Second, func() error {
+		err = util.Retry(120, 10*time.Second, func() error {
 			// get list of machines
 			machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
 			if err != nil {
@@ -632,7 +632,7 @@ func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 
 	// start bootstrap command (or pre upgrade etc)
 	opResult := make(chan commandError)
-	timer := time.NewTimer(20 * time.Minute)
+	timer := time.NewTimer(30 * time.Minute)
 
 	go func(ch chan<- commandError) {
 		cmd, err := op(r, machineInstance)
