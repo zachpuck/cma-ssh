@@ -795,6 +795,12 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 		ssh.Command{Cmd: "rm -rf /var/lib/etcd"},
 		ssh.Command{Cmd: "rm -rf /var/lib/etcd2"},
 		ssh.Command{Cmd: "rm -rf /var/lib/kubelet"},
+		ssh.Command{Cmd: "ip link set cni0 down"},
+		ssh.Command{Cmd: "ip link set flannel.1 down"},
+		ssh.Command{Cmd: "ip link set docker0 down"},
+		ssh.Command{Cmd: "ip link delete cni0"},
+		ssh.Command{Cmd: "ip link delete flannel.1"},
+		ssh.Command{Cmd: "ip link delete docker0"},
 	)
 	if err != nil {
 		return nil, cmd, err
