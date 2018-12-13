@@ -1,0 +1,298 @@
+// Copyright 2018 Samsung SDS Cloud Native Computing Team authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Samsung CNCT <maratoid@gmail.com>
+
+syntax = "proto3";
+
+package cmassh;
+
+import "google/api/annotations.proto";
+import "protoc-gen-swagger/options/annotations.proto";
+
+
+option (grpc.gateway.protoc_gen_swagger.options.openapiv2_swagger) = {
+  info: {
+    title: "Cluster Manager API SSH provider";
+    version: "v0.1.0";
+    contact: {
+        name: "Marat Garafutdinov";
+        url: "https://github.com/samsung-cnct/cma-ssh";
+        email: "maratoid@gmail.com";
+    };
+  };
+  external_docs: {
+    url: "https://github.com/samsung-cnct/cma-ssh";
+    description: "More about Cluster Manager API SSH provider";
+  }
+  schemes: HTTPS;
+  schemes: HTTP;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Cluster {
+    // Will provision a cluster
+    rpc CreateCluster (CreateClusterMsg) returns (CreateClusterReply) {
+        option (google.api.http) = {
+            post : "/api/v1/cluster"
+            body : "*"
+        };
+    }
+    // Will retrieve the status of a cluster and its kubeconfig for connectivity
+    rpc GetCluster (GetClusterMsg) returns (GetClusterReply) {
+        option (google.api.http) = {
+            get : "/api/v1/cluster"
+        };
+    }
+    // Will delete a cluster
+    rpc DeleteCluster (DeleteClusterMsg) returns (DeleteClusterReply) {
+        option (google.api.http) = {
+            delete : "/api/v1/cluster"
+        };
+    }
+    // Will retrieve a list of clusters
+    rpc GetClusterList (GetClusterListMsg) returns (GetClusterListReply) {
+        option (google.api.http) = {
+            get : "/api/v1/cluster/list"
+        };
+    }
+    // Will return version information about api server
+    rpc GetVersionInformation (GetVersionMsg) returns (GetVersionReply) {
+        option (google.api.http) = {
+            get : "/api/v1/version"
+        };
+    }
+    // Will adjust a provision a cluster
+    rpc AdjustClusterNodes (AdjustClusterMsg) returns (AdjustClusterReply) {
+        option (google.api.http) = {
+            put : "/api/v1/cluster"
+            body : "*"
+        };
+    }
+    // Will return upgrade options for a given cluster
+    rpc GetUpgradeClusterInformation (GetUpgradeClusterInformationMsg) returns (GetUpgradeClusterInformationReply) {
+        option (google.api.http) = {
+            get : "/api/v1/cluster/upgrade"
+        };
+    }
+    // Will attempt to upgrade a cluster
+    rpc UpgradeCluster (UpgradeClusterMsg) returns (UpgradeClusterReply) {
+        option (google.api.http) = {
+            put : "/api/v1/cluster/upgrade"
+            body : "*"
+        };
+    }
+}
+
+enum ClusterStatus {
+    // Not set
+    STATUS_UNSPECIFIED = 0;
+    // The PROVISIONING state indicates the cluster is being created.
+    PROVISIONING = 1;
+    // The RUNNING state indicates the cluster has been created and is fully usable.
+    RUNNING = 2;
+    // The RECONCILING state indicates that some work is actively being done on the cluster, such as upgrading the master or node software.
+    RECONCILING = 3;
+    // The STOPPING state indicates the cluster is being deleted
+    STOPPING = 4;
+    // The ERROR state indicates the cluster may be unusable
+    ERROR = 5;
+    // The DEGRADED state indicates the cluster requires user action to restore full functionality
+    DEGRADED = 6;
+}
+
+message CreateClusterMsg {
+    // Name of the cluster to be provisioned
+    string name = 1;
+    // The version of Kubernetes for worker nodes. Control plane versions are determined by the MachineSpec.
+    string k8s_version = 2;
+    // Whether or not the cluster is HA
+    bool high_availability = 3;
+    // The fabric to be used
+    string network_fabric = 4;
+    // Machines which comprise the cluster
+    repeated SshMachineSpec control_plane_nodes = 5;
+    // Machines which comprise the cluster
+    repeated SshMachineSpec worker_nodes = 6;
+    // This should be a value like ip:port that will be a virtual IP/port
+    // Passed back to external customers to be able to communicate to the cluster
+    string api_endpoint = 7;
+    // Private key used to ssh into machines
+    string private_key = 8;
+}
+
+message CreateClusterReply {
+    // Whether or not the cluster was provisioned by this request
+    bool ok = 1;
+    // The details of the cluster request response
+    ClusterItem cluster = 2;
+}
+
+message GetClusterMsg {
+    // Name of the cluster to be looked up
+    string name = 1;
+}
+
+message GetClusterReply {
+    // Is the cluster in the system
+    bool ok = 1;
+
+    ClusterDetailItem cluster = 2;
+}
+
+message DeleteClusterMsg {
+    // What is the cluster's name to destroy
+    string name = 1;
+}
+
+message DeleteClusterReply {
+    // Could the cluster be destroyed
+    bool ok = 1;
+    // Status of the request
+    string status = 2;
+}
+
+message GetClusterListMsg {
+}
+
+message GetClusterListReply {
+    // Is the cluster in the system
+    bool ok = 1;
+    // List of clusters
+    repeated ClusterItem clusters = 2;
+}
+
+message ClusterItem {
+    // ID of the cluster
+    string id = 1;
+    // Name of the cluster
+    string name = 2;
+    // Additional information about the status of the cluster
+    string status_message = 3;
+    // The status of the cluster
+    ClusterStatus status = 4;
+}
+
+message ClusterDetailItem {
+    // ID of the cluster
+    string id = 1;
+    // Name of the cluster
+    string name = 2;
+    // Additional information about the status of the cluster
+    string status_message = 3;
+    // What is the kubeconfig to connect to the cluster
+    string kubeconfig = 4;
+    // The status of the cluster
+    ClusterStatus status = 5;
+}
+
+message KubernetesLabel {
+    // The name of a label
+    string name = 1;
+    // The value of a label
+    string value = 2;
+}
+
+// The specification for a specific node
+message SshMachineSpec {
+    // The username for SSH access
+    string username = 1;
+    // The host for SSH access
+    string host = 2;
+    // The port for SSH access
+    int32 port = 3;
+    // The password for SSH access. This is not implemented within the clusterapi
+    // because without known_host support a MITM can get the password. A MITM is
+    // still a problem for key based authentication; even if they do not get the
+    // key they can still impersonate the machine. TODO: implement known_hosts.
+    string password = 4;
+    // The labels for the machines
+    repeated KubernetesLabel labels = 5;
+}
+
+
+// Get version of API Server
+message GetVersionMsg {
+}
+
+// Reply for version request
+message GetVersionReply {
+    // If operation was OK
+    bool ok = 1;
+
+    message VersionInformation {
+        // The tag on the git repository
+        string git_version = 1;
+        // The hash of the git commit
+        string git_commit = 2;
+        // Whether or not the tree was clean when built
+        string git_tree_state = 3;
+        // Date of build
+        string build_date = 4;
+        // Version of go used to compile
+        string go_version = 5;
+        // Compiler used
+        string compiler = 6;
+        // Platform it was compiled for / running on
+        string platform = 7;
+    }
+
+    // Version Information
+    VersionInformation version_information = 2;
+}
+
+message GetUpgradeClusterInformationMsg {
+    // What is the cluster that we are considering for upgrade
+    string name = 1;
+}
+
+message GetUpgradeClusterInformationReply {
+    // Can the cluster be upgraded
+    bool ok = 1;
+    // What versions are possible right now
+    repeated string versions = 2;
+}
+
+message UpgradeClusterMsg {
+    // What is the cluster that we are considering for upgrade
+    string name = 1;
+    // What version are we upgrading to?
+    string version = 2;
+}
+
+message UpgradeClusterReply {
+    // Was this a successful request
+    bool ok = 1;
+}
+
+message AdjustClusterMsg {
+    // What is the cluster that we are considering for upgrade
+    string name = 1;
+    // Machines which we want to add to the cluster
+    repeated SshMachineSpec add_nodes = 2;
+    // Machines which we want to remove from the cluster
+    repeated SshRemoveMachineSpec remove_nodes = 3;
+
+    message SshRemoveMachineSpec {
+        // The host for SSH access
+        string host = 1;
+    }
+
+}
+
+message AdjustClusterReply {
+    // Was this a successful request
+    bool ok = 1;
+}

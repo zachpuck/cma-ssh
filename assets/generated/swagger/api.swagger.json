@@ -1,0 +1,550 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Cluster Manager API SSH provider",
+    "version": "v0.1.0",
+    "contact": {
+      "name": "Marat Garafutdinov",
+      "url": "https://github.com/samsung-cnct/cma-ssh",
+      "email": "maratoid@gmail.com"
+    }
+  },
+  "schemes": [
+    "https",
+    "http"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/api/v1/cluster": {
+      "get": {
+        "summary": "Will retrieve the status of a cluster and its kubeconfig for connectivity",
+        "operationId": "GetCluster",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "$ref": "#/definitions/cmasshGetClusterReply"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "description": "Name of the cluster to be looked up.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Cluster"
+        ]
+      },
+      "delete": {
+        "summary": "Will delete a cluster",
+        "operationId": "DeleteCluster",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "$ref": "#/definitions/cmasshDeleteClusterReply"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "description": "What is the cluster's name to destroy.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Cluster"
+        ]
+      },
+      "post": {
+        "summary": "Will provision a cluster",
+        "operationId": "CreateCluster",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "$ref": "#/definitions/cmasshCreateClusterReply"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/cmasshCreateClusterMsg"
+            }
+          }
+        ],
+        "tags": [
+          "Cluster"
+        ]
+      },
+      "put": {
+        "summary": "Will adjust a provision a cluster",
+        "operationId": "AdjustClusterNodes",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "$ref": "#/definitions/cmasshAdjustClusterReply"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/cmasshAdjustClusterMsg"
+            }
+          }
+        ],
+        "tags": [
+          "Cluster"
+        ]
+      }
+    },
+    "/api/v1/cluster/list": {
+      "get": {
+        "summary": "Will retrieve a list of clusters",
+        "operationId": "GetClusterList",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "$ref": "#/definitions/cmasshGetClusterListReply"
+            }
+          }
+        },
+        "tags": [
+          "Cluster"
+        ]
+      }
+    },
+    "/api/v1/cluster/upgrade": {
+      "get": {
+        "summary": "Will return upgrade options for a given cluster",
+        "operationId": "GetUpgradeClusterInformation",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "$ref": "#/definitions/cmasshGetUpgradeClusterInformationReply"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "description": "What is the cluster that we are considering for upgrade.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Cluster"
+        ]
+      },
+      "put": {
+        "summary": "Will attempt to upgrade a cluster",
+        "operationId": "UpgradeCluster",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "$ref": "#/definitions/cmasshUpgradeClusterReply"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/cmasshUpgradeClusterMsg"
+            }
+          }
+        ],
+        "tags": [
+          "Cluster"
+        ]
+      }
+    },
+    "/api/v1/version": {
+      "get": {
+        "summary": "Will return version information about api server",
+        "operationId": "GetVersionInformation",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "$ref": "#/definitions/cmasshGetVersionReply"
+            }
+          }
+        },
+        "tags": [
+          "Cluster"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "AdjustClusterMsgSshRemoveMachineSpec": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "title": "The host for SSH access"
+        }
+      }
+    },
+    "GetVersionReplyVersionInformation": {
+      "type": "object",
+      "properties": {
+        "git_version": {
+          "type": "string",
+          "title": "The tag on the git repository"
+        },
+        "git_commit": {
+          "type": "string",
+          "title": "The hash of the git commit"
+        },
+        "git_tree_state": {
+          "type": "string",
+          "title": "Whether or not the tree was clean when built"
+        },
+        "build_date": {
+          "type": "string",
+          "title": "Date of build"
+        },
+        "go_version": {
+          "type": "string",
+          "title": "Version of go used to compile"
+        },
+        "compiler": {
+          "type": "string",
+          "title": "Compiler used"
+        },
+        "platform": {
+          "type": "string",
+          "title": "Platform it was compiled for / running on"
+        }
+      }
+    },
+    "cmasshAdjustClusterMsg": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "What is the cluster that we are considering for upgrade"
+        },
+        "add_nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/cmasshSshMachineSpec"
+          },
+          "title": "Machines which we want to add to the cluster"
+        },
+        "remove_nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AdjustClusterMsgSshRemoveMachineSpec"
+          },
+          "title": "Machines which we want to remove from the cluster"
+        }
+      }
+    },
+    "cmasshAdjustClusterReply": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "format": "boolean",
+          "title": "Was this a successful request"
+        }
+      }
+    },
+    "cmasshClusterDetailItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "title": "ID of the cluster"
+        },
+        "name": {
+          "type": "string",
+          "title": "Name of the cluster"
+        },
+        "status_message": {
+          "type": "string",
+          "title": "Additional information about the status of the cluster"
+        },
+        "kubeconfig": {
+          "type": "string",
+          "title": "What is the kubeconfig to connect to the cluster"
+        },
+        "status": {
+          "$ref": "#/definitions/cmasshClusterStatus",
+          "title": "The status of the cluster"
+        }
+      }
+    },
+    "cmasshClusterItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "title": "ID of the cluster"
+        },
+        "name": {
+          "type": "string",
+          "title": "Name of the cluster"
+        },
+        "status_message": {
+          "type": "string",
+          "title": "Additional information about the status of the cluster"
+        },
+        "status": {
+          "$ref": "#/definitions/cmasshClusterStatus",
+          "title": "The status of the cluster"
+        }
+      }
+    },
+    "cmasshClusterStatus": {
+      "type": "string",
+      "enum": [
+        "STATUS_UNSPECIFIED",
+        "PROVISIONING",
+        "RUNNING",
+        "RECONCILING",
+        "STOPPING",
+        "ERROR",
+        "DEGRADED"
+      ],
+      "default": "STATUS_UNSPECIFIED",
+      "title": "- STATUS_UNSPECIFIED: Not set\n - PROVISIONING: The PROVISIONING state indicates the cluster is being created.\n - RUNNING: The RUNNING state indicates the cluster has been created and is fully usable.\n - RECONCILING: The RECONCILING state indicates that some work is actively being done on the cluster, such as upgrading the master or node software.\n - STOPPING: The STOPPING state indicates the cluster is being deleted\n - ERROR: The ERROR state indicates the cluster may be unusable\n - DEGRADED: The DEGRADED state indicates the cluster requires user action to restore full functionality"
+    },
+    "cmasshCreateClusterMsg": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Name of the cluster to be provisioned"
+        },
+        "k8s_version": {
+          "type": "string",
+          "description": "The version of Kubernetes for worker nodes. Control plane versions are determined by the MachineSpec."
+        },
+        "high_availability": {
+          "type": "boolean",
+          "format": "boolean",
+          "title": "Whether or not the cluster is HA"
+        },
+        "network_fabric": {
+          "type": "string",
+          "title": "The fabric to be used"
+        },
+        "control_plane_nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/cmasshSshMachineSpec"
+          },
+          "title": "Machines which comprise the cluster"
+        },
+        "worker_nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/cmasshSshMachineSpec"
+          },
+          "title": "Machines which comprise the cluster"
+        },
+        "api_endpoint": {
+          "type": "string",
+          "title": "This should be a value like ip:port that will be a virtual IP/port\nPassed back to external customers to be able to communicate to the cluster"
+        },
+        "private_key": {
+          "type": "string",
+          "title": "Private key used to ssh into machines"
+        }
+      }
+    },
+    "cmasshCreateClusterReply": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "format": "boolean",
+          "title": "Whether or not the cluster was provisioned by this request"
+        },
+        "cluster": {
+          "$ref": "#/definitions/cmasshClusterItem",
+          "title": "The details of the cluster request response"
+        }
+      }
+    },
+    "cmasshDeleteClusterReply": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "format": "boolean",
+          "title": "Could the cluster be destroyed"
+        },
+        "status": {
+          "type": "string",
+          "title": "Status of the request"
+        }
+      }
+    },
+    "cmasshGetClusterListReply": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "format": "boolean",
+          "title": "Is the cluster in the system"
+        },
+        "clusters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/cmasshClusterItem"
+          },
+          "title": "List of clusters"
+        }
+      }
+    },
+    "cmasshGetClusterReply": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "format": "boolean",
+          "title": "Is the cluster in the system"
+        },
+        "cluster": {
+          "$ref": "#/definitions/cmasshClusterDetailItem"
+        }
+      }
+    },
+    "cmasshGetUpgradeClusterInformationReply": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "format": "boolean",
+          "title": "Can the cluster be upgraded"
+        },
+        "versions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "What versions are possible right now"
+        }
+      }
+    },
+    "cmasshGetVersionReply": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "format": "boolean",
+          "title": "If operation was OK"
+        },
+        "version_information": {
+          "$ref": "#/definitions/GetVersionReplyVersionInformation",
+          "title": "Version Information"
+        }
+      },
+      "title": "Reply for version request"
+    },
+    "cmasshKubernetesLabel": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "The name of a label"
+        },
+        "value": {
+          "type": "string",
+          "title": "The value of a label"
+        }
+      }
+    },
+    "cmasshSshMachineSpec": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "title": "The username for SSH access"
+        },
+        "host": {
+          "type": "string",
+          "title": "The host for SSH access"
+        },
+        "port": {
+          "type": "integer",
+          "format": "int32",
+          "title": "The port for SSH access"
+        },
+        "password": {
+          "type": "string",
+          "description": "The password for SSH access. This is not implemented within the clusterapi\nbecause without known_host support a MITM can get the password. A MITM is\nstill a problem for key based authentication; even if they do not get the\nkey they can still impersonate the machine. TODO: implement known_hosts."
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/cmasshKubernetesLabel"
+          },
+          "title": "The labels for the machines"
+        }
+      },
+      "title": "The specification for a specific node"
+    },
+    "cmasshUpgradeClusterMsg": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "What is the cluster that we are considering for upgrade"
+        },
+        "version": {
+          "type": "string",
+          "title": "What version are we upgrading to?"
+        }
+      }
+    },
+    "cmasshUpgradeClusterReply": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "format": "boolean",
+          "title": "Was this a successful request"
+        }
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "More about Cluster Manager API SSH provider",
+    "url": "https://github.com/samsung-cnct/cma-ssh"
+  }
+}

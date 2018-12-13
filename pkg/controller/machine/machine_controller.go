@@ -92,7 +92,7 @@ type ReconcileMachine struct {
 
 // Reconcile reads that stamakte of the cluster for a Machine object and makes changes based on the state read
 // and what is in the Machine.Spec
-// +kubebuilder:rbac:groups=cnctmachine.cnct.sds.samsung.com,resources=cnctmachines;cnctclusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cluster.cnct.sds.samsung.com,resources=cnctmachines;cnctclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Result, error) {

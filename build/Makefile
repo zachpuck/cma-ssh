@@ -33,6 +33,11 @@ OPERATOR_SOURCE_FILE=cmd/cma-ssh/main.go
 # build binary command
 BUILD_OPERATOR_BINARY_CMD=${GOBUILD} -a -tags netgo -ldflags ${LDFLAGS} -o ${OPERATOR_BINARY_NAME} ${OPERATOR_SOURCE_FILE}
 
+# protoc variables
+PROTOC_VERSION=3.6.1
+PROTOC_DARWIN_FILENAME=protoc-${PROTOC_VERSION}-osx-x86_64.zip
+PROTOC_DARWIN_DOWNLOAD_URL=https://github.com/google/protobuf/releases/download/v${PROTOC_VERSION}/${PROTOC_DARWIN_FILENAME}
+
 all: test cma-ssh-linux-amd64
 linux: test cma-ssh-linux-amd64
 darwin: test cma-ssh-darwin-amd64
@@ -72,15 +77,28 @@ fmt:
 vet:
 	go vet ./pkg/... ./cmd/...
 
+install-tools-darwin: install-protoc-darwin install-dep
+
+install-protoc-darwin:
+	curl -L ${PROTOC_DARWIN_DOWNLOAD_URL} > /tmp/${PROTOC_DARWIN_FILENAME}
+	sudo unzip -o /tmp/${PROTOC_DARWIN_FILENAME} -d /usr/local/
+	rm /tmp/${PROTOC_DARWIN_FILENAME}
+
 # Generate code
 generate:
+	./build/generators/api.sh
+	./build/generators/swagger-dist-adjustment.sh
 	go generate ./pkg/... ./cmd/...
 
 # Install dep will install dependencies
 install-dep:
 	go get -u github.com/golang/dep/cmd/dep
-	go get -u github.com/onsi/ginkgo/ginkgo
-	go get -u github.com/onsi/gomega/...
+	go install ./vendor/github.com/onsi/ginkgo/ginkgo
+	go install ./vendor/github.com/onsi/gomega/...
+	go install ./vendor/github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc
+	go install ./vendor/github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway
+	go install ./vendor/github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger
+	go install ./vendor/github.com/golang/protobuf/protoc-gen-go
 
 # New Dep will just blow away Gopkg, vendor and do a dep init
 new-dep:
