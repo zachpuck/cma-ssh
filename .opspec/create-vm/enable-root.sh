@@ -31,6 +31,13 @@ vmIP=$(az vm show -g $resourceGroup -n ${name}-${guid} -d --query publicIps --ou
 echo "enable ssh as root on vm"
 ssh -o "StrictHostKeyChecking no" -i /privateKey centos@$vmIP \
     'export TERM=xterm;
-    sudo sed -i s/^#PermitRootLogin\ yes/PermitRootLogin\ without-password/ /etc/ssh/sshd_config;
-    sudo mkdir /root/.ssh;
-    sudo cp ~/.ssh/authorized_keys /root/.ssh'
+    sudo sed -e "s/^#PermitRootLogin\ yes/PermitRootLogin\ yes/" \
+             -e "s/^PasswordAuthentication no/PasswordAuthentication yes/" -i /etc/ssh/sshd_config;
+    sudo mkdir -p /root/.ssh;
+    sudo cp ~/.ssh/authorized_keys /root/.ssh;
+    sudo systemctl restart sshd'
+
+echo "setting root password on vm"
+ssh -o "StrictHostKeyChecking no" -i /privateKey root@$vmIP \
+    "export TERM=xterm;
+    echo -e "${rootPassword}" | passwd --stdin root"
