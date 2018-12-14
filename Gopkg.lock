@@ -104,7 +104,6 @@
     "ptypes/duration",
     "ptypes/struct",
     "ptypes/timestamp",
-    "ptypes/wrappers",
   ]
   pruneopts = "T"
   revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
@@ -601,7 +600,6 @@
   packages = [
     "googleapis/api/annotations",
     "googleapis/rpc/status",
-    "protobuf/field_mask",
   ]
   pruneopts = "T"
   revision = "383e8b2c3b9e36c4076b235b32537292176bae20"

@@ -16,4 +16,4 @@ spec:
     host: 10.240.0.10
     port: 22
     username: root
-    secret: ssh-key
+    secret: cluster-private-key

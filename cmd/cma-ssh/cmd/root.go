@@ -105,11 +105,9 @@ func operator(cmd *cobra.Command) {
 	}
 
 	log.Info("Creating Web Server")
-	tcpMux := createWebServer(&apiserver.ServerOptions{PortNumber: portNumber})
+	tcpMux := createWebServer(&apiserver.ServerOptions{PortNumber: portNumber}, mgr)
 
 	var wg sync.WaitGroup
-	stop := make(chan struct{})
-
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -130,19 +128,19 @@ func operator(cmd *cobra.Command) {
 		}
 	}()
 
-	<-stop
 	log.Info("Waiting for controllers to shut down gracefully")
 	wg.Wait()
 }
 
-func createWebServer(options *apiserver.ServerOptions) cmux.CMux {
+func createWebServer(options *apiserver.ServerOptions, manager manager.Manager) cmux.CMux {
 	conn, err := net.Listen("tcp", fmt.Sprintf(":%d", options.PortNumber))
 	if err != nil {
 		panic(err)
 	}
 	tcpMux := cmux.New(conn)
 
-	apiserver.AddServersToMux(tcpMux, options)
+	apiServer := apiserver.NewApiServer(manager, tcpMux)
+	apiServer.AddServersToMux(options)
 
-	return tcpMux
+	return apiServer.GetMux()
 }

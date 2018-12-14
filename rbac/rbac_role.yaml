@@ -30,6 +30,18 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
   - cluster.cnct.sds.samsung.com
   resources:
   - cnctmachines
@@ -58,6 +70,18 @@ rules:
   - ""
   resources:
   - secrets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
   verbs:
   - get
   - list

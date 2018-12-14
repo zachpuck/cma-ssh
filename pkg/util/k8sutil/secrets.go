@@ -76,55 +76,6 @@ func CreateSecret(c client.Client, secret *corev1.Secret) error {
 	return nil
 }
 
-func GetSSHSecret(c client.Client, name string, namespace string) ([]byte, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("k8sutil secrets GetSSHSecret()")
-
-	secretResult, err := GetSecret(c, name, namespace)
-	if secretResult.Type != corev1.SecretTypeOpaque {
-		log.Error(err, "secret is not of type ", corev1.SecretTypeOpaque, ", but rather is of type -->", secretResult.Type, "<--")
-		return nil, err
-	}
-	key := secretResult.Data["private-key"]
-	return key, nil
-}
-
-func GetKubeconfigSecretList(c client.Client, namespace string) (result []corev1.Secret, err error) {
-
-	listOption := client.ListOptions{
-		Namespace: namespace,
-	}
-
-	listOption.SetFieldSelector("type=" + string(corev1.SecretTypeOpaque))
-	listOption.SetLabelSelector("kubeconfig=true")
-	return GetSecretList(c, &listOption)
-}
-
-func GetKubeconfigSecret(c client.Client, name string, namespace string) ([]byte, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("k8sutil secrets GetKubeconfigSecret()")
-
-	secretResult, err := GetSecret(c, name, namespace)
-	if err != nil {
-		log.Error(err, "failed to get kubeconfig secret for cluster in ", "namespace", namespace)
-		return nil, err
-	}
-	if secretResult.Type != corev1.SecretTypeOpaque {
-		log.Error(err, "secret is not of ", "type", corev1.SecretTypeOpaque)
-		return nil, err
-	}
-	if secretResult.Labels["kubeconfig"] != "true" {
-		log.Error(err, "secret does not have ", "label", "kubeconfig=true")
-		return nil, err
-	}
-	secret := secretResult.Data[corev1.ServiceAccountKubeconfigKey]
-	return secret, nil
-}
-
-func DeleteKubeconfigSecret(c client.Client, name string, namespace string) error {
-	return DeleteSecret(c, name, namespace)
-}
-
 func CreateKubeconfigSecret(c client.Client, clusterInstance *clusterv1alpha1.CnctCluster,
 	scheme *runtime.Scheme, kubeconfig []byte) error {
 

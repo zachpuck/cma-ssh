@@ -89,6 +89,7 @@ type ReconcileCluster struct {
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=cluster.cnct.sds.samsung.com,resources=cnctclusters;cnctmachines,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("cluster Controller Reconcile()")
