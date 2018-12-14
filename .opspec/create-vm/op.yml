@@ -41,6 +41,11 @@ inputs:
       constraints: { minLength: 1 }
       description: version of centos to install (format publisher:Offer:Sku:Version)
       default: OpenLogic:CentOS:7.4:latest
+  rootPassword:
+    string:
+      constraints: { minLength: 1 }
+      description: vm root password
+      isSecret: true
 version: 0.0.1
 run:
   serial:
@@ -91,3 +96,4 @@ run:
           resourceGroup: $(name)-group
           name:
           uuid:
+          rootPassword:
