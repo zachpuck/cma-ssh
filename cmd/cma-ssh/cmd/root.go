@@ -19,14 +19,18 @@ package cmd
 import (
 	"fmt"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis"
+	"github.com/samsung-cnct/cma-ssh/pkg/apiserver"
 	"github.com/samsung-cnct/cma-ssh/pkg/controller"
 	"github.com/samsung-cnct/cma-ssh/pkg/webhook"
+	"github.com/soheilhy/cmux"
 	"github.com/spf13/cobra"
+	"net"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+	"sync"
 )
 
 var (
@@ -46,6 +50,10 @@ func Execute() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+func init() {
+	rootCmd.Flags().Int("port", 9020, "Port to listen on")
 }
 
 func operator(cmd *cobra.Command) {
@@ -90,10 +98,49 @@ func operator(cmd *cobra.Command) {
 		os.Exit(1)
 	}
 
-	// Start the Cmd
-	log.Info("Starting the Cmd.")
-	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-		log.Error(err, "unable to run the manager")
-		os.Exit(1)
+	// get flags
+	portNumber, err := cmd.Flags().GetInt("port")
+	if err != nil {
+		log.Error(err, "Could not get port")
 	}
+
+	log.Info("Creating Web Server")
+	tcpMux := createWebServer(&apiserver.ServerOptions{PortNumber: portNumber}, mgr)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		log.Info("Starting to serve requests on port %d", portNumber)
+		if err := tcpMux.Serve(); err != nil {
+			log.Error(err, "unable serve requests")
+			os.Exit(1)
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		log.Info("Starting the Cmd")
+		if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
+			log.Error(err, "unable to run the manager")
+			os.Exit(1)
+		}
+	}()
+
+	log.Info("Waiting for controllers to shut down gracefully")
+	wg.Wait()
+}
+
+func createWebServer(options *apiserver.ServerOptions, manager manager.Manager) cmux.CMux {
+	conn, err := net.Listen("tcp", fmt.Sprintf(":%d", options.PortNumber))
+	if err != nil {
+		panic(err)
+	}
+	tcpMux := cmux.New(conn)
+
+	apiServer := apiserver.NewApiServer(manager, tcpMux)
+	apiServer.AddServersToMux(options)
+
+	return apiServer.GetMux()
 }
