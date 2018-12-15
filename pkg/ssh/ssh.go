@@ -22,10 +22,11 @@ type Client struct {
 }
 
 type SSHMachineParams struct {
-	Username string
-	Host     string
-	Port     int32
-	Password string
+	Username   string
+	Host       string
+	PublicHost string
+	Port       int32
+	Password   string
 }
 
 type SSHClusterParams struct {
@@ -197,8 +198,14 @@ func GenerateSSHKeyPair() (private []byte, public []byte, err error) {
 }
 
 func SetupPrivateKeyAccess(machine SSHMachineParams, privateKey []byte, publicKey []byte) error {
+
+	host := machine.PublicHost
+	if host == "" {
+		host = machine.Host
+	}
+
 	err := AddPublicKeyToRemoteNode(
-		machine.Host,
+		host,
 		machine.Port,
 		machine.Username,
 		machine.Password,
@@ -221,7 +228,7 @@ func SetupPrivateKeyAccess(machine SSHMachineParams, privateKey []byte, publicKe
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", machine.Host, machine.Port), config)
+	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", host, machine.Port), config)
 	if err != nil {
 		return err
 	}

@@ -515,6 +515,10 @@
             "$ref": "#/definitions/cmasshKubernetesLabel"
           },
           "title": "The labels for the machines"
+        },
+        "publichost": {
+          "type": "string",
+          "title": "optional public host ip"
         }
       },
       "title": "The specification for a specific node"

@@ -107,7 +107,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 					Username:   machineConfig.Username,
 					Host:       machineConfig.Host,
 					Port:       uint32(machineConfig.Port),
-					PublicHost: machineConfig.Host,
+					PublicHost: machineConfig.PublicHost,
 					Secret:     "cluster-private-key",
 				},
 			},
@@ -137,7 +137,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 					Username:   machineConfig.Username,
 					Host:       machineConfig.Host,
 					Port:       uint32(machineConfig.Port),
-					PublicHost: machineConfig.Host,
+					PublicHost: machineConfig.PublicHost,
 					Secret:     "cluster-private-key",
 				},
 			},
@@ -228,6 +228,22 @@ func (s *Server) DeleteCluster(ctx context.Context, in *pb.DeleteClusterMsg) (*p
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	namespace := &corev1.Namespace{}
+	err = client.Get(
+		ctx,
+		clientlib.ObjectKey{
+			Namespace: "",
+			Name:      in.Name,
+		}, namespace)
+	if err == nil {
+		err = client.Delete(ctx, namespace)
+		if err != nil {
+			log.Error(err, "Could not delete namespace "+in.Name)
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+
+
 	return &pb.DeleteClusterReply{Ok: true, Status: "Deleted"}, nil
 }
 
@@ -299,6 +315,10 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 	}
 
 	for _, addedNode := range in.AddNodes {
+		publicHost := addedNode.Publichost
+		if publicHost == "" {
+			publicHost = addedNode.Host
+		}
 		machineObject := &v1alpha.CnctMachine{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "worker-",
@@ -314,7 +334,7 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 					Username:   addedNode.Username,
 					Host:       addedNode.Host,
 					Port:       uint32(addedNode.Port),
-					PublicHost: addedNode.Host,
+					PublicHost: publicHost,
 					Secret:     "cluster-private-key",
 				},
 			},

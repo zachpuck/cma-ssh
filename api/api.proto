@@ -220,6 +220,8 @@ message SshMachineSpec {
     string password = 4;
     // The labels for the machines
     repeated KubernetesLabel labels = 5;
+    // optional public host ip
+    string publichost = 6;
 }
 
 

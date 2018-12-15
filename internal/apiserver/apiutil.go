@@ -2,7 +2,6 @@ package apiserver
 
 import (
 	"context"
-	"encoding/base64"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	"github.com/samsung-cnct/cma-ssh/pkg/generated/api"
 	pb "github.com/samsung-cnct/cma-ssh/pkg/generated/api"
@@ -21,20 +20,30 @@ func TranslateCreateClusterMsg(in *pb.CreateClusterMsg) ssh.SSHClusterParams {
 	}
 
 	for _, m := range in.ControlPlaneNodes {
+		publicHost := m.Publichost
+		if publicHost == "" {
+			publicHost = m.Host
+		}
 		cluster.ControlPlaneNodes = append(cluster.ControlPlaneNodes, ssh.SSHMachineParams{
-			Username: m.Username,
-			Password: m.Password,
-			Host:     m.Host,
-			Port:     m.Port,
+			Username: 	m.Username,
+			Password: 	m.Password,
+			Host:     	m.Host,
+			PublicHost: publicHost,
+			Port:     	m.Port,
 		})
 	}
 
 	for _, m := range in.WorkerNodes {
+		publicHost := m.Publichost
+		if publicHost == "" {
+			publicHost = m.Host
+		}
 		cluster.WorkerNodes = append(cluster.WorkerNodes, ssh.SSHMachineParams{
-			Username: m.Username,
-			Password: m.Password,
-			Host:     m.Host,
-			Port:     m.Port,
+			Username: 	m.Username,
+			Password: 	m.Password,
+			Host:     	m.Host,
+			PublicHost: publicHost,
+			Port:     	m.Port,
 		})
 	}
 
@@ -47,8 +56,8 @@ func PrepareNodes(cluster *ssh.SSHClusterParams) error {
 		return err
 	}
 
-	cluster.PrivateKey = base64.StdEncoding.EncodeToString(private)
-	cluster.PublicKey = base64.StdEncoding.EncodeToString(public)
+	cluster.PrivateKey = string(private[:])
+	cluster.PublicKey = string(public[:])
 
 	for _, node := range cluster.ControlPlaneNodes {
 		err := ssh.SetupPrivateKeyAccess(node, private, public)
