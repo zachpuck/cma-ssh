@@ -15,8 +15,6 @@ See [Protocol Documentation](https://github.com/samsung-cnct/cma-ssh/blob/master
 
 ### Requirements
 - Kubernetes 1.10+
-- [nginx-ingress](https://github.com/helm/charts/tree/master/stable/nginx-ingress)
-- [cert-manager](https://github.com/helm/charts/tree/master/stable/cert-manager)
 
 ### Deploy
 ```bash
