@@ -13,9 +13,9 @@ spec:
   # Provides options for the service so chart users have the full choice
   type: NodePort
   ports:
-    - targetPort: 80
-      port: 80
-      nodePort: {{ .Values.install.bootstrapPort }}
+    - targetPort: {{ .Values.service.bootstrap.port }}
+      port: {{ .Values.service.bootstrap.port }}
+      nodePort: {{ .Values.service.bootstrap.nodePort }}
   selector:
     app: {{ include "cma-ssh.name" . }}-bootstrap
     release: {{ .Release.Name }}

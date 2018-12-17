@@ -1,0 +1,22 @@
+{{- if .Values.install.operator }}
+apiVersion: v1
+kind: Service
+metadata:
+    labels:
+        app.kubernetes.io/name: {{ include "cma-ssh.name" . }}
+        helm.sh/chart: {{ include "cma-ssh.chart" . }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/version: {{ .Chart.AppVersion | replace "+" "_" | trunc 63 }}
+    name: {{ include "cma-ssh.fullname" . }}
+spec:
+    # Provides options for the service so chart users have the full choice
+    type: {{ .Values.service.operator.type }}
+    ports:
+        - targetPort: {{ .Values.service.operator.targetPort | int }}
+          port: {{ .Values.service.operator.port }}
+          nodePort: {{ .Values.service.operator.nodePort | int }}
+    selector:
+        app: {{ include "cma-ssh.name" . }}
+        release: {{ .Release.Name }}
+{{- end }}
