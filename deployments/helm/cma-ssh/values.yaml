@@ -12,11 +12,27 @@ images:
 # installation settings
 install:
    operator: true
+   operatorIngress: false
    crds: true
    bootstrap: true
-   bootstrapPort: 30005
    bootstrapIp: '192.168.64.24'
    airgapProxyIp: '182.195.81.113'
+
+service:
+   operator:
+      port: 80
+      targetPort: 9020
+      type: NodePort
+      nodePort: 30006
+   bootstrap:
+      port: 80
+      nodePort: 30005
+
+ingress:
+   grpc:
+      host: cma-ssh-grpc.ontario.cluster.cnct.io
+   rest:
+      host: cma-ssh.ontario.cluster.cnct.io
 
 # short resource name override
 nameOverride: ''
