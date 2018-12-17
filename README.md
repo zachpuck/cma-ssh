@@ -55,7 +55,7 @@ Requirements:
 - [azure cli](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
     - install on mac osx: `brew install azure-cli`
 
-####Setup steps:
+#### Setup steps:
 1. create the ssh key pair (requires rsa and 2048 bit)
     **no password**
     ```bash
@@ -66,7 +66,7 @@ Requirements:
     ```bash
     touch .opspec/args.yml
     ```
-    add inputes:
+    add inputs:
     ```$xslt
       subscriptionId: <azure subscription id>
       loginId: <azure service principal id (must have permission to edit user permissions in subscription>
