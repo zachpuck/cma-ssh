@@ -50,24 +50,38 @@ func TranslateCreateClusterMsg(in *pb.CreateClusterMsg) ssh.SSHClusterParams {
 	return cluster
 }
 
-func PrepareNodes(cluster *ssh.SSHClusterParams) error {
+func PrepareNodes(in *pb.CreateClusterMsg) error {
 	private, public, err := ssh.GenerateSSHKeyPair()
 	if err != nil {
 		return err
 	}
 
-	cluster.PrivateKey = string(private[:])
-	cluster.PublicKey = string(public[:])
+	in.PrivateKey = string(private[:])
 
-	for _, node := range cluster.ControlPlaneNodes {
-		err := ssh.SetupPrivateKeyAccess(node, private, public)
+	for _, node := range in.ControlPlaneNodes {
+		sshParams := ssh.SSHMachineParams {
+			Username: node.Username,
+			Host: node.Host,
+			PublicHost: node.Publichost,
+			Port: node.Port,
+			Password: node.Password,
+		}
+		err := ssh.SetupPrivateKeyAccess(sshParams, private, public)
 		if err != nil {
 			return err
 		}
 	}
 
-	for _, node := range cluster.WorkerNodes {
-		err := ssh.SetupPrivateKeyAccess(node, private, public)
+	for _, node := range in.WorkerNodes {
+		sshParams := ssh.SSHMachineParams {
+			Username: node.Username,
+			Host: node.Host,
+			PublicHost: node.Publichost,
+			Port: node.Port,
+			Password: node.Password,
+		}
+
+		err := ssh.SetupPrivateKeyAccess(sshParams, private, public)
 		if err != nil {
 			return err
 		}

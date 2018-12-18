@@ -20,9 +20,8 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("CreateCluster")
 
-	cluster := TranslateCreateClusterMsg(in)
-	if cluster.PrivateKey == "" {
-		err := PrepareNodes(&cluster)
+	if in.PrivateKey == "" {
+		err := PrepareNodes(in)
 		if err != nil {
 			log.Error(err, "Failed to prepare nodes")
 			return nil, status.Error(codes.Internal, err.Error())
@@ -35,7 +34,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 	// create namespace
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: cluster.Name,
+			Name: in.Name,
 		},
 	}
 	err := client.Create(ctx, namespace)
@@ -46,12 +45,12 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 
 	// create secret
 	dataMap := make(map[string][]byte)
-	dataMap["private-key"] = []byte(cluster.PrivateKey)
+	dataMap["private-key"] = []byte(in.PrivateKey)
 	dataMap["pass-phrase"] = []byte("")
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster-private-key",
-			Namespace: cluster.Name,
+			Namespace: in.Name,
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: dataMap,
@@ -65,8 +64,8 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 	// create cluster
 	clusterObject := &v1alpha.CnctCluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cluster.Name,
-			Namespace: cluster.Name,
+			Name:      in.Name,
+			Namespace: in.Name,
 			Labels: map[string]string{
 				"controller-tools.k8s.io": "1.0",
 			},
@@ -81,7 +80,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 				},
 				ServiceDomain: "cluster.local",
 			},
-			KubernetesVersion: cluster.K8SVersion,
+			KubernetesVersion: in.K8SVersion,
 		},
 	}
 	err = client.Create(ctx, clusterObject)
@@ -91,23 +90,29 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 	}
 
 	// create control plane machines
-	for _, machineConfig := range cluster.ControlPlaneNodes {
+	for _, machineConfig := range in.ControlPlaneNodes {
+		machineLabels := map[string]string{}
+		for _, label := range machineConfig.Labels {
+			machineLabels[label.Name] = label.Value
+		}
+
 		machineObject := &v1alpha.CnctMachine{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "control-plane-",
-				Namespace:    cluster.Name,
+				Namespace:    in.Name,
 				Labels: map[string]string{
 					"controller-tools.k8s.io": "1.0",
 				},
 			},
 			Spec: v1alpha.MachineSpec{
-				ClusterRef: cluster.Name,
+				ClusterRef: in.Name,
 				Roles:      []common.MachineRoles{common.MachineRoleMaster, common.MachineRoleEtcd},
+				Labels: machineLabels,
 				SshConfig: v1alpha.MachineSshConfigInfo{
 					Username:   machineConfig.Username,
 					Host:       machineConfig.Host,
 					Port:       uint32(machineConfig.Port),
-					PublicHost: machineConfig.PublicHost,
+					PublicHost: machineConfig.Publichost,
 					Secret:     "cluster-private-key",
 				},
 			},
@@ -121,23 +126,28 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 	}
 
 	// create worker plane machines
-	for _, machineConfig := range cluster.ControlPlaneNodes {
+	for _, machineConfig := range in.WorkerNodes {
+		machineLabels := map[string]string{}
+		for _, label := range machineConfig.Labels {
+			machineLabels[label.Name] = label.Value
+		}
 		machineObject := &v1alpha.CnctMachine{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "worker-",
-				Namespace:    cluster.Name,
+				Namespace:    in.Name,
 				Labels: map[string]string{
 					"controller-tools.k8s.io": "1.0",
 				},
 			},
 			Spec: v1alpha.MachineSpec{
-				ClusterRef: cluster.Name,
+				ClusterRef: in.Name,
 				Roles:      []common.MachineRoles{common.MachineRoleWorker},
+				Labels: machineLabels,
 				SshConfig: v1alpha.MachineSshConfigInfo{
 					Username:   machineConfig.Username,
 					Host:       machineConfig.Host,
 					Port:       uint32(machineConfig.Port),
-					PublicHost: machineConfig.PublicHost,
+					PublicHost: machineConfig.Publichost,
 					Secret:     "cluster-private-key",
 				},
 			},
@@ -319,6 +329,10 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 		if publicHost == "" {
 			publicHost = addedNode.Host
 		}
+		machineLabels := map[string]string{}
+		for _, label := range addedNode.Labels {
+			machineLabels[label.Name] = label.Value
+		}
 		machineObject := &v1alpha.CnctMachine{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "worker-",
@@ -330,6 +344,7 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 			Spec: v1alpha.MachineSpec{
 				ClusterRef: clusterInstance.GetName(),
 				Roles:      []common.MachineRoles{common.MachineRoleWorker},
+				Labels: machineLabels,
 				SshConfig: v1alpha.MachineSshConfigInfo{
 					Username:   addedNode.Username,
 					Host:       addedNode.Host,

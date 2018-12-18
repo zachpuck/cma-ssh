@@ -370,8 +370,6 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubeadm-" + k8sVersion + " -y"},
 		ssh.Command{Cmd: "sed -i 's/cgroup-driver=cgroupfs/cgroup-driver=systemd/g' " +
 			"/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"},
-		ssh.Command{Cmd: "sed -i 's/cgroup-driver=systemd/cgroup-driver=systemd --runtime-cgroups=\\/systemd\\/system.slice " +
-			"--kubelet-cgroups=\\/systemd\\/system.slice/g' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf"},
 		ssh.Command{Cmd: "mkdir -p /etc/kubernetes/"},
 		ssh.Command{Cmd: "wget --output-document=/etc/kubernetes/kube-flannel.yml " + bootstrapRepoUrl + "/download/kube-flannel.yml"},
 		ssh.Command{Cmd: "systemctl daemon-reload"},
@@ -864,7 +862,7 @@ var UpgradeMaster = func(client *ssh.Client, kubeClient client.Client,
 		client.Client,
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
 			bootstrapRepoName + " kubeadm-" + k8sVersion + " -y --disableexcludes=kubernetes"},
-		ssh.Command{Cmd: "kubeadm upgrade apply v" + k8sVersion + " -y"},
+		ssh.Command{Cmd: "kubeadm upgrade apply v" + k8sVersion + " --feature-gates=CoreDNS=false -y"},
 		ssh.Command{Cmd: "kubectl drain " + hostnameString + " --ignore-daemonsets --kubeconfig=/etc/kubernetes/admin.conf"},
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
 			bootstrapRepoName + " kubelet-" + k8sVersion + " -y --disableexcludes=kubernetes"},
@@ -878,8 +876,7 @@ var UpgradeMaster = func(client *ssh.Client, kubeClient client.Client,
 	// configure kubelet
 	cmd, err = cr.Run(
 		client.Client,
-		ssh.Command{Cmd: "echo -n 'KUBELET_EXTRA_ARGS=--cgroup-driver=systemd " +
-			"--runtime-cgroups=/systemd/system.slice --kubelet-cgroups=/systemd/system.slice' > /etc/sysconfig/kubelet"},
+		ssh.Command{Cmd: "echo -n 'KUBELET_EXTRA_ARGS=--cgroup-driver=systemd' > /etc/sysconfig/kubelet"},
 	)
 	if err != nil {
 		return nil, cmd, err
@@ -967,8 +964,7 @@ var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
 	// configure kubelet
 	cmd, err = cr.Run(
 		client.Client,
-		ssh.Command{Cmd: "echo -n 'KUBELET_EXTRA_ARGS=--cgroup-driver=systemd " +
-			"--runtime-cgroups=/systemd/system.slice --kubelet-cgroups=/systemd/system.slice' > /etc/sysconfig/kubelet"},
+		ssh.Command{Cmd: "echo -n 'KUBELET_EXTRA_ARGS=--cgroup-driver=systemd' > /etc/sysconfig/kubelet"},
 	)
 	if err != nil {
 		return nil, cmd, err
