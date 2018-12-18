@@ -4,6 +4,7 @@ import (
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	v1alpha "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	pb "github.com/samsung-cnct/cma-ssh/pkg/generated/api"
+	"github.com/samsung-cnct/cma-ssh/pkg/ssh"
 	"github.com/samsung-cnct/cma-ssh/pkg/util/k8sutil"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
@@ -20,12 +21,17 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("CreateCluster")
 
+	var public, private []byte
+	var err error
 	if in.PrivateKey == "" {
-		err := PrepareNodes(in)
+		public, private, err = PrepareNodes(in)
 		if err != nil {
 			log.Error(err, "Failed to prepare nodes")
 			return nil, status.Error(codes.Internal, err.Error())
 		}
+	} else {
+		private = []byte(in.PrivateKey)
+		public = []byte("")
 	}
 
 	// get client
@@ -37,7 +43,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 			Name: in.Name,
 		},
 	}
-	err := client.Create(ctx, namespace)
+	err = client.Create(ctx, namespace)
 	if err != nil {
 		log.Error(err, "Failed to create cluster namespace")
 		return nil, status.Error(codes.Internal, err.Error())
@@ -45,7 +51,8 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 
 	// create secret
 	dataMap := make(map[string][]byte)
-	dataMap["private-key"] = []byte(in.PrivateKey)
+	dataMap["private-key"] = private
+	dataMap["public-key"] = public
 	dataMap["pass-phrase"] = []byte("")
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -81,11 +88,18 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 				ServiceDomain: "cluster.local",
 			},
 			KubernetesVersion: in.K8SVersion,
+			Secret:     "cluster-private-key",
 		},
 	}
 	err = client.Create(ctx, clusterObject)
 	if err != nil {
 		log.Error(err, "Failed to create cluster object")
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	err = k8sutil.SetSecretOwner(client, secret, clusterObject, s.Manager.GetScheme())
+	if err != nil {
+		log.Error(err, "Failed to set private key secret owner")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -113,7 +127,6 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 					Host:       machineConfig.Host,
 					Port:       uint32(machineConfig.Port),
 					PublicHost: machineConfig.Publichost,
-					Secret:     "cluster-private-key",
 				},
 			},
 		}
@@ -148,7 +161,6 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 					Host:       machineConfig.Host,
 					Port:       uint32(machineConfig.Port),
 					PublicHost: machineConfig.Publichost,
-					Secret:     "cluster-private-key",
 				},
 			},
 		}
@@ -324,11 +336,36 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	// get the private key secret
+	privateKeySecret, err := k8sutil.GetSecret(client, clusterInstance.Spec.Secret, clusterInstance.GetNamespace())
+	if err != nil {
+		log.Error(err, "Could not query for cluster private key secret " + clusterInstance.Spec.Secret)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
 	for _, addedNode := range in.AddNodes {
 		publicHost := addedNode.Publichost
 		if publicHost == "" {
 			publicHost = addedNode.Host
 		}
+
+		sshParams := ssh.SSHMachineParams {
+			Username: addedNode.Username,
+			Host: addedNode.Host,
+			PublicHost: publicHost,
+			Port: addedNode.Port,
+			Password: addedNode.Password,
+		}
+
+		if string(privateKeySecret.Data["public-key"][:]) != "" {
+			err = ssh.SetupPrivateKeyAccess(sshParams,
+				privateKeySecret.Data["private-key"], privateKeySecret.Data["public-key"])
+			if err != nil {
+				log.Error(err, "Could not setup node "+publicHost+" for private kety access")
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+		}
+
 		machineLabels := map[string]string{}
 		for _, label := range addedNode.Labels {
 			machineLabels[label.Name] = label.Value
@@ -350,12 +387,11 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 					Host:       addedNode.Host,
 					Port:       uint32(addedNode.Port),
 					PublicHost: publicHost,
-					Secret:     "cluster-private-key",
 				},
 			},
 		}
 
-		err := client.Create(ctx, machineObject)
+		err = client.Create(ctx, machineObject)
 		if err != nil {
 			log.Error(err, "Failed to create worker machine object")
 			return nil, status.Error(codes.Internal, err.Error())

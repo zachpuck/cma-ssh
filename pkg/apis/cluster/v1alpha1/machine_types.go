@@ -53,8 +53,6 @@ type MachineSshConfigInfo struct {
 	PublicHost string `json:"publichost,omitempty"`
 
 	Port uint32 `json:"port,omitempty"`
-
-	Secret string `json:"secret,omitempty"`
 }
 
 // MachineStatus defines the observed state of Machine

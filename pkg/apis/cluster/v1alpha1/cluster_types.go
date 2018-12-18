@@ -29,6 +29,9 @@ type ClusterSpec struct {
 	// Cluster network configuration
 	ClusterNetwork ClusterNetworkingConfig `json:"clusterNetwork"`
 
+	// name of the private key secret for machines
+	Secret string `json:"secret,omitempty"`
+
 	KubernetesVersion string `json:"kubernetesVersion"`
 }
 

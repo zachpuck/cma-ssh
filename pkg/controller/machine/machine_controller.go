@@ -41,7 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-type backgroundMachineOp func(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine) (string, error)
+type backgroundMachineOp func(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) (string, error)
 
 // Add creates a new Machine Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -352,30 +352,30 @@ func getCluster(c client.Client, namespace string, clusterName string) (*cluster
 	return clusterInstance, nil
 }
 
-func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine) (string, error) {
+func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) (string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller doBootstrap()")
 
 	// Setup bootstrap repo
-	_, cmd, err := RunSshCommand(r.Client, machineInstance, InstallBootstrapRepo, make(map[string]string))
+	_, cmd, err := RunSshCommand(r.Client, machineInstance, privateKey, InstallBootstrapRepo, make(map[string]string))
 	if err != nil {
 		return cmd, err
 	}
 
 	// install local nginx proxy
-	_, cmd, err = RunSshCommand(r.Client, machineInstance, InstallNginx, make(map[string]string))
+	_, cmd, err = RunSshCommand(r.Client, machineInstance, privateKey, InstallNginx, make(map[string]string))
 	if err != nil {
 		return cmd, err
 	}
 
 	// install docker
-	_, cmd, err = RunSshCommand(r.Client, machineInstance, InstallDocker, make(map[string]string))
+	_, cmd, err = RunSshCommand(r.Client, machineInstance, privateKey, InstallDocker, make(map[string]string))
 	if err != nil {
 		return cmd, err
 	}
 
 	// install kubernetes components
-	_, cmd, err = RunSshCommand(r.Client, machineInstance, InstallKubernetes, make(map[string]string))
+	_, cmd, err = RunSshCommand(r.Client, machineInstance, privateKey, InstallKubernetes, make(map[string]string))
 	if err != nil {
 		return cmd, err
 	}
@@ -383,26 +383,9 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachi
 	// if this is a master, proceed with bootstrap
 	if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleMaster) {
 		// run kubeadm init
-		_, cmd, err = RunSshCommand(r.Client, machineInstance, KubeadmInit, make(map[string]string))
+		_, cmd, err = RunSshCommand(r.Client, machineInstance, privateKey, KubeadmInit, make(map[string]string))
 		if err != nil {
 			return cmd, err
-		}
-
-		// get kubeconfig
-		kubeConfig, cmd, err := RunSshCommand(r.Client, machineInstance, GetKubeConfig, make(map[string]string))
-		if err != nil {
-			return cmd, err
-		}
-
-		// create kubeconfig secret with cluster as controller reference
-		clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
-		if err != nil {
-			return "getCluster()", err
-		}
-
-		err = k8sutil.CreateKubeconfigSecret(r.Client, clusterInstance, r.scheme, kubeConfig)
-		if err != nil {
-			return "k8sutil.CreateKubeconfigSecret()", err
 		}
 
 	} else if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleWorker) {
@@ -430,7 +413,7 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachi
 		err = util.Retry(120, 10*time.Second, func() error {
 			// run kubeadm create token on master machine, get token back
 			log.Info("Trying to get kubeadm token from master...")
-			token, cmd, err = RunSshCommand(r.Client, masterMachine, KubeadmTokenCreate, make(map[string]string))
+			token, cmd, err = RunSshCommand(r.Client, masterMachine, privateKey, KubeadmTokenCreate, make(map[string]string))
 			if err != nil {
 				log.Info("Waiting for kubeadm to be able to create a token",
 					"machine", masterMachine)
@@ -446,7 +429,7 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachi
 		}
 
 		// run kubeadm join on worker machine
-		_, cmd, err = RunSshCommand(r.Client, machineInstance,
+		_, cmd, err = RunSshCommand(r.Client, machineInstance, privateKey,
 			KubeadmJoin, map[string]string{"token": string(token[:]), "master": masterMachine.Spec.SshConfig.Host})
 		if err != nil {
 			return cmd, err
@@ -464,13 +447,14 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachi
 	return "doBootstrap()", err
 }
 
-func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine) (string, error) {
+func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) (string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller doUpgrade()")
 
 	// get the cluster instance
 	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
 	if err != nil {
+		log.Error(err, "Could not get cluster "+clusterInstance.GetName())
 		return "getCluster()", err
 	}
 
@@ -481,7 +465,7 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine
 	// its status kubernetes version matches clusters kubernetes version
 	if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleMaster) {
 		log.Info("running upgrade on master " + machineInstance.GetName())
-		_, cmd, err := RunSshCommand(r.Client, machineInstance,
+		_, cmd, err := RunSshCommand(r.Client, machineInstance, privateKey,
 			UpgradeMaster, make(map[string]string))
 		if err != nil {
 			return cmd, err
@@ -536,13 +520,14 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine
 		}
 
 		// get admin kubeconfig
-		kubeConfig, cmd, err := RunSshCommand(r.Client, masterMachine, GetKubeConfig, make(map[string]string))
+		kubeConfig, cmd, err := RunSshCommand(r.Client, masterMachine, privateKey,
+			GetKubeConfig, make(map[string]string))
 		if err != nil {
 			return cmd, err
 		}
 
 		// run node upgrade
-		_, cmd, err = RunSshCommand(r.Client, machineInstance,
+		_, cmd, err = RunSshCommand(r.Client, machineInstance, privateKey,
 			UpgradeNode, map[string]string{"admin.conf": string(kubeConfig[:])})
 		if err != nil {
 			return cmd, err
@@ -562,7 +547,7 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine
 	return "doUpgrade()", nil
 }
 
-func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine) (string, error) {
+func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) (string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("machine Controller doDelete()")
 
@@ -598,13 +583,14 @@ func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine)
 		}
 
 		// get admin kubeconfig
-		kubeConfig, cmd, err := RunSshCommand(r.Client, masterMachine, GetKubeConfig, make(map[string]string))
+		kubeConfig, cmd, err := RunSshCommand(r.Client, masterMachine, privateKey,
+			GetKubeConfig, make(map[string]string))
 		if err != nil {
 			return cmd, err
 		}
 
 		// run node drain
-		_, cmd, err = RunSshCommand(r.Client, machineInstance,
+		_, cmd, err = RunSshCommand(r.Client, machineInstance, privateKey,
 			DrainAndDeleteNode, map[string]string{"admin.conf": string(kubeConfig[:])})
 		if err != nil {
 			return cmd, err
@@ -612,7 +598,8 @@ func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine)
 	}
 
 	// run delete command
-	_, cmd, err := RunSshCommand(r.Client, machineInstance, DeleteNode, make(map[string]string))
+	_, cmd, err := RunSshCommand(r.Client, machineInstance, privateKey,
+		DeleteNode, make(map[string]string))
 	if err != nil {
 		log.Error(err, "failed to clean up physical node for machine "+machineInstance.GetName()+
 			". Manual cleanup might be required for "+machineInstance.Spec.SshConfig.Host)
@@ -643,8 +630,22 @@ func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 	opResult := make(chan commandError)
 	timer := time.NewTimer(30 * time.Minute)
 
+	// get the cluster instance
+	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
+	if err != nil {
+		log.Error(err, "Could not get cluster "+clusterInstance.GetName())
+		return
+	}
+
+	privateKeySecret, err := k8sutil.GetSecret(r.Client, clusterInstance.Spec.Secret, clusterInstance.GetNamespace())
+	if err != nil {
+		log.Error(err, "Could not get cluster private key secret"+clusterInstance.Spec.Secret)
+		return
+	}
+	privateKey := privateKeySecret.Data["private-key"]
+
 	go func(ch chan<- commandError) {
-		cmd, err := op(r, machineInstance)
+		cmd, err := op(r, machineInstance, privateKey)
 		ch <- commandError{Err: err, Cmd: cmd}
 		close(opResult)
 	}(opResult)
