@@ -440,6 +440,10 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachi
 			log.Info("Got master kubeadm token: " + string(token[:]))
 			return nil
 		})
+		if err != nil {
+			log.Error(err, "Failed to get kubeadm token from master in time")
+			return "KubeadmTokenCreate", err
+		}
 
 		// run kubeadm join on worker machine
 		_, cmd, err = RunSshCommand(r.Client, machineInstance,
@@ -514,6 +518,10 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine
 				" master version: " + masterMachine.Status.KubernetesVersion)
 			return nil
 		})
+		if err != nil {
+			log.Error(err, "Master failed to upgrade in time")
+			return "doUpgrade", err
+		}
 
 		machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
 		if err != nil {
