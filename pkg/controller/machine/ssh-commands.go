@@ -873,6 +873,15 @@ var UpgradeMaster = func(client *ssh.Client, kubeClient client.Client,
 		return nil, cmd, err
 	}
 
+	// configure kubelet
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "echo -n 'KUBELET_EXTRA_ARGS=--cgroup-driver=systemd' > /etc/sysconfig/kubelet"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+
 	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "systemctl daemon-reload"},
@@ -947,6 +956,15 @@ var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
 			bootstrapRepoName + " kubectl-" + k8sVersion + " -y"},
 		ssh.Command{Cmd: "kubeadm upgrade node config --kubelet-version $(kubelet --version | cut -d ' ' -f 2)"},
+	)
+	if err != nil {
+		return nil, cmd, err
+	}
+
+	// configure kubelet
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "echo -n 'KUBELET_EXTRA_ARGS=--cgroup-driver=systemd' > /etc/sysconfig/kubelet"},
 	)
 	if err != nil {
 		return nil, cmd, err
