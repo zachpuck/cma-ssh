@@ -52,6 +52,8 @@ spec:
               type: object
             kubernetesVersion:
               type: string
+            secret:
+              type: string
           required:
           - clusterNetwork
           - kubernetesVersion

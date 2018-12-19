@@ -20,13 +20,16 @@ import (
 	"context"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
+	"github.com/samsung-cnct/cma-ssh/pkg/controller/machine"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"time"
 
+	"github.com/samsung-cnct/cma-ssh/pkg/util/k8sutil"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -90,6 +93,7 @@ type ReconcileCluster struct {
 // +kubebuilder:rbac:groups=cluster.cnct.sds.samsung.com,resources=cnctclusters;cnctmachines,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("cluster Controller Reconcile()")
@@ -181,6 +185,44 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	clusterStatus, apiEndpoint := util.GetStatus(machineList)
 	if clusterInstance.Status.Phase != clusterStatus || clusterInstance.Status.APIEndpoint != apiEndpoint {
+
+		// if cluster is ready, update or create the kubeconfig secret
+		if clusterStatus == common.RunningClusterPhase {
+			// make sure private key secret is there, do not requeue if it is not found, this is a fatal error.
+			privateKeySecret, err := k8sutil.GetSecret(r.Client, clusterInstance.Spec.Secret, clusterInstance.GetNamespace())
+			if err != nil {
+				log.Error(err, "could not find cluster private key secret ", clusterInstance.Spec.Secret)
+				return reconcile.Result{}, nil
+			}
+
+			// get machine list
+			machineList := &clusterv1alpha1.CnctMachineList{}
+			err = r.List(
+				context.Background(),
+				&client.ListOptions{LabelSelector: labels.Everything()},
+				machineList)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+
+			masterMachine, err := util.GetMaster(machineList.Items)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+
+			// get kubeconfig
+			kubeConfig, _, err := machine.RunSshCommand(r.Client, masterMachine, privateKeySecret.Data["private-key"],
+				machine.GetKubeConfig, make(map[string]string))
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+
+			err = k8sutil.CreateKubeconfigSecret(r.Client, clusterInstance, r.scheme, kubeConfig)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+		}
+
 		clusterInstance.Status.Phase = clusterStatus
 		clusterInstance.Status.APIEndpoint = apiEndpoint
 		err = r.updateStatus(clusterInstance, corev1.EventTypeNormal,

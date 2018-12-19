@@ -39,8 +39,6 @@ spec:
                   type: integer
                 publichost:
                   type: string
-                secret:
-                  type: string
                 username:
                   type: string
               type: object

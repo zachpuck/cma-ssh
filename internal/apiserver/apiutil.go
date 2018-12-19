@@ -12,51 +12,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-func TranslateCreateClusterMsg(in *pb.CreateClusterMsg) ssh.SSHClusterParams {
-	cluster := ssh.SSHClusterParams{
-		Name:       in.Name,
-		K8SVersion: in.K8SVersion,
-		PrivateKey: in.PrivateKey,
-	}
-
-	for _, m := range in.ControlPlaneNodes {
-		publicHost := m.Publichost
-		if publicHost == "" {
-			publicHost = m.Host
-		}
-		cluster.ControlPlaneNodes = append(cluster.ControlPlaneNodes, ssh.SSHMachineParams{
-			Username: 	m.Username,
-			Password: 	m.Password,
-			Host:     	m.Host,
-			PublicHost: publicHost,
-			Port:     	m.Port,
-		})
-	}
-
-	for _, m := range in.WorkerNodes {
-		publicHost := m.Publichost
-		if publicHost == "" {
-			publicHost = m.Host
-		}
-		cluster.WorkerNodes = append(cluster.WorkerNodes, ssh.SSHMachineParams{
-			Username: 	m.Username,
-			Password: 	m.Password,
-			Host:     	m.Host,
-			PublicHost: publicHost,
-			Port:     	m.Port,
-		})
-	}
-
-	return cluster
-}
-
-func PrepareNodes(in *pb.CreateClusterMsg) error {
+func PrepareNodes(in *pb.CreateClusterMsg) ([]byte, []byte, error) {
 	private, public, err := ssh.GenerateSSHKeyPair()
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-
-	in.PrivateKey = string(private[:])
 
 	for _, node := range in.ControlPlaneNodes {
 		sshParams := ssh.SSHMachineParams {
@@ -68,7 +28,7 @@ func PrepareNodes(in *pb.CreateClusterMsg) error {
 		}
 		err := ssh.SetupPrivateKeyAccess(sshParams, private, public)
 		if err != nil {
-			return err
+			return private, public, err
 		}
 	}
 
@@ -83,11 +43,11 @@ func PrepareNodes(in *pb.CreateClusterMsg) error {
 
 		err := ssh.SetupPrivateKeyAccess(sshParams, private, public)
 		if err != nil {
-			return err
+			return private, public, err
 		}
 	}
 
-	return nil
+	return public, private, nil
 }
 
 func TranslateClusterStatus(crStatus common.ClusterStatusPhase) cmassh.ClusterStatus {

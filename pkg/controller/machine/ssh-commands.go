@@ -3,7 +3,6 @@ package machine
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"fmt"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
@@ -12,7 +11,6 @@ import (
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	crypto "golang.org/x/crypto/ssh"
 	"io/ioutil"
-	corev1 "k8s.io/api/core/v1"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
@@ -33,28 +31,12 @@ type sshCommand func(client *ssh.Client, kubeClient client.Client,
 
 func RunSshCommand(kubeClient client.Client,
 	machineInstance *clusterv1alpha1.CnctMachine,
+	privateKey []byte,
 	command sshCommand, commandArgs map[string]string) ([]byte, string, error) {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("RunSshCommand()")
 
 	sshConfig := machineInstance.Spec.SshConfig
-	secret := &corev1.Secret{}
-
-	err := util.Retry(120, 10*time.Second, func() error {
-		err := kubeClient.Get(
-			context.Background(),
-			client.ObjectKey{
-				Namespace: machineInstance.GetNamespace(),
-				Name:      sshConfig.Secret,
-			},
-			secret)
-		if err != nil {
-			log.Error(err,
-				"could not find ssh key secret for machine "+machineInstance.GetName())
-			return err
-		}
-		return nil
-	})
 
 	var host string
 	if len(sshConfig.PublicHost) > 0 {
@@ -63,7 +45,7 @@ func RunSshCommand(kubeClient client.Client,
 		host = sshConfig.Host
 	}
 	addr := fmt.Sprintf("%v:%v", host, sshConfig.Port)
-	sshClient, err := ssh.NewClient(addr, sshConfig.Username, secret.Data["private-key"])
+	sshClient, err := ssh.NewClient(addr, sshConfig.Username, privateKey)
 	if err != nil {
 		return nil, "", err
 	}
@@ -103,17 +85,6 @@ func RunSshCommand(kubeClient client.Client,
 	}
 
 	return output, cmd, err
-}
-
-var IpAddr sshCommand = func(client *ssh.Client, kubeClient client.Client,
-	machineInstance *clusterv1alpha1.CnctMachine,
-	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
-	cr := &ssh.CommandRunner{}
-
-	return cr.GetOutput(
-		client.Client,
-		ssh.Command{Cmd: "ip addr"},
-	)
 }
 
 var InstallBootstrapRepo = func(client *ssh.Client, kubeClient client.Client,
