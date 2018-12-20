@@ -926,8 +926,19 @@ var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
 			bootstrapRepoName + " kubelet-" + k8sVersion + " -y --disableexcludes=kubernetes"},
 		ssh.Command{Cmd: "yum install --disablerepo='*' --enablerepo=" +
 			bootstrapRepoName + " kubectl-" + k8sVersion + " -y"},
-		ssh.Command{Cmd: "kubeadm upgrade node config --kubelet-version $(kubelet --version | cut -d ' ' -f 2)"},
 	)
+	if err != nil {
+		return nil, cmd, err
+	}
+
+	// intermittent failures are possible when pulling config from master
+	err = util.Retry(60, 2*time.Second, func() error {
+		cmd, err = cr.Run(
+			client.Client,
+			ssh.Command{Cmd: "kubeadm upgrade node config --kubelet-version $(kubelet --version | cut -d ' ' -f 2)"},
+		)
+		return err
+	})
 	if err != nil {
 		return nil, cmd, err
 	}
