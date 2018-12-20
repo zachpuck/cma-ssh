@@ -8,7 +8,6 @@ import (
 )
 
 func (s *Server) GetVersionInformation(ctx context.Context, in *pb.GetVersionMsg) (*pb.GetVersionReply, error) {
-	SetLogger()
 	versionInformation := version.Get()
 	reply := &pb.GetVersionReply{
 		Ok: true,

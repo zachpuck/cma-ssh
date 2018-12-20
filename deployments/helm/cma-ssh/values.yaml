@@ -15,8 +15,8 @@ install:
    operatorIngress: false
    crds: true
    bootstrap: true
-   bootstrapIp: '192.168.64.24'
-   airgapProxyIp: '182.195.81.113'
+   bootstrapIp: '10.240.0.4'
+   airgapProxyIp: '10.240.0.7'
 
 service:
    operator:

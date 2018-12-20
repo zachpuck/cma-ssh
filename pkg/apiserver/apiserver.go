@@ -2,6 +2,7 @@ package apiserver
 
 import (
 	"context"
+	"github.com/golang/glog"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/samsung-cnct/cma-ssh/internal/apiserver"
 	"github.com/soheilhy/cmux"
@@ -9,7 +10,6 @@ import (
 	"google.golang.org/grpc/reflection"
 	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"strconv"
 
 	pb "github.com/samsung-cnct/cma-ssh/pkg/generated/api"
@@ -44,9 +44,6 @@ func (r *ApiServer) GetMux() cmux.CMux {
 }
 
 func (r *ApiServer) addGRPCServer(tcpMux cmux.CMux) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("addGRPCServer")
-
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterClusterServer(grpcServer, r.newgRPCServiceServer())
@@ -56,17 +53,14 @@ func (r *ApiServer) addGRPCServer(tcpMux cmux.CMux) {
 	grpcListener := tcpMux.MatchWithWriters(cmux.HTTP2MatchHeaderFieldPrefixSendSettings("content-type", "application/grpc"))
 	// Start servers
 	go func() {
-		log.Info("Starting gRPC Server")
+		glog.Info("Starting gRPC Server")
 		if err := grpcServer.Serve(grpcListener); err != nil {
-			log.Error(err, "Unable to start external gRPC server")
+			glog.Errorf("Unable to start external gRPC server: %q", err)
 		}
 	}()
 }
 
 func (r *ApiServer) addRestAndWebsite(tcpMux cmux.CMux, grpcPortNumber int) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("addRestAndWebsite")
-
 	httpListener := tcpMux.Match(cmux.HTTP1Fast())
 
 	go func() {
@@ -76,24 +70,21 @@ func (r *ApiServer) addRestAndWebsite(tcpMux cmux.CMux, grpcPortNumber int) {
 		httpServer := http.Server{
 			Handler: router,
 		}
-		log.Info("Starting HTTP/1 Server")
+		glog.Info("Starting HTTP/1 Server")
 		err := httpServer.Serve(httpListener)
 		if err != nil {
-			log.Error(err, "Failed to start http server Serve()")
+			glog.Errorf("Failed to start http server Serve(): %q", err)
 		}
 	}()
 
 }
 
 func (r *ApiServer) addgRPCRestGateway(router *http.ServeMux, grpcPortNumber int) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("addRestAndWebsite")
-
 	dopts := []grpc.DialOption{grpc.WithInsecure()}
 	gwmux := runtime.NewServeMux()
 	err := pb.RegisterClusterHandlerFromEndpoint(context.Background(), gwmux, "localhost:"+strconv.Itoa(grpcPortNumber), dopts)
 	if err != nil {
-		log.Error(err, "Failed to register handler from enpoint")
+		glog.Errorf("Failed to register handler from enpoint: %q", err)
 	}
 	router.Handle("/api/", gwmux)
 }

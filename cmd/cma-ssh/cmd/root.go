@@ -17,7 +17,9 @@ limitations under the License.
 package cmd
 
 import (
+	"flag"
 	"fmt"
+	"github.com/golang/glog"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis"
 	"github.com/samsung-cnct/cma-ssh/pkg/apiserver"
 	"github.com/samsung-cnct/cma-ssh/pkg/controller"
@@ -28,7 +30,6 @@ import (
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 	"sync"
 )
@@ -46,6 +47,13 @@ var (
 
 // Execute runs the root cobra command
 func Execute() {
+	rootCmd.Flags().AddGoFlagSet(flag.CommandLine)
+	err := flag.CommandLine.Parse([]string{})
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -57,63 +65,60 @@ func init() {
 }
 
 func operator(cmd *cobra.Command) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("entrypoint")
-
 	// Get a config to talk to the apiserver
-	log.Info("setting up client for manager")
+	glog.Info("setting up client for manager")
 	cfg, err := config.GetConfig()
 	if err != nil {
-		log.Error(err, "unable to set up client config")
+		glog.Errorf("unable to set up client config: %q", err)
 		os.Exit(1)
 	}
 
 	// Create a new Cmd to provide shared dependencies and start components
-	log.Info("setting up manager")
+	glog.Info("setting up manager")
 	mgr, err := manager.New(cfg, manager.Options{})
 	if err != nil {
-		log.Error(err, "unable to set up overall controller manager")
+		glog.Errorf("unable to set up overall controller manager: %q", err)
 		os.Exit(1)
 	}
 
-	log.Info("Registering Components.")
+	glog.Info("Registering Components.")
 
 	// Setup Scheme for all resources
-	log.Info("setting up scheme")
+	glog.Info("setting up scheme")
 	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Error(err, "unable add APIs to scheme")
+		glog.Errorf("unable add APIs to scheme: %q", err)
 		os.Exit(1)
 	}
 
 	// Setup all Controllers
-	log.Info("Setting up controller")
+	glog.Info("Setting up controller")
 	if err := controller.AddToManager(mgr); err != nil {
-		log.Error(err, "unable to register controllers to the manager")
+		glog.Errorf("unable to register controllers to the manager: %q", err)
 		os.Exit(1)
 	}
 
-	log.Info("setting up webhooks")
+	glog.Info("setting up webhooks")
 	if err := webhook.AddToManager(mgr); err != nil {
-		log.Error(err, "unable to register webhooks to the manager")
+		glog.Errorf("unable to register webhooks to the manager: %q", err)
 		os.Exit(1)
 	}
 
 	// get flags
 	portNumber, err := cmd.Flags().GetInt("port")
 	if err != nil {
-		log.Error(err, "Could not get port")
+		glog.Errorf("Could not get port: %q", err)
 	}
 
-	log.Info("Creating Web Server")
+	glog.Info("Creating Web Server")
 	tcpMux := createWebServer(&apiserver.ServerOptions{PortNumber: portNumber}, mgr)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		log.Info("Starting to serve requests on port %d", portNumber)
+		glog.Infof("Starting to serve requests on port %d", portNumber)
 		if err := tcpMux.Serve(); err != nil {
-			log.Error(err, "unable serve requests")
+			glog.Errorf("unable serve requests: %q", err)
 			os.Exit(1)
 		}
 	}()
@@ -121,14 +126,14 @@ func operator(cmd *cobra.Command) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		log.Info("Starting the Cmd")
+		glog.Info("Starting the Cmd")
 		if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-			log.Error(err, "unable to run the manager")
+			glog.Errorf("unable to run the manager: %q", err)
 			os.Exit(1)
 		}
 	}()
 
-	log.Info("Waiting for controllers to shut down gracefully")
+	glog.Info("Waiting for controllers to shut down gracefully")
 	wg.Wait()
 }
 

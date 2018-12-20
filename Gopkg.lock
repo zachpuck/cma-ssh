@@ -978,7 +978,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/emicklei/go-restful",
-    "github.com/go-logr/logr",
+    "github.com/golang/glog",
     "github.com/golang/protobuf/proto",
     "github.com/golang/protobuf/protoc-gen-go",
     "github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway",
@@ -1023,7 +1023,6 @@
     "sigs.k8s.io/controller-runtime/pkg/handler",
     "sigs.k8s.io/controller-runtime/pkg/manager",
     "sigs.k8s.io/controller-runtime/pkg/reconcile",
-    "sigs.k8s.io/controller-runtime/pkg/runtime/log",
     "sigs.k8s.io/controller-runtime/pkg/runtime/scheme",
     "sigs.k8s.io/controller-runtime/pkg/runtime/signals",
     "sigs.k8s.io/controller-runtime/pkg/source",
