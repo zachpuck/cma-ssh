@@ -36,7 +36,7 @@ spec:
             - name: CMA_BOOTSTRAP_PORT
               value: "{{ .Values.service.bootstrap.nodePort }}"
           command: ["./cma-ssh"]
-          args: ["--port", "{{ .Values.service.operator.targetPort }}"]
+          args: ["--port", "{{ .Values.service.operator.targetPort }}", "--logtostderr", "--v", "{{ .Values.logLevel }}"]
           resources:
 {{ toYaml .Values.resources | indent 12 }}
     {{- with .Values.nodeSelector }}

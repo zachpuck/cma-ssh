@@ -2,6 +2,7 @@ package k8sutil
 
 import (
 	"context"
+	"github.com/golang/glog"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -10,20 +11,16 @@ import (
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 func GetSecretList(c client.Client, options *client.ListOptions) ([]corev1.Secret, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("k8sutil secrets GetSecretList()")
-
 	secrets := &corev1.SecretList{}
 	err := c.List(
 		context.Background(),
 		options,
 		secrets)
 	if err != nil {
-		log.Error(err, "failed to list secrets in Namespace: ", options.Namespace)
+		glog.Errorf("failed to list secrets in Namespace %s: %q", options.Namespace, err)
 		return nil, err
 	}
 
@@ -31,15 +28,12 @@ func GetSecretList(c client.Client, options *client.ListOptions) ([]corev1.Secre
 }
 
 func DeleteSecret(c client.Client, name string, namespace string) error {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("k8sutil secrets DeleteSecret()")
-
 	secret := &corev1.Secret{}
 	err := c.Delete(
 		context.Background(),
 		secret)
 	if err != nil {
-		log.Error(err, "failed to delete Secret: ", name, " in Namespace: ", namespace)
+		glog.Errorf("failed to delete Secret %s in namespace %s: %q", name, namespace, err)
 		return err
 	}
 
@@ -47,16 +41,13 @@ func DeleteSecret(c client.Client, name string, namespace string) error {
 }
 
 func GetSecret(c client.Client, name string, namespace string) (corev1.Secret, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("k8sutil secrets GetSecret()")
-
 	secret := &corev1.Secret{}
 	err := c.Get(
 		context.Background(),
 		client.ObjectKey{Namespace: namespace, Name: name},
 		secret)
 	if err != nil {
-		log.Error(err, "failed to get secret", "secret", name)
+		glog.Errorf("failed to get secret %s: %q", name, err)
 		return *secret, err
 	}
 
@@ -64,14 +55,11 @@ func GetSecret(c client.Client, name string, namespace string) (corev1.Secret, e
 }
 
 func CreateSecret(c client.Client, secret *corev1.Secret) error {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("k8sutil secrets CreateSecret()")
-
 	err := c.Create(
 		context.Background(),
 		secret)
 	if err != nil {
-		log.Error(err, "failed to create Secret: ", secret.Name)
+		glog.Errorf("failed to create Secret %s: %q", secret.Name, err)
 		return err
 	}
 
@@ -80,14 +68,10 @@ func CreateSecret(c client.Client, secret *corev1.Secret) error {
 
 func SetSecretOwner(c client.Client, secret *corev1.Secret,
 	clusterInstance *clusterv1alpha1.CnctCluster, scheme *runtime.Scheme) error {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("k8sutil secrets SetSecretOwner()")
-
 	err := controllerutil.SetControllerReference(clusterInstance, secret, scheme)
 	if err != nil {
-		log.Error(err, "failed to set controller reference on secret",
-			"controller", clusterInstance,
-			"secret", secret)
+		glog.Errorf("failed to set controller %s reference on secret %s: %q",
+			clusterInstance.GetName(), secret.Name, err)
 		return err
 	}
 
@@ -95,7 +79,7 @@ func SetSecretOwner(c client.Client, secret *corev1.Secret,
 		context.Background(),
 		secret)
 	if err != nil {
-		log.Error(err, "failed to update Secret: ", secret.Name)
+		glog.Errorf("failed to update Secret %s: %q", secret.Name, err)
 		return err
 	}
 
@@ -104,10 +88,6 @@ func SetSecretOwner(c client.Client, secret *corev1.Secret,
 
 func CreateKubeconfigSecret(c client.Client, clusterInstance *clusterv1alpha1.CnctCluster,
 	scheme *runtime.Scheme, kubeconfig []byte) error {
-
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("k8sutil secrets CreateKubeconfigSecret()")
-
 	dataMap := make(map[string][]byte)
 	dataMap[corev1.ServiceAccountKubeconfigKey] = kubeconfig
 
@@ -124,19 +104,17 @@ func CreateKubeconfigSecret(c client.Client, clusterInstance *clusterv1alpha1.Cn
 			}
 			err = controllerutil.SetControllerReference(clusterInstance, newSecret, scheme)
 			if err != nil {
-				log.Error(err, "failed to set controller reference on secret",
-					"controller", clusterInstance,
-					"secret", secret)
+				glog.Errorf("failed to set controller %s reference on secret %s: %q",
+					clusterInstance.GetName(), secret.GetName(), err)
 				return err
 			}
 			err = CreateSecret(c, newSecret)
 			if err != nil {
-				log.Error(err, "failed to create kubeconfig secret",
-					"secret", secret)
+				glog.Errorf("failed to create kubeconfig secret %s: %q", secret.GetName(), err)
 				return err
 			}
 		} else {
-			log.Error(err, "failed to query for secret "+clusterInstance.GetName()+"-kubeconfig")
+			glog.Errorf("failed to query for secret %s: %q", clusterInstance.GetName()+"-kubeconfig", err)
 			return err
 		}
 	} else {
@@ -144,7 +122,7 @@ func CreateKubeconfigSecret(c client.Client, clusterInstance *clusterv1alpha1.Cn
 			secret.Data = dataMap
 			err = c.Update(context.Background(), &secret)
 			if err != nil {
-				log.Error(err, "failed to update secret "+clusterInstance.GetName()+"-kubeconfig")
+				glog.Errorf("failed to update secret %s: %q", clusterInstance.GetName()+"-kubeconfig", err)
 				return err
 			}
 		}

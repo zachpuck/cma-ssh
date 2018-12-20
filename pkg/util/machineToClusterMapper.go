@@ -2,12 +2,12 @@ package util
 
 import (
 	"context"
+	"github.com/golang/glog"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 // A mapper that returns all the Registries
@@ -16,9 +16,6 @@ type MachineToClusterMapper struct {
 }
 
 func (m MachineToClusterMapper) Map(obj handler.MapObject) []reconcile.Request {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("MachineToClusterMapper Map()")
-
 	var res []reconcile.Request
 
 	machine, ok := obj.Object.(*clusterv1alpha1.CnctMachine)
@@ -28,7 +25,7 @@ func (m MachineToClusterMapper) Map(obj handler.MapObject) []reconcile.Request {
 
 	clusters := &clusterv1alpha1.CnctClusterList{}
 	if err := m.List(context.Background(), &client.ListOptions{}, clusters); err != nil {
-		log.Error(err, "could not get list of clusters")
+		glog.Error("could not get list of clusters: %q", err)
 		return res
 	}
 

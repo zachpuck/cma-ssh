@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/golang/glog"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"github.com/samsung-cnct/cma-ssh/pkg/ssh"
@@ -13,7 +14,6 @@ import (
 	"io/ioutil"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"strings"
 	"text/template"
 	"time"
@@ -33,8 +33,6 @@ func RunSshCommand(kubeClient client.Client,
 	machineInstance *clusterv1alpha1.CnctMachine,
 	privateKey []byte,
 	command sshCommand, commandArgs map[string]string) ([]byte, string, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("RunSshCommand()")
 
 	sshConfig := machineInstance.Spec.SshConfig
 
@@ -78,9 +76,10 @@ func RunSshCommand(kubeClient client.Client,
 	if err != nil {
 		switch err.(type) {
 		case *crypto.ExitMissingError:
-			log.Error(err, "command "+cmd+" exited without status")
+			glog.Errorf("command %s exited without status: %q", cmd, err)
 		case *crypto.ExitError:
-			log.Error(err, "command "+cmd+" exited with failing status", "output", string(output[:]))
+			glog.Errorf("command %s exited with failing status and output %s: %q",
+				cmd, string(output[:]), err)
 		}
 	}
 
@@ -90,8 +89,6 @@ func RunSshCommand(kubeClient client.Client,
 var InstallBootstrapRepo = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("Install bootstrap repo command")
 
 	bootstrapConf, err := asset.Assets.Open("/etc/yum.repos.d/bootstrap.repo")
 	if err != nil {
@@ -115,14 +112,14 @@ var InstallBootstrapRepo = func(client *ssh.Client, kubeClient client.Client,
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stdout writer")
+			glog.Errorf("could not flush os.Stdout writer: %q", err)
 		}
 	}(bout)
 	berr := bufio.NewWriter(os.Stderr)
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stderr writer")
+			glog.Errorf("could not flush os.Stderr writer: %q", err)
 		}
 	}(berr)
 
@@ -145,8 +142,6 @@ var InstallBootstrapRepo = func(client *ssh.Client, kubeClient client.Client,
 var InstallNginx = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("Install nginx command")
 
 	nginxConf, err := asset.Assets.Open("/etc/nginx/nginx.conf")
 	if err != nil {
@@ -170,14 +165,14 @@ var InstallNginx = func(client *ssh.Client, kubeClient client.Client,
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stdout writer")
+			glog.Errorf("could not flush os.Stdout writer: %q", err)
 		}
 	}(bout)
 	berr := bufio.NewWriter(os.Stderr)
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stderr writer")
+			glog.Errorf("could not flush os.Stderr writer: %q", err)
 		}
 	}(berr)
 
@@ -218,14 +213,12 @@ var InstallNginx = func(client *ssh.Client, kubeClient client.Client,
 var InstallDocker = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("Install docker command")
 
 	bout := bufio.NewWriter(os.Stdout)
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stdout writer")
+			glog.Errorf("could not flush os.Stdout writer: %q", err)
 		}
 	}(bout)
 
@@ -233,7 +226,7 @@ var InstallDocker = func(client *ssh.Client, kubeClient client.Client,
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stderr writer")
+			glog.Errorf("could not flush os.Stderr writer: %q", err)
 		}
 	}(berr)
 
@@ -279,14 +272,12 @@ var InstallDocker = func(client *ssh.Client, kubeClient client.Client,
 var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("Install kubernetes command")
 
 	bout := bufio.NewWriter(os.Stdout)
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stdout writer")
+			glog.Errorf("could not flush os.Stdout writer: %q", err)
 		}
 	}(bout)
 
@@ -294,7 +285,7 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stderr writer")
+			glog.Errorf("could not flush os.Stderr writer: %q", err)
 		}
 	}(berr)
 
@@ -322,7 +313,7 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 	// read in k8s.conf
 	k8sConf, err := asset.Assets.Open("/etc/sysctl.d/k8s.conf")
 	if err != nil {
-		log.Error(err, "error reading /etc/sysctl.d/k8s.conf")
+		glog.Errorf("error reading /etc/sysctl.d/k8s.conf: %q", err)
 		return nil, "", err
 	}
 
@@ -354,14 +345,12 @@ var InstallKubernetes = func(client *ssh.Client, kubeClient client.Client,
 var KubeadmInit = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("Kubeadm init command")
 
 	bout := bufio.NewWriter(os.Stdout)
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stdout writer")
+			glog.Errorf("could not flush os.Stdout writer: %q", err)
 		}
 	}(bout)
 
@@ -369,7 +358,7 @@ var KubeadmInit = func(client *ssh.Client, kubeClient client.Client,
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stderr writer")
+			glog.Errorf("could not flush os.Stderr writer: %q", err)
 		}
 	}(berr)
 
@@ -381,7 +370,7 @@ var KubeadmInit = func(client *ssh.Client, kubeClient client.Client,
 	// get the kubernetes version to use
 	clusterInstance, err := getCluster(kubeClient, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
 	if err != nil {
-		log.Error(err, "error getting cluster instance")
+		glog.Errorf("error getting cluster instance: %q", err)
 		return nil, "", err
 	}
 
@@ -424,14 +413,12 @@ var KubeadmInit = func(client *ssh.Client, kubeClient client.Client,
 var KubeadmTokenCreate = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("Kubeadm token create command")
 
 	bout := bufio.NewWriter(os.Stdout)
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stdout writer")
+			glog.Errorf("could not flush os.Stdout writer: %q", err)
 		}
 	}(bout)
 
@@ -439,7 +426,7 @@ var KubeadmTokenCreate = func(client *ssh.Client, kubeClient client.Client,
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stderr writer")
+			glog.Errorf("could not flush os.Stderr writer: %q", err)
 		}
 	}(berr)
 
@@ -458,14 +445,12 @@ var KubeadmTokenCreate = func(client *ssh.Client, kubeClient client.Client,
 var KubeadmJoin = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("Kubeadm join command")
 
 	bout := bufio.NewWriter(os.Stdout)
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stdout writer")
+			glog.Errorf("could not flush os.Stdout writer: %q", err)
 		}
 	}(bout)
 
@@ -473,7 +458,7 @@ var KubeadmJoin = func(client *ssh.Client, kubeClient client.Client,
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stderr writer")
+			glog.Errorf("could not flush os.Stderr writer: %q", err)
 		}
 	}(berr)
 
@@ -524,14 +509,12 @@ var KubeadmJoin = func(client *ssh.Client, kubeClient client.Client,
 var GetKubeConfig = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("Get kubeconfig")
 
 	bout := bufio.NewWriter(os.Stdout)
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stdout writer")
+			glog.Errorf("could not flush os.Stdout writer: %q", err)
 		}
 	}(bout)
 
@@ -539,7 +522,7 @@ var GetKubeConfig = func(client *ssh.Client, kubeClient client.Client,
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stderr writer")
+			glog.Errorf("could not flush os.Stderr writer: %q", err)
 		}
 	}(berr)
 
@@ -558,14 +541,12 @@ var GetKubeConfig = func(client *ssh.Client, kubeClient client.Client,
 var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("delete node command")
 
 	bout := bufio.NewWriter(os.Stdout)
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stdout writer")
+			glog.Errorf("could not flush os.Stdout writer: %q", err)
 		}
 	}(bout)
 
@@ -573,7 +554,7 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stderr writer")
+			glog.Errorf("could not flush os.Stderr writer: %q", err)
 		}
 	}(berr)
 
@@ -585,13 +566,13 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	bootstrapRepoName := templateData.BootstrapIp + "_" + templateData.BootstrapPort
 
 	// check if kubelet is installed, uninstall
-	log.Info("Checking wget for " + machineInstance.GetName())
+	glog.Infof("checking wget for %s", machineInstance.GetName())
 	cmd, err := cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " wget"},
 	)
 	if err == nil {
-		log.Info("Deleting wget for " + machineInstance.GetName())
+		glog.Infof("deleting wget for %s", machineInstance.GetName())
 		cmd, err = cr.Run(
 			client.Client,
 			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " wget -y"},
@@ -602,19 +583,19 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// check if kubeadm ins installed, uninstall
-	log.Info("Checking kubeadm for " + machineInstance.GetName())
+	glog.Infof("checking kubeadm for %s", machineInstance.GetName())
 	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubeadm"},
 	)
 	if err == nil {
-		log.Info("Deleting kubeadm for " + machineInstance.GetName())
+		glog.Infof("Deleting kubeadm for %s", machineInstance.GetName())
 		cmd, err = cr.Run(
 			client.Client,
 			ssh.Command{Cmd: "kubeadm reset --force"},
 		)
 		if err != nil {
-			log.Info("kubeadm probably does not understand '--force' flag, trying without.")
+			glog.Info("kubeadm probably does not understand '--force' flag, trying without")
 			cmd, err = cr.Run(
 				client.Client,
 				ssh.Command{Cmd: "kubeadm reset"},
@@ -634,13 +615,13 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// check if kubelet is installed, uninstall
-	log.Info("Checking kubelet for " + machineInstance.GetName())
+	glog.Infof("checking kubelet for %s", machineInstance.GetName())
 	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubelet"},
 	)
 	if err == nil {
-		log.Info("Deleting kubelet for " + machineInstance.GetName())
+		glog.Infof("deleting kubelet for %s", machineInstance.GetName())
 		cmd, err = cr.Run(
 			client.Client,
 			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubelet -y"},
@@ -651,13 +632,13 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// check if cni is installed, uninstall
-	log.Info("Checking cni for " + machineInstance.GetName())
+	glog.Infof("checking cni for %s", machineInstance.GetName())
 	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubernetes-cni"},
 	)
 	if err == nil {
-		log.Info("Deleting cni for " + machineInstance.GetName())
+		glog.Infof("deleting cni for %s", machineInstance.GetName())
 		cmd, err = cr.Run(
 			client.Client,
 			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubernetes-cni -y"},
@@ -668,13 +649,13 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// check if kubectl is installed, uninstall
-	log.Info("Checking kubectl for " + machineInstance.GetName())
+	glog.Infof("checking kubectl for %s", machineInstance.GetName())
 	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubectl"},
 	)
 	if err == nil {
-		log.Info("Deleting kubectl for " + machineInstance.GetName())
+		glog.Infof("deleting kubectl for %s", machineInstance.GetName())
 		cmd, err = cr.Run(
 			client.Client,
 			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " kubectl -y"},
@@ -685,13 +666,13 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// check if docker is installed, uninstall
-	log.Info("Checking docker for " + machineInstance.GetName())
+	glog.Infof("checking docker for %s", machineInstance.GetName())
 	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " docker"},
 	)
 	if err == nil {
-		log.Info("Deleting docker for " + machineInstance.GetName())
+		glog.Infof("deleting docker for %s", machineInstance.GetName())
 		cmd, err = cr.Run(
 			client.Client,
 			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " docker -y"},
@@ -704,13 +685,13 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// check if nginx is installed, uninstall
-	log.Info("Checking nginx for " + machineInstance.GetName())
+	glog.Infof("checking nginx for %s", machineInstance.GetName())
 	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " nginx"},
 	)
 	if err == nil {
-		log.Info("Deleting nginx for " + machineInstance.GetName())
+		glog.Infof("deleting nginx for %s", machineInstance.GetName())
 		cmd, err = cr.Run(
 			client.Client,
 			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " nginx -y"},
@@ -721,13 +702,13 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// check if conntrack is installed, uninstall
-	log.Info("Checking conntrack for " + machineInstance.GetName())
+	glog.Infof("checking conntrack for %s", machineInstance.GetName())
 	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " conntrack"},
 	)
 	if err == nil {
-		log.Info("Deleting conntrack for " + machineInstance.GetName())
+		glog.Info("deleting conntrack for %s", machineInstance.GetName())
 		cmd, err = cr.Run(
 			client.Client,
 			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " conntrack -y"},
@@ -738,7 +719,7 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// delete bootstrap repo file
-	log.Info("Deleting repo file for " + machineInstance.GetName())
+	glog.Info("deleting repo file for %s", machineInstance.GetName())
 	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "rm -f /etc/yum.repos.d/" + bootstrapRepoName + ".repo"},
@@ -748,7 +729,7 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// delete folders
-	log.Info("Deleting folders " + machineInstance.GetName())
+	glog.Info("deleting folders for %s", machineInstance.GetName())
 	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "rm -rf /etc/cni"},
@@ -781,14 +762,12 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 var UpgradeMaster = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("Upgrade master command")
 
 	bout := bufio.NewWriter(os.Stdout)
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stdout writer")
+			glog.Errorf("could not flush os.Stdout writer: %q", err)
 		}
 	}(bout)
 
@@ -796,7 +775,7 @@ var UpgradeMaster = func(client *ssh.Client, kubeClient client.Client,
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stderr writer")
+			glog.Errorf("could not flush os.Stderr writer: %q", err)
 		}
 	}(berr)
 
@@ -808,7 +787,7 @@ var UpgradeMaster = func(client *ssh.Client, kubeClient client.Client,
 	// get the kubernetes version to use
 	clusterInstance, err := getCluster(kubeClient, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
 	if err != nil {
-		log.Error(err, "error getting cluster instance")
+		glog.Errorf("error getting cluster instance for machine %s: %q", machineInstance.GetName(), err)
 		return nil, "", err
 	}
 	// for updates we use the version from cluster, as that is what we are upgrading to
@@ -866,14 +845,12 @@ var UpgradeMaster = func(client *ssh.Client, kubeClient client.Client,
 var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("Upgrade node command")
 
 	bout := bufio.NewWriter(os.Stdout)
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stdout writer")
+			glog.Errorf("could not flush os.Stdout writer: %q", err)
 		}
 	}(bout)
 
@@ -881,7 +858,7 @@ var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stderr writer")
+			glog.Errorf("could not flush os.Stderr writer: %q", err)
 		}
 	}(berr)
 
@@ -893,7 +870,7 @@ var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
 	// get the kubernetes version to use
 	clusterInstance, err := getCluster(kubeClient, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
 	if err != nil {
-		log.Error(err, "error getting cluster instance")
+		glog.Errorf("error getting cluster instance for machine %s: %q", machineInstance.GetName(), err)
 		return nil, "", err
 	}
 	// for updates we use the version from cluster, as that is what we are upgrading to
@@ -965,14 +942,12 @@ var UpgradeNode = func(client *ssh.Client, kubeClient client.Client,
 var DrainAndDeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	machineInstance *clusterv1alpha1.CnctMachine,
 	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("Upgrade node command")
 
 	bout := bufio.NewWriter(os.Stdout)
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stdout writer")
+			glog.Errorf("could not flush os.Stdout writer: %q", err)
 		}
 	}(bout)
 
@@ -980,7 +955,7 @@ var DrainAndDeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	defer func(w *bufio.Writer) {
 		err := w.Flush()
 		if err != nil {
-			log.Error(err, "could not flush os.Stderr writer")
+			glog.Errorf("could not flush os.Stderr writer: %q", err)
 		}
 	}(berr)
 

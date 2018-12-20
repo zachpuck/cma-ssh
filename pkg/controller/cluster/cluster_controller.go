@@ -18,26 +18,25 @@ package cluster
 
 import (
 	"context"
+	"github.com/golang/glog"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"github.com/samsung-cnct/cma-ssh/pkg/controller/machine"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
-	"time"
-
 	"github.com/samsung-cnct/cma-ssh/pkg/util/k8sutil"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"time"
 )
 
 // Add creates a new Cluster Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -95,9 +94,6 @@ type ReconcileCluster struct {
 // +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	logf.SetLogger(logf.ZapLogger(false))
-	log := logf.Log.WithName("cluster Controller Reconcile()")
-
 	// Fetch the Cluster instance
 	clusterInstance := &clusterv1alpha1.CnctCluster{}
 	err := r.Get(context.Background(), request.NamespacedName, clusterInstance)
@@ -108,7 +104,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		log.Error(err, "error reading object cluster", "cluster", request)
+		glog.Errorf("error reading object cluster %s: %q", request.Name, err)
 		return reconcile.Result{}, err
 	}
 
@@ -123,7 +119,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 				common.ResourceStateChange, common.MessageResourceStateChange,
 				clusterInstance.GetName(), common.ReconcilingClusterPhase)
 			if err != nil {
-				log.Error(err, "could not update status of cluster", "cluster", clusterInstance)
+				glog.Errorf("could not update status of cluster %s: %q", clusterInstance.GetName(), err)
 				return reconcile.Result{}, err
 			}
 		}
@@ -138,7 +134,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 					common.ResourceStateChange, common.MessageResourceStateChange,
 					clusterInstance.GetName(), common.StoppingClusterPhase)
 				if err != nil {
-					log.Error(err, "could not update status of cluster", "cluster", clusterInstance)
+					glog.Errorf("could not update status of cluster %s: %q", clusterInstance.GetName(), err)
 					return reconcile.Result{}, err
 				}
 			}
@@ -146,7 +142,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			// there is a finalizer so we check if there are any machines left
 			machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
 			if err != nil {
-				log.Error(err, "could not list Machines for object cluster", "cluster", clusterInstance)
+				glog.Errorf("could not list Machines for object cluster %s: %q", clusterInstance.GetName(), err)
 				return reconcile.Result{}, err
 			}
 
@@ -160,8 +156,8 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 					err = r.Delete(context.Background(), &machine)
 					if err != nil {
 						if !errors.IsNotFound(err) {
-							log.Error(err, "could not delete object machine for object cluster",
-								"machine", machine, "cluster", clusterInstance)
+							glog.Error("could not delete machine %s for cluster %s: %q",
+								machine.GetName(), clusterInstance.GetName(), err)
 						}
 					}
 				}
@@ -179,7 +175,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
 	if err != nil {
-		log.Error(err, "could not list Machines")
+		glog.Errorf("could not list Machines for cluster %s: %q", clusterInstance.GetName(), err)
 		return reconcile.Result{}, err
 	}
 
@@ -191,7 +187,8 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			// make sure private key secret is there, do not requeue if it is not found, this is a fatal error.
 			privateKeySecret, err := k8sutil.GetSecret(r.Client, clusterInstance.Spec.Secret, clusterInstance.GetNamespace())
 			if err != nil {
-				log.Error(err, "could not find cluster private key secret ", clusterInstance.Spec.Secret)
+				glog.Errorf("could not find cluster %s private key secret %s: %q",
+					clusterInstance.GetName(), clusterInstance.Spec.Secret, err)
 				return reconcile.Result{}, nil
 			}
 
@@ -228,7 +225,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 		err = r.updateStatus(clusterInstance, corev1.EventTypeNormal,
 			common.ResourceStateChange, common.MessageResourceStateChange, clusterInstance.GetName(), clusterStatus)
 		if err != nil {
-			log.Error(err, "could not update object cluster status", "cluster", clusterInstance)
+			glog.Errorf("could not update cluster %s status: %q", clusterInstance.GetName(), err)
 		}
 	}
 	return reconcile.Result{}, err
