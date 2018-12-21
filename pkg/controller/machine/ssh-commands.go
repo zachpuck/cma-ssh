@@ -494,7 +494,7 @@ var KubeadmJoin = func(client *ssh.Client, kubeClient client.Client,
 			cmd, err = cr.Run(
 				client.Client,
 				ssh.Command{Cmd: "kubectl --kubeconfig /etc/kubernetes/kubelet.conf label node " +
-					hostnameString + " " + k + "=" + v},
+					hostnameString + " " + k + "=" + v + " --overwrite"},
 			)
 			if err != nil {
 				return err
