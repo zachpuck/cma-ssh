@@ -30,14 +30,14 @@ $ helm install deployments/helm/cma-ssh --name cma-ssh
 ## Build 
 #### one time setup of tools
 - mac osx: 
-`make -f buid/Makefile install-tools-darwin`
+`make -f build/Makefile install-tools-darwin`
 
 - linux:
 `make -f build/Makefile install-tools-linux`
 
 #### To generate code and binary:
 - mac osx: 
-`make -f buid/Makefile darwin`
+`make -f build/Makefile darwin`
 
 - linux:
 `make -f build/Makefile linux`
