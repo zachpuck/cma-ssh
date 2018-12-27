@@ -6,6 +6,14 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: cnctclusters.cluster.cnct.sds.samsung.com
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.phase
+    description: machine status
+    name: Status
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: cluster.cnct.sds.samsung.com
   names:
     kind: CnctCluster
@@ -15,16 +23,24 @@ spec:
     openAPIV3Schema:
       properties:
         apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
           type: string
         kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
           type: string
         metadata:
           type: object
         spec:
           properties:
             clusterNetwork:
+              description: Cluster network configuration
               properties:
                 pods:
+                  description: The network ranges from which POD networks are allocated.
                   properties:
                     cidrBlock:
                       type: string
@@ -32,8 +48,10 @@ spec:
                   - cidrBlock
                   type: object
                 serviceDomain:
+                  description: Domain name for services.
                   type: string
                 services:
+                  description: The network ranges from which service VIPs are allocated.
                   properties:
                     cidrBlock:
                       type: string
@@ -48,6 +66,7 @@ spec:
             kubernetesVersion:
               type: string
             secret:
+              description: name of the private key secret for machines
               type: string
           required:
           - clusterNetwork
@@ -56,11 +75,14 @@ spec:
         status:
           properties:
             apiendpoint:
+              description: API endpoint
               type: string
             lastUpdated:
+              description: When was this status last observed
               format: date-time
               type: string
             phase:
+              description: Cluster status
               type: string
           type: object
   version: v1alpha1
