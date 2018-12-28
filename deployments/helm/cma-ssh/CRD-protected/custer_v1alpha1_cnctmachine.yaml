@@ -14,7 +14,7 @@ metadata:
   name: cnctmachines.cluster.cnct.sds.samsung.com
 spec:
   additionalPrinterColumns:
-  - JSONPath: .spec.status.phase
+  - JSONPath: .status.phase
     description: machine status
     name: Status
     type: string
