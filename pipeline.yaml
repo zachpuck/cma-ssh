@@ -4,12 +4,12 @@ builds:
     context: cma-ssh
     chart: cma-ssh
     tagValue: images.operator.tag
-    dockerContext: build/docker/bootstrap
+    dockerContext: .
   - image: samsung_cnct/cma-ssh-bootstrap
     context: bootstrap
     chart: cma-ssh
     tagValue: images.bootstrap.tag
-    dockerContext: .
+    dockerContext: build/docker/bootstrap
 deployments:
   - chart: cma-ssh
     timeout: 600
