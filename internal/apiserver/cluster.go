@@ -1,6 +1,7 @@
 package apiserver
 
 import (
+	"github.com/golang/glog"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	v1alpha "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	pb "github.com/samsung-cnct/cma-ssh/pkg/generated/api"
@@ -14,7 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientlib "sigs.k8s.io/controller-runtime/pkg/client"
-	"github.com/golang/glog"
 )
 
 func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*pb.CreateClusterReply, error) {
@@ -85,7 +85,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 				ServiceDomain: "cluster.local",
 			},
 			KubernetesVersion: in.K8SVersion,
-			Secret:     "cluster-private-key",
+			Secret:            "cluster-private-key",
 		},
 	}
 	err = client.Create(ctx, clusterObject)
@@ -119,7 +119,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 			Spec: v1alpha.MachineSpec{
 				ClusterRef: in.Name,
 				Roles:      []common.MachineRoles{common.MachineRoleMaster, common.MachineRoleEtcd},
-				Labels: machineLabels,
+				Labels:     machineLabels,
 				SshConfig: v1alpha.MachineSshConfigInfo{
 					Username:   machineConfig.Username,
 					Host:       machineConfig.Host,
@@ -153,7 +153,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 			Spec: v1alpha.MachineSpec{
 				ClusterRef: in.Name,
 				Roles:      []common.MachineRoles{common.MachineRoleWorker},
-				Labels: machineLabels,
+				Labels:     machineLabels,
 				SshConfig: v1alpha.MachineSshConfigInfo{
 					Username:   machineConfig.Username,
 					Host:       machineConfig.Host,
@@ -260,7 +260,6 @@ func (s *Server) DeleteCluster(ctx context.Context, in *pb.DeleteClusterMsg) (*p
 		}
 	}
 
-
 	return &pb.DeleteClusterReply{Ok: true, Status: "Deleted"}, nil
 }
 
@@ -339,12 +338,12 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 			publicHost = addedNode.Host
 		}
 
-		sshParams := ssh.SSHMachineParams {
-			Username: addedNode.Username,
-			Host: addedNode.Host,
+		sshParams := ssh.SSHMachineParams{
+			Username:   addedNode.Username,
+			Host:       addedNode.Host,
 			PublicHost: publicHost,
-			Port: addedNode.Port,
-			Password: addedNode.Password,
+			Port:       addedNode.Port,
+			Password:   addedNode.Password,
 		}
 
 		if string(privateKeySecret.Data["public-key"][:]) != "" {
@@ -371,7 +370,7 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 			Spec: v1alpha.MachineSpec{
 				ClusterRef: clusterInstance.GetName(),
 				Roles:      []common.MachineRoles{common.MachineRoleWorker},
-				Labels: machineLabels,
+				Labels:     machineLabels,
 				SshConfig: v1alpha.MachineSshConfigInfo{
 					Username:   addedNode.Username,
 					Host:       addedNode.Host,
@@ -387,7 +386,6 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
-
 
 	for _, removedNode := range in.RemoveNodes {
 		machineName, err := GetMachineName(clusterInstance.GetName(), removedNode.Host, s.Manager)
