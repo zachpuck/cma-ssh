@@ -19,14 +19,16 @@ package machine
 import (
 	"context"
 	"fmt"
-	"github.com/samsung-cnct/cma-ssh/pkg/util/k8sutil"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/masterminds/semver"
+	errs "github.com/pkg/errors"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
+	"github.com/samsung-cnct/cma-ssh/pkg/ssh"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
+	"github.com/samsung-cnct/cma-ssh/pkg/util/k8sutil"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-type backgroundMachineOp func(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) (string, error)
+type backgroundMachineOp func(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) error
 
 // Add creates a new Machine Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -344,39 +346,39 @@ func getCluster(c client.Client, namespace string, clusterName string) (*cluster
 	return clusterInstance, nil
 }
 
-func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) (string, error) {
-	// Setup bootstrap repo
-	_, cmd, err := RunSshCommand(r.Client, machineInstance, privateKey, InstallBootstrapRepo, make(map[string]string))
+func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) error {
+	// create config for ssh commands
+	cfg, err := NewCmdConfig(r.Client, machineInstance, privateKey)
 	if err != nil {
-		return cmd, err
+		return err
+	}
+
+	// Setup bootstrap repo
+	if err := InstallBootstrapRepo(cfg, nil); err != nil {
+		return err
 	}
 
 	// install local nginx proxy
-	_, cmd, err = RunSshCommand(r.Client, machineInstance, privateKey, InstallNginx, make(map[string]string))
-	if err != nil {
-		return cmd, err
+	if err := InstallNginx(cfg, nil); err != nil {
+		return err
 	}
 
 	// install docker
-	_, cmd, err = RunSshCommand(r.Client, machineInstance, privateKey, InstallDocker, make(map[string]string))
-	if err != nil {
-		return cmd, err
+	if err := InstallDocker(cfg, nil); err != nil {
+		return err
 	}
 
 	// install kubernetes components
-	_, cmd, err = RunSshCommand(r.Client, machineInstance, privateKey, InstallKubernetes, make(map[string]string))
-	if err != nil {
-		return cmd, err
+	if err := InstallKubernetes(cfg, nil); err != nil {
+		return err
 	}
 
 	// if this is a master, proceed with bootstrap
 	if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleMaster) {
 		// run kubeadm init
-		_, cmd, err = RunSshCommand(r.Client, machineInstance, privateKey, KubeadmInit, make(map[string]string))
-		if err != nil {
-			return cmd, err
+		if err := KubeadmInit(cfg, nil); err != nil {
+			return err
 		}
-
 	} else if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleWorker) {
 		// on worker, see if master is able to run kubeadm
 		// if it is, run kubeadm token create and use the token to
@@ -388,14 +390,15 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachi
 		err := r.List(
 			context.Background(),
 			&client.ListOptions{LabelSelector: labels.Everything()},
-			machineList)
+			machineList,
+		)
 		if err != nil {
-			return "get machine list", err
+			return err
 		}
 
 		masterMachine, err := util.GetMaster(machineList.Items)
 		if err != nil {
-			return "util.GetMaster()", err
+			return err
 		}
 
 		var token []byte
@@ -403,7 +406,7 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachi
 			// run kubeadm create token on master machine, get token back
 			glog.Infof("Trying to get kubeadm token from master %s for node %s",
 				masterMachine.GetName(), machineInstance.GetName())
-			token, cmd, err = RunSshCommand(r.Client, masterMachine, privateKey, KubeadmTokenCreate, make(map[string]string))
+			token, err = KubeadmTokenCreate(cfg, nil)
 			if err != nil {
 				glog.Infof("Waiting for kubeadm to be able to create a token on master %s for machine %s",
 					masterMachine.GetName(), machineInstance.GetName())
@@ -416,14 +419,16 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachi
 		if err != nil {
 			glog.Errorf("Failed to get kubeadm token from master %s for machine %s in time: %q",
 				masterMachine.GetName(), machineInstance.GetName(), err)
-			return "KubeadmTokenCreate", err
+			return err
 		}
 
 		// run kubeadm join on worker machine
-		_, cmd, err = RunSshCommand(r.Client, machineInstance, privateKey,
-			KubeadmJoin, map[string]string{"token": string(token[:]), "master": masterMachine.Spec.SshConfig.Host})
-		if err != nil {
-			return cmd, err
+		args := map[string]string{
+			"token":  string(token),
+			"master": masterMachine.Spec.SshConfig.Host,
+		}
+		if err := KubeadmJoin(cfg, args); err != nil {
+			return err
 		}
 	}
 
@@ -433,17 +438,15 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachi
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.ReadyMachinePhase)
 	if err != nil {
-		return "updateStatus()", err
+		return err
 	}
-	return "doBootstrap()", err
+	return nil
 }
 
-func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) (string, error) {
-	// get the cluster instance
-	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
+func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) error {
+	cfg, err := NewCmdConfig(r.Client, machineInstance, privateKey)
 	if err != nil {
-		glog.Errorf("Could not get cluster %s: %q", clusterInstance.GetName(), err)
-		return "getCluster()", err
+		return err
 	}
 
 	// if master, do the upgrade.
@@ -454,18 +457,15 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine
 	if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleMaster) {
 		glog.Infof("running upgrade on master %s for cluster %s",
 			machineInstance.GetName(), machineInstance.Spec.ClusterRef)
-		_, cmd, err := RunSshCommand(r.Client, machineInstance, privateKey,
-			UpgradeMaster, make(map[string]string))
-		if err != nil {
-			return cmd, err
+		if err := UpgradeMaster(cfg, nil); err != nil {
+			return err
 		}
-
 	} else {
 		glog.Infof("running upgrade on worker %s for cluster %s",
 			machineInstance.GetName(), machineInstance.Spec.ClusterRef)
 		err = util.Retry(120, 10*time.Second, func() error {
 			// get list of machines
-			machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
+			machineList, err := util.GetClusterMachineList(r.Client, cfg.clusterInstance.GetName())
 			if err != nil {
 				glog.Errorf("could not list Machines for cluster %s: %q",
 					machineInstance.Spec.ClusterRef, err)
@@ -486,7 +486,7 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine
 					machineInstance.Spec.ClusterRef)
 			}
 
-			if masterMachine.Status.KubernetesVersion != clusterInstance.Spec.KubernetesVersion {
+			if masterMachine.Status.KubernetesVersion != cfg.clusterInstance.Spec.KubernetesVersion {
 				glog.Infof("master %s of cluster %s is not done with upgrade, will retry machine %s",
 					masterMachine.GetName(), machineInstance.Spec.ClusterRef, machineInstance.GetName())
 				return fmt.Errorf("master %s of cluster %s is not ready", masterMachine.GetName(),
@@ -499,103 +499,105 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine
 		})
 		if err != nil {
 			glog.Error(err, "Master failed to upgrade in time")
-			return "doUpgrade", err
+			return err
 		}
 
-		machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
+		machineList, err := util.GetClusterMachineList(r.Client, cfg.clusterInstance.GetName())
 		if err != nil {
 			glog.Error("could not list Machines for cluster %s: %q",
-				clusterInstance.GetName(), err)
-			return "util.GetClusterMachineList", err
+				cfg.clusterInstance.GetName(), err)
+			return err
 		}
 
 		masterMachine, err := util.GetMaster(machineList)
 		if err != nil {
 			glog.Errorf("could not get master instance for cluster %s: %q",
-				clusterInstance.GetName(), err)
-			return "util.GetMaster", err
+				cfg.clusterInstance.GetName(), err)
+			return err
 		}
 
+		masterCfg := cfg
+		masterCfg.machineInstance = masterMachine
 		// get admin kubeconfig
-		kubeConfig, cmd, err := RunSshCommand(r.Client, masterMachine, privateKey,
-			GetKubeConfig, make(map[string]string))
+		kubeConfig, err := GetKubeConfig(masterCfg, nil)
 		if err != nil {
-			return cmd, err
+			return err
 		}
 
 		// run node upgrade
-		_, cmd, err = RunSshCommand(r.Client, machineInstance, privateKey,
-			UpgradeNode, map[string]string{"admin.conf": string(kubeConfig[:])})
+		err = UpgradeNode(cfg, map[string]string{"admin.conf": string(kubeConfig)})
 		if err != nil {
-			return cmd, err
+			return err
 		}
 	}
 
 	machineInstance.Status.Phase = common.ReadyMachinePhase
-	machineInstance.Status.KubernetesVersion = clusterInstance.Spec.KubernetesVersion
+	machineInstance.Status.KubernetesVersion = cfg.clusterInstance.Spec.KubernetesVersion
 
 	err = r.updateStatus(machineInstance, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineInstance.GetName(), common.ReadyMachinePhase)
 	if err != nil {
-		return "updateStatus()", err
+		return err
 	}
 
-	return "doUpgrade()", nil
+	return nil
 }
 
-func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) (string, error) {
+func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) error {
 	// there is a few possibilities here:
 	// 1. Cluster is being deleted. We can just delete this machine
 	// 2. Worker machine is being deleted. We should drain the machine first, and then delete it
 	// 3. Master machine is being deleted. We should issue a warning, and then delete it.
-	// get the cluster instance
-	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
+	cfg, err := NewCmdConfig(r.Client, machineInstance, privateKey)
 	if err != nil {
-		return "getCluster()", err
+		return err
 	}
 
 	// Cluster is NOT being deleted.
-	if clusterInstance.Status.Phase != common.StoppingClusterPhase {
+	if cfg.clusterInstance.Status.Phase != common.StoppingClusterPhase {
 		// get the master machine
-		machineList, err := util.GetClusterMachineList(r.Client, clusterInstance.GetName())
+		machineList, err := util.GetClusterMachineList(r.Client, cfg.clusterInstance.GetName())
 		if err != nil {
 			glog.Errorf("could not list Machines for cluster %s: %q",
-				clusterInstance.GetName(), err)
-			return "util.GetClusterMachineList", err
+				cfg.clusterInstance.GetName(), err)
+			return errs.Wrapf(err, "could not list Machines for cluster %s", cfg.clusterInstance.GetName())
 		}
 		masterMachine, err := util.GetMaster(machineList)
 		if err != nil {
 			glog.Errorf("could not get master for cluster %s: %q",
-				clusterInstance.GetName(), err)
-			return "util.GetMaster", err
+				cfg.clusterInstance.GetName(), err)
+			return errs.Wrapf(err, "could not get master for cluster %s", cfg.clusterInstance.GetName())
 		}
 
 		// TODO: this will need to be handled better
 		if masterMachine.GetName() == machineInstance.GetName() {
 			glog.Infof("WARNING!!! DELETING MASTER, %s"+
 				"CLUSTER %s WILL NOT FUNCTION WITHOUT NEW MASTER AND FULL RESET",
-				masterMachine.GetName(), clusterInstance.GetName())
+				masterMachine.GetName(), cfg.clusterInstance.GetName())
 		}
 
+		masterCfg := cfg
+		masterCfg.machineInstance = masterMachine
 		// get admin kubeconfig
-		kubeConfig, cmd, err := RunSshCommand(r.Client, masterMachine, privateKey,
-			GetKubeConfig, make(map[string]string))
-		if err != nil {
-			return cmd, err
-		}
+		kubeConfig, err := GetKubeConfig(masterCfg, nil)
 
 		// run node drain
-		_, cmd, err = RunSshCommand(r.Client, machineInstance, privateKey,
-			DrainAndDeleteNode, map[string]string{"admin.conf": string(kubeConfig[:])})
-		if err != nil {
-			return cmd, err
+		args := map[string]string{"admin.conf": string(kubeConfig)}
+		if err := DrainAndDeleteNode(cfg, args); err != nil {
+			return err
 		}
 	}
 
 	// run delete command
-	_, cmd, err := RunSshCommand(r.Client, machineInstance, privateKey,
-		DeleteNode, make(map[string]string))
+	if err := DeleteNode(cfg, nil); err != nil {
+		return errs.Wrapf(
+			err,
+			"failed to clean up physical node for machine %s Manual cleanup might be required for %s",
+			machineInstance.GetName(),
+			machineInstance.Spec.SshConfig.Host,
+		)
+	}
 	if err != nil {
 		glog.Errorf("failed to clean up physical node for machine %s Manual cleanup might be required for %s",
 			machineInstance.GetName(), machineInstance.Spec.SshConfig.Host)
@@ -609,15 +611,15 @@ func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine,
 		glog.Errorf("failed to update status for machine %s: %q", machineInstance.GetName(), err)
 	}
 
-	return cmd, err
+	return err
 }
 
 func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 	machineInstance *clusterv1alpha1.CnctMachine, operationName string) {
-
+	// TODO: add cancelable context to the commands so we don't continue running
+	//  them after a timeout.
 	type commandError struct {
 		Err error
-		Cmd string
 	}
 
 	// start bootstrap command (or pre upgrade etc)
@@ -639,9 +641,11 @@ func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 	}
 	privateKey := privateKeySecret.Data["private-key"]
 
+	// TODO: op should just take a context.WithTimeout
+
 	go func(ch chan<- commandError) {
-		cmd, err := op(r, machineInstance, privateKey)
-		ch <- commandError{Err: err, Cmd: cmd}
+		err := op(r, machineInstance, privateKey)
+		ch <- commandError{Err: err}
 		close(opResult)
 	}(opResult)
 
@@ -660,8 +664,21 @@ func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 		case result := <-opResult:
 			// if finished with error
 			if result.Err != nil {
-				glog.Errorf("could not complete machine %s pre-start step %s command %s: %q",
-					machineInstance.GetName(), operationName, result.Cmd, result.Err)
+				switch err := errs.Cause(result.Err).(type) {
+				case ssh.ErrorCmd:
+					glog.Errorf(
+						"could not complete machine %s pre-start step %s command %s: %q",
+						machineInstance.GetName(),
+						operationName,
+						err.Cmd(),
+						result.Err,
+					)
+				default:
+					glog.Errorf(
+						"could not complete machine %s pre-start: %q",
+						err,
+					)
+				}
 
 				// set error status
 				machineInstance.Status.Phase = common.ErrorMachinePhase
@@ -669,20 +686,40 @@ func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 					common.ResourceStateChange, common.MessageResourceStateChange,
 					machineInstance.GetName(), common.ErrorMachinePhase)
 				if err != nil {
-					glog.Errorf("could not update status of machine %s of cluster %s: %q",
-						machineInstance.GetName(), machineInstance.Spec.ClusterRef, err)
+					glog.Errorf(
+						"could not update status of machine %s of cluster %s: %q",
+						machineInstance.GetName(), machineInstance.Spec.ClusterRef,
+						err,
+					)
 				}
 			}
 		}
 
 		// if timed out, wait for operation to complete
 		if timedOut {
-			select {
-			case result := <-opResult:
-				glog.Errorf("Timed out machine %s pre-start step %s command %s: %q",
-					machineInstance.GetName(), operationName, result.Cmd, result.Err)
+			// TODO: fix this so we cancel the command. Currently this will
+			//  always run until completion or failure.
+			result := <-opResult
+			if result.Err != nil {
+				switch err := errs.Cause(result.Err).(type) {
+				case ssh.ErrorCmd:
+					glog.Errorf(
+						"Timed out machine %s pre-start step %s command %s: %q",
+						machineInstance.GetName(),
+						operationName,
+						err.Cmd(),
+						err.Error(),
+					)
+				}
+			} else {
+				glog.Errorf(
+					"Timed out machine %s but completed \"successfully\".",
+					machineInstance.GetName(),
+				)
 			}
 
+			// TODO: this sets the machine to ErrorMachinePhase even if it
+			//  eventually completed successfully.
 			// set error status
 			machineInstance.Status.Phase = common.ErrorMachinePhase
 			err := r.updateStatus(machineInstance, corev1.EventTypeWarning,
@@ -693,6 +730,5 @@ func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 					machineInstance.GetName(), machineInstance.Spec.ClusterRef, err)
 			}
 		}
-
 	}()
 }

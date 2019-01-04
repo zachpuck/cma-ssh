@@ -8,17 +8,23 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"golang.org/x/crypto/ssh"
 	"io"
 	"net"
 	"path/filepath"
+	"sync"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 // Client contains the underlying net.Conn and an ssh.Client for the conn.
 type Client struct {
 	c net.Conn
 	*ssh.Client
+}
+
+func (c *Client) Close() error {
+	return c.Client.Close()
 }
 
 type SSHMachineParams struct {
@@ -72,14 +78,48 @@ type CommandRunner struct {
 	currentCmd string
 }
 
-type Command struct {
-	Cmd   string
-	Stdin io.Reader
+type BatchRunner struct {
+	client *Client
+	out    io.Writer
+	err    error
 }
 
-func (c *CommandRunner) Run(client *ssh.Client, cmds ...Command) (string, error) {
+func NewBatchRunner(c *Client, out io.Writer) *BatchRunner {
+	return &BatchRunner{client: c, out: out}
+}
+
+func (b *BatchRunner) Err() error {
+	return b.err
+}
+
+func (b *BatchRunner) Run(cmds ...Cmd) {
+	ocw := combinedWriter{w: b.out}
 	for _, cmd := range cmds {
-		c.currentCmd, c.err = c.exec(client, cmd)
+		// do not run commands if there is any previous error
+		if b.err != nil {
+			return
+		}
+		cmd.Stdout = &ocw
+		cmd.Stderr = &ocw
+		b.err = cmd.Run(b.client)
+	}
+}
+
+type combinedWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+func (m *combinedWriter) Write(b []byte) (int, error) {
+	m.mu.Lock()
+	n, err := m.w.Write(b)
+	m.mu.Unlock()
+	return n, err
+}
+
+func (c *CommandRunner) Run(client *Client, cmds ...Cmd) (string, error) {
+	for _, cmd := range cmds {
+		c.currentCmd, c.err = c.exec(client.Client, cmd)
 		if c.err != nil {
 			return c.currentCmd, c.err
 		}
@@ -87,36 +127,36 @@ func (c *CommandRunner) Run(client *ssh.Client, cmds ...Command) (string, error)
 	return c.currentCmd, c.err
 }
 
-func (c *CommandRunner) GetOutput(client *ssh.Client, cmd Command) ([]byte, string, error) {
-	return c.execWithOutput(client, cmd)
+func (c *CommandRunner) GetOutput(client *Client, cmd Cmd) ([]byte, string, error) {
+	return c.execWithOutput(client.Client, cmd)
 }
 
-func (c *CommandRunner) exec(client *ssh.Client, cmd Command) (string, error) {
+func (c *CommandRunner) exec(client *ssh.Client, cmd Cmd) (string, error) {
 
 	session, err := client.NewSession()
 	if err != nil {
-		return cmd.Cmd, err
+		return cmd.Command, err
 	}
 	defer session.Close()
 
 	session.Stdin = cmd.Stdin
 	session.Stdout = c.Stdout
 	session.Stderr = c.Stderr
-	return cmd.Cmd, session.Run(cmd.Cmd)
+	return cmd.Command, session.Run(cmd.Command)
 }
 
-func (c *CommandRunner) execWithOutput(client *ssh.Client, cmd Command) ([]byte, string, error) {
+func (c *CommandRunner) execWithOutput(client *ssh.Client, cmd Cmd) ([]byte, string, error) {
 
 	session, err := client.NewSession()
 	if err != nil {
-		return nil, cmd.Cmd, err
+		return nil, cmd.Command, err
 	}
 	defer session.Close()
 
 	session.Stdin = cmd.Stdin
 	session.Stderr = c.Stderr
-	out, err := session.Output(cmd.Cmd)
-	return bytes.TrimSpace(out), cmd.Cmd, err
+	out, err := session.Output(cmd.Command)
+	return bytes.TrimSpace(out), cmd.Command, err
 }
 
 // AddPublicKeyToRemoteNode will add the publicKey to the username@host:port's authorized_keys file w/password
@@ -158,6 +198,57 @@ func AddPublicKeyToRemoteNode(host string, port int32, username string, password
 	fmt.Println(b.String())
 
 	return nil
+}
+
+type Cmd struct {
+	Command string
+	Stdin   io.Reader
+	Stdout  io.Writer
+	Stderr  io.Writer
+}
+
+func Command(command string) Cmd {
+	return Cmd{
+		Command: command,
+	}
+}
+
+func CommandWithInput(command string, r io.Reader) Cmd {
+	return Cmd{
+		Command: command,
+		Stdin:   r,
+	}
+}
+
+func (c Cmd) Run(client *Client) error {
+	s, err := client.Client.NewSession()
+	if err != nil {
+
+	}
+	s.Stdin = c.Stdin
+	s.Stdout = c.Stdout
+	s.Stderr = c.Stderr
+
+	if err := s.Run(c.Command); err != nil {
+		return ErrorCmd{
+			cmd: c,
+			err: err,
+		}
+	}
+	return nil
+}
+
+type ErrorCmd struct {
+	cmd Cmd
+	err error
+}
+
+func (e ErrorCmd) Error() string {
+	return e.err.Error()
+}
+
+func (e ErrorCmd) Cmd() string {
+	return e.cmd.Command
 }
 
 // GenerateSSHKeyPair creates a ECDSA a x509 ASN.1-DER format-PEM encoded private

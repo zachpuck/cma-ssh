@@ -989,6 +989,7 @@
     "github.com/masterminds/semver",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
+    "github.com/pkg/errors",
     "github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc",
     "github.com/shurcooL/vfsgen",
     "github.com/soheilhy/cmux",
