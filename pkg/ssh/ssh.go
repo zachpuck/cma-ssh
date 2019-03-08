@@ -27,7 +27,7 @@ func (c *Client) Close() error {
 	return c.Client.Close()
 }
 
-type SSHMachineParams struct {
+type MachineParams struct {
 	Username   string
 	Host       string
 	PublicHost string
@@ -35,13 +35,13 @@ type SSHMachineParams struct {
 	Password   string
 }
 
-type SSHClusterParams struct {
+type ClusterParams struct {
 	Name              string
 	PrivateKey        string // These are base64 _and_ PEM encoded Eliptic
 	PublicKey         string // Curve (EC) keys used in JSON and YAML.
 	K8SVersion        string
-	ControlPlaneNodes []SSHMachineParams
-	WorkerNodes       []SSHMachineParams
+	ControlPlaneNodes []MachineParams
+	WorkerNodes       []MachineParams
 }
 
 // NewClient returns a client with the underlying net.Conn and an ssh.Client.
@@ -69,13 +69,6 @@ func NewClient(address, user string, privateKey []byte) (*Client, error) {
 
 	client := ssh.NewClient(conn, newCh, reqCh)
 	return &Client{c: c, Client: client}, nil
-}
-
-type CommandRunner struct {
-	Stdout     io.Writer
-	Stderr     io.Writer
-	err        error
-	currentCmd string
 }
 
 type BatchRunner struct {
@@ -117,48 +110,6 @@ func (m *combinedWriter) Write(b []byte) (int, error) {
 	return n, err
 }
 
-func (c *CommandRunner) Run(client *Client, cmds ...Cmd) (string, error) {
-	for _, cmd := range cmds {
-		c.currentCmd, c.err = c.exec(client.Client, cmd)
-		if c.err != nil {
-			return c.currentCmd, c.err
-		}
-	}
-	return c.currentCmd, c.err
-}
-
-func (c *CommandRunner) GetOutput(client *Client, cmd Cmd) ([]byte, string, error) {
-	return c.execWithOutput(client.Client, cmd)
-}
-
-func (c *CommandRunner) exec(client *ssh.Client, cmd Cmd) (string, error) {
-
-	session, err := client.NewSession()
-	if err != nil {
-		return cmd.Command, err
-	}
-	defer session.Close()
-
-	session.Stdin = cmd.Stdin
-	session.Stdout = c.Stdout
-	session.Stderr = c.Stderr
-	return cmd.Command, session.Run(cmd.Command)
-}
-
-func (c *CommandRunner) execWithOutput(client *ssh.Client, cmd Cmd) ([]byte, string, error) {
-
-	session, err := client.NewSession()
-	if err != nil {
-		return nil, cmd.Command, err
-	}
-	defer session.Close()
-
-	session.Stdin = cmd.Stdin
-	session.Stderr = c.Stderr
-	out, err := session.Output(cmd.Command)
-	return bytes.TrimSpace(out), cmd.Command, err
-}
-
 // AddPublicKeyToRemoteNode will add the publicKey to the username@host:port's authorized_keys file w/password
 func AddPublicKeyToRemoteNode(host string, port int32, username string, password string, publicKey []byte) error {
 	var sshDir = filepath.Join("${HOME}", ".ssh")
@@ -186,9 +137,7 @@ func AddPublicKeyToRemoteNode(host string, port int32, username string, password
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = session.Close()
-	}()
+	defer session.Close()
 
 	var b bytes.Buffer
 	session.Stdout = &b
@@ -288,7 +237,7 @@ func GenerateSSHKeyPair() (private []byte, public []byte, err error) {
 	return privatePEMBytes, pubKeyBytes, nil
 }
 
-func SetupPrivateKeyAccess(machine SSHMachineParams, privateKey []byte, publicKey []byte) error {
+func SetupPrivateKeyAccess(machine MachineParams, privateKey []byte, publicKey []byte) error {
 
 	host := machine.PublicHost
 	if host == "" {

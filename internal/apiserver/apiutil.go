@@ -19,7 +19,7 @@ func PrepareNodes(in *pb.CreateClusterMsg) ([]byte, []byte, error) {
 	}
 
 	for _, node := range in.ControlPlaneNodes {
-		sshParams := ssh.SSHMachineParams{
+		sshParams := ssh.MachineParams{
 			Username:   node.Username,
 			Host:       node.Host,
 			PublicHost: node.Publichost,
@@ -33,7 +33,7 @@ func PrepareNodes(in *pb.CreateClusterMsg) ([]byte, []byte, error) {
 	}
 
 	for _, node := range in.WorkerNodes {
-		sshParams := ssh.SSHMachineParams{
+		sshParams := ssh.MachineParams{
 			Username:   node.Username,
 			Host:       node.Host,
 			PublicHost: node.Publichost,

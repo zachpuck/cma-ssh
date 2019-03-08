@@ -91,8 +91,6 @@ func NewCmdConfig(kubeClient client.Client, machineInstance *clusterv1alpha1.Cnc
 
 }
 
-type sshCommand func(CmdConfig, map[string]string) error
-
 func parseAndExecute(file string, data bootstrapConfig) (*bytes.Buffer, error) {
 	f, err := asset.Assets.Open(file)
 	if err != nil {
@@ -365,7 +363,7 @@ func DeleteNode(cfg CmdConfig, args map[string]string) error {
 	}
 
 	// delete bootstrap repo file
-	glog.Info("deleting repo file for %s", cfg.machineInstance.GetName())
+	glog.Infof("deleting repo file for %s", cfg.machineInstance.GetName())
 	if err := rmrf("/etc/yum.repos.d/sds_bootstrap.repo").Run(cfg.sshClient); err != nil {
 		return err
 	}
@@ -373,7 +371,7 @@ func DeleteNode(cfg CmdConfig, args map[string]string) error {
 	br := ssh.NewBatchRunner(cfg.sshClient, os.Stdout)
 
 	// delete folders
-	glog.Info("deleting folders for %s", cfg.machineInstance.GetName())
+	glog.Infof("deleting folders for %s", cfg.machineInstance.GetName())
 	br.Run(
 		rmrf("/etc/cni"),
 		rmrf("/etc/docker"),
@@ -538,22 +536,12 @@ func (y yumConfig) String() string {
 	return strings.Join(flags, " ")
 }
 
-func install(y *yumConfig) {
-	y.action = yumInstall
-}
-
 func remove(y *yumConfig) {
 	y.action = yumRemove
 }
 
-func list_installed(y *yumConfig) {
+func listInstalled(y *yumConfig) {
 	y.action = yumListInstalled
-}
-
-func disableRepo(repo string) yumOption {
-	return func(y *yumConfig) {
-		y.disableRepo = repo
-	}
 }
 
 func disableExclude(repo string) yumOption {
@@ -581,7 +569,7 @@ func yum(rpm string, opts ...yumOption) ssh.Cmd {
 func yumCheckAndRemove(cfg CmdConfig, rpm string) error {
 	// check if wget is installed, uninstall
 	glog.Infof("checking %s for %s", rpm, cfg.machineInstance.GetName())
-	err := yum(rpm, list_installed).Run(cfg.sshClient)
+	err := yum(rpm, listInstalled).Run(cfg.sshClient)
 	if err == nil {
 		glog.Infof("deleting %s for %s", rpm, cfg.machineInstance.GetName())
 		if err := yum(rpm, remove).Run(cfg.sshClient); err != nil {

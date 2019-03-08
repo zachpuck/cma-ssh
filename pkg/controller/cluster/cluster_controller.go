@@ -157,7 +157,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 					err = r.Delete(context.Background(), &machine)
 					if err != nil {
 						if !errors.IsNotFound(err) {
-							glog.Error("could not delete machine %s for cluster %s: %q",
+							glog.Errorf("could not delete machine %s for cluster %s: %q",
 								machine.GetName(), clusterInstance.GetName(), err)
 						}
 					}

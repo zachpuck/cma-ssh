@@ -338,7 +338,7 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 			publicHost = addedNode.Host
 		}
 
-		sshParams := ssh.SSHMachineParams{
+		sshParams := ssh.MachineParams{
 			Username:   addedNode.Username,
 			Host:       addedNode.Host,
 			PublicHost: publicHost,

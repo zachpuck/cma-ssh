@@ -215,7 +215,7 @@ func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.CnctMac
 			common.ResourceStateChange, common.MessageResourceStateChange,
 			machineInstance.GetName(), common.DeletingMachinePhase)
 		if err != nil {
-			glog.Errorf("could not update status of machine %s: %q", machineInstance.GetName())
+			glog.Errorf("could not update status of machine %s: %q", machineInstance.GetName(), err)
 			return reconcile.Result{}, err
 		}
 
@@ -504,7 +504,7 @@ func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine
 
 		machineList, err := util.GetClusterMachineList(r.Client, cfg.clusterInstance.GetName())
 		if err != nil {
-			glog.Error("could not list Machines for cluster %s: %q",
+			glog.Errorf("could not list Machines for cluster %s: %q",
 				cfg.clusterInstance.GetName(), err)
 			return err
 		}
@@ -676,6 +676,7 @@ func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 				default:
 					glog.Errorf(
 						"could not complete machine %s pre-start: %q",
+						machineInstance.GetName(),
 						err,
 					)
 				}
