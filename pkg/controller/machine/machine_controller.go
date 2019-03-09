@@ -17,6 +17,7 @@ limitations under the License.
 package machine
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"time"
@@ -400,13 +401,16 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachi
 		if err != nil {
 			return err
 		}
-
+		masterConfig, err := NewCmdConfig(r.Client, masterMachine, privateKey)
+		if err != nil {
+			return err
+		}
 		var token []byte
 		err = util.Retry(120, 10*time.Second, func() error {
 			// run kubeadm create token on master machine, get token back
 			glog.Infof("Trying to get kubeadm token from master %s for node %s",
 				masterMachine.GetName(), machineInstance.GetName())
-			token, err = KubeadmTokenCreate(cfg, nil)
+			token, err = KubeadmTokenCreate(masterConfig, nil)
 			if err != nil {
 				glog.Infof("Waiting for kubeadm to be able to create a token on master %s for machine %s",
 					masterMachine.GetName(), machineInstance.GetName())
@@ -424,7 +428,7 @@ func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachi
 
 		// run kubeadm join on worker machine
 		args := map[string]string{
-			"token":  string(token),
+			"token":  string(bytes.TrimSpace(token)),
 			"master": masterMachine.Spec.SshConfig.Host,
 		}
 		if err := KubeadmJoin(cfg, args); err != nil {
