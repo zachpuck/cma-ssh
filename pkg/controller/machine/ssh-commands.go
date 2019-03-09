@@ -172,7 +172,7 @@ func InstallNginx(cfg CmdConfig, args map[string]string) error {
 		ssh.Command("systemctl enable nginx"),
 		ssh.Command("systemctl stop firewalld"),
 		ssh.Command("systemctl disable firewalld"),
-		ssh.CommandWithInput("cat /etc/hosts - >> /etc/hosts", newHosts),
+		ssh.CommandWithInput("cat - >> /etc/hosts", newHosts),
 	)
 
 	return br.Err()
