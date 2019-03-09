@@ -295,10 +295,9 @@ func KubeadmJoin(cfg CmdConfig, args map[string]string) error {
 
 	// kubeadm join
 	br.Run(
-		ssh.Command("kubeadm join --token " +
-			token +
-			" --ignore-preflight-errors=all --discovery-token-unsafe-skip-ca-verification " +
-			master),
+		ssh.Command("kubeadm join --token " + token +
+			" --ignore-preflight-errors=all " +
+			"--discovery-token-unsafe-skip-ca-verification " + master),
 	)
 	if br.Err() != nil {
 		return br.Err()

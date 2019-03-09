@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -172,8 +173,9 @@ func CommandWithInput(command string, r io.Reader) Cmd {
 func (c Cmd) Run(client *Client) error {
 	s, err := client.Client.NewSession()
 	if err != nil {
-
+		return errors.Wrap(err, "could not create a new ssh session")
 	}
+
 	s.Stdin = c.Stdin
 	s.Stdout = c.Stdout
 	s.Stderr = c.Stderr
