@@ -524,14 +524,14 @@ const (
 
 func (y yumConfig) String() string {
 	flags := []string{y.action}
-	if y.enableRepo != "" {
-		flags = append(flags, fmt.Sprintf("--enablerepo=%q", y.enableRepo))
-	}
 	if y.disableRepo != "" {
 		flags = append(flags, fmt.Sprintf("--disablerepo=%q", y.disableRepo))
 	}
 	if y.disableExclude != "" {
 		flags = append(flags, fmt.Sprintf("--disableexcludes=%q", y.disableExclude))
+	}
+	if y.enableRepo != "" {
+		flags = append(flags, fmt.Sprintf("--enablerepo=%q", y.enableRepo))
 	}
 	return strings.Join(flags, " ")
 }
