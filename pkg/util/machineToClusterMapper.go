@@ -25,7 +25,7 @@ func (m MachineToClusterMapper) Map(obj handler.MapObject) []reconcile.Request {
 
 	clusters := &clusterv1alpha1.CnctClusterList{}
 	if err := m.List(context.Background(), &client.ListOptions{}, clusters); err != nil {
-		glog.Error("could not get list of clusters: %q", err)
+		glog.Errorf("could not get list of clusters: %q", err)
 		return res
 	}
 

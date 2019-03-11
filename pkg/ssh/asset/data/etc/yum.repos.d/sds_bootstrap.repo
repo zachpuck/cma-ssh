@@ -1,0 +1,5 @@
+[sds_bootstrap]
+name=SDS Bootstrap yum repo
+baseurl=http://{{.BootstrapIp}}:{{.BootstrapPort}}
+enabled=1
+gpgcheck=0

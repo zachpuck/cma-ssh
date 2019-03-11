@@ -8,11 +8,14 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"golang.org/x/crypto/ssh"
 	"io"
 	"net"
 	"path/filepath"
+	"sync"
 	"time"
+
+	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
 )
 
 // Client contains the underlying net.Conn and an ssh.Client for the conn.
@@ -21,7 +24,11 @@ type Client struct {
 	*ssh.Client
 }
 
-type SSHMachineParams struct {
+func (c *Client) Close() error {
+	return c.Client.Close()
+}
+
+type MachineParams struct {
 	Username   string
 	Host       string
 	PublicHost string
@@ -29,13 +36,13 @@ type SSHMachineParams struct {
 	Password   string
 }
 
-type SSHClusterParams struct {
+type ClusterParams struct {
 	Name              string
 	PrivateKey        string // These are base64 _and_ PEM encoded Eliptic
 	PublicKey         string // Curve (EC) keys used in JSON and YAML.
 	K8SVersion        string
-	ControlPlaneNodes []SSHMachineParams
-	WorkerNodes       []SSHMachineParams
+	ControlPlaneNodes []MachineParams
+	WorkerNodes       []MachineParams
 }
 
 // NewClient returns a client with the underlying net.Conn and an ssh.Client.
@@ -65,58 +72,43 @@ func NewClient(address, user string, privateKey []byte) (*Client, error) {
 	return &Client{c: c, Client: client}, nil
 }
 
-type CommandRunner struct {
-	Stdout     io.Writer
-	Stderr     io.Writer
-	err        error
-	currentCmd string
+type BatchRunner struct {
+	client *Client
+	out    io.Writer
+	err    error
 }
 
-type Command struct {
-	Cmd   string
-	Stdin io.Reader
+func NewBatchRunner(c *Client, out io.Writer) *BatchRunner {
+	return &BatchRunner{client: c, out: out}
 }
 
-func (c *CommandRunner) Run(client *ssh.Client, cmds ...Command) (string, error) {
+func (b *BatchRunner) Err() error {
+	return b.err
+}
+
+func (b *BatchRunner) Run(cmds ...Cmd) {
+	ocw := combinedWriter{w: b.out}
 	for _, cmd := range cmds {
-		c.currentCmd, c.err = c.exec(client, cmd)
-		if c.err != nil {
-			return c.currentCmd, c.err
+		// do not run commands if there is any previous error
+		if b.err != nil {
+			return
 		}
+		cmd.Stdout = &ocw
+		cmd.Stderr = &ocw
+		b.err = cmd.Run(b.client)
 	}
-	return c.currentCmd, c.err
 }
 
-func (c *CommandRunner) GetOutput(client *ssh.Client, cmd Command) ([]byte, string, error) {
-	return c.execWithOutput(client, cmd)
+type combinedWriter struct {
+	mu sync.Mutex
+	w  io.Writer
 }
 
-func (c *CommandRunner) exec(client *ssh.Client, cmd Command) (string, error) {
-
-	session, err := client.NewSession()
-	if err != nil {
-		return cmd.Cmd, err
-	}
-	defer session.Close()
-
-	session.Stdin = cmd.Stdin
-	session.Stdout = c.Stdout
-	session.Stderr = c.Stderr
-	return cmd.Cmd, session.Run(cmd.Cmd)
-}
-
-func (c *CommandRunner) execWithOutput(client *ssh.Client, cmd Command) ([]byte, string, error) {
-
-	session, err := client.NewSession()
-	if err != nil {
-		return nil, cmd.Cmd, err
-	}
-	defer session.Close()
-
-	session.Stdin = cmd.Stdin
-	session.Stderr = c.Stderr
-	out, err := session.Output(cmd.Cmd)
-	return bytes.TrimSpace(out), cmd.Cmd, err
+func (m *combinedWriter) Write(b []byte) (int, error) {
+	m.mu.Lock()
+	n, err := m.w.Write(b)
+	m.mu.Unlock()
+	return n, err
 }
 
 // AddPublicKeyToRemoteNode will add the publicKey to the username@host:port's authorized_keys file w/password
@@ -146,9 +138,7 @@ func AddPublicKeyToRemoteNode(host string, port int32, username string, password
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = session.Close()
-	}()
+	defer session.Close()
 
 	var b bytes.Buffer
 	session.Stdout = &b
@@ -158,6 +148,58 @@ func AddPublicKeyToRemoteNode(host string, port int32, username string, password
 	fmt.Println(b.String())
 
 	return nil
+}
+
+type Cmd struct {
+	Command string
+	Stdin   io.Reader
+	Stdout  io.Writer
+	Stderr  io.Writer
+}
+
+func Command(command string) Cmd {
+	return Cmd{
+		Command: command,
+	}
+}
+
+func CommandWithInput(command string, r io.Reader) Cmd {
+	return Cmd{
+		Command: command,
+		Stdin:   r,
+	}
+}
+
+func (c Cmd) Run(client *Client) error {
+	s, err := client.Client.NewSession()
+	if err != nil {
+		return errors.Wrap(err, "could not create a new ssh session")
+	}
+
+	s.Stdin = c.Stdin
+	s.Stdout = c.Stdout
+	s.Stderr = c.Stderr
+
+	if err := s.Run(c.Command); err != nil {
+		return ErrorCmd{
+			cmd: c,
+			err: err,
+		}
+	}
+	return nil
+}
+
+type ErrorCmd struct {
+	cmd Cmd
+	err error
+}
+
+func (e ErrorCmd) Error() string {
+	return e.err.Error()
+}
+
+func (e ErrorCmd) Cmd() string {
+	return e.cmd.Command
 }
 
 // GenerateSSHKeyPair creates a ECDSA a x509 ASN.1-DER format-PEM encoded private
@@ -197,7 +239,7 @@ func GenerateSSHKeyPair() (private []byte, public []byte, err error) {
 	return privatePEMBytes, pubKeyBytes, nil
 }
 
-func SetupPrivateKeyAccess(machine SSHMachineParams, privateKey []byte, publicKey []byte) error {
+func SetupPrivateKeyAccess(machine MachineParams, privateKey []byte, publicKey []byte) error {
 
 	host := machine.PublicHost
 	if host == "" {

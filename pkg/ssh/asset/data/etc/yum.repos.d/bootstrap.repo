@@ -1,5 +1,0 @@
-[{{.BootstrapIp}}_{{.BootstrapPort}}]
-name=added from: http://{{.BootstrapIp}}:{{.BootstrapPort}}
-baseurl=http://{{.BootstrapIp}}:{{.BootstrapPort}}
-enabled=1
-gpgcheck=0
