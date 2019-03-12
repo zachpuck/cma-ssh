@@ -148,7 +148,7 @@ func InstallNginx(cfg CmdConfig, args map[string]string) error {
 	hostname := bytes.ToLower(bytes.TrimSpace(buf.Bytes()))
 
 	const newHostFmt = `
-127.0.0.1 registry.docker.io gcr.io k8s.gcr.io quay.io
+127.0.0.1 registry-1.docker.io gcr.io k8s.gcr.io quay.io
 %s sds.redii.net
 %s %s
 `
