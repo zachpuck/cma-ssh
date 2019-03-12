@@ -28,6 +28,7 @@ func (c *Client) Close() error {
 	return c.Client.Close()
 }
 
+// MachineParams contains parameters for individual machines.
 type MachineParams struct {
 	Username   string
 	Host       string
@@ -36,6 +37,7 @@ type MachineParams struct {
 	Password   string
 }
 
+// ClusterParams contains parameters for the entire cluster.
 type ClusterParams struct {
 	Name              string
 	PrivateKey        string // These are base64 _and_ PEM encoded Eliptic
@@ -72,6 +74,7 @@ func NewClient(address, user string, privateKey []byte) (*Client, error) {
 	return &Client{c: c, Client: client}, nil
 }
 
+// BatchRunner is used for running multiple ssh commands on a single client.
 type BatchRunner struct {
 	client *Client
 	out    io.Writer
@@ -86,6 +89,10 @@ func (b *BatchRunner) Err() error {
 	return b.err
 }
 
+// Run executes all the commands on the client. If any of the commands
+// return an error then all remaining commands will be skipped. You can check
+// the error with BatchRunner.Err(). Stdout and Stderr from the command are
+// interleaved and are written to the BatchRunners output.
 func (b *BatchRunner) Run(cmds ...Cmd) {
 	ocw := combinedWriter{w: b.out}
 	for _, cmd := range cmds {
@@ -157,12 +164,15 @@ type Cmd struct {
 	Stderr  io.Writer
 }
 
+// Command is a convenience method to create Cmd.
 func Command(command string) Cmd {
 	return Cmd{
 		Command: command,
 	}
 }
 
+// CommandWithInput is a convenience method to create Cmd that takes input from
+// a supplied io.Reader.
 func CommandWithInput(command string, r io.Reader) Cmd {
 	return Cmd{
 		Command: command,
@@ -170,11 +180,14 @@ func CommandWithInput(command string, r io.Reader) Cmd {
 	}
 }
 
+// Run executes the command on the client. It handles creating ssh sessions.
 func (c Cmd) Run(client *Client) error {
 	s, err := client.Client.NewSession()
 	if err != nil {
 		return errors.Wrap(err, "could not create a new ssh session")
 	}
+	// We will close the session in case the code below changes for any reason.
+	defer s.Close()
 
 	s.Stdin = c.Stdin
 	s.Stdout = c.Stdout
@@ -189,15 +202,18 @@ func (c Cmd) Run(client *Client) error {
 	return nil
 }
 
+// ErrorCmd is helper to return the error msg as well as the Cmd that was run.
 type ErrorCmd struct {
 	cmd Cmd
 	err error
 }
 
+// Error implements the error interface
 func (e ErrorCmd) Error() string {
 	return e.err.Error()
 }
 
+// Cmd returns the command that was run.
 func (e ErrorCmd) Cmd() string {
 	return e.cmd.Command
 }
@@ -240,7 +256,6 @@ func GenerateSSHKeyPair() (private []byte, public []byte, err error) {
 }
 
 func SetupPrivateKeyAccess(machine MachineParams, privateKey []byte, publicKey []byte) error {
-
 	host := machine.PublicHost
 	if host == "" {
 		host = machine.Host
@@ -279,9 +294,7 @@ func SetupPrivateKeyAccess(machine MachineParams, privateKey []byte, publicKey [
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = session.Close()
-	}()
+	defer session.Close()
 
 	var b bytes.Buffer
 	session.Stdout = &b
