@@ -44,9 +44,9 @@ ssh -o "StrictHostKeyChecking no" -i /privateKey centos@$proxyIP \
     sudo docker kill gcr-proxy > /dev/null && sudo docker rm gcr-proxy  > /dev/null;
     sudo docker kill k8sgcr-proxy > /dev/null && sudo docker rm k8sgcr-proxy  > /dev/null;
     sudo docker kill quay-proxy > /dev/null && sudo docker rm quay-proxy  > /dev/null;
-    sudo docker run -d --restart=always -p 9401:5000 --name dockerhub-proxy -v $(pwd)/docker-configs/config-dockerhub.yaml:/etc/docker/registry/config.yml registry:2;
-    sudo docker run -d --restart=always -p 9402:5000 --name gcr-proxy -v $(pwd)/docker-configs/config-gcr.yaml:/etc/docker/registry/config.yml registry:2;
-    sudo docker run -d --restart=always -p 9403:5000 --name k8sgcr-proxy -v $(pwd)/docker-configs/config-k8sgcr.yaml:/etc/docker/registry/config.yml registry:2;
-    sudo docker run -d --restart=always -p 9404:5000 --name quay-proxy -v $(pwd)/docker-configs/config-quay.yaml:/etc/docker/registry/config.yml registry:2;'
+    sudo docker run -d --restart=always -p 9401:5000 --name dockerhub-proxy -v $(pwd)/docker-configs/config-dockerhub.yaml:/etc/docker/registry/config.yml registry:2.6.2;
+    sudo docker run -d --restart=always -p 9402:5000 --name gcr-proxy -v $(pwd)/docker-configs/config-gcr.yaml:/etc/docker/registry/config.yml registry:2.6.2;
+    sudo docker run -d --restart=always -p 9403:5000 --name k8sgcr-proxy -v $(pwd)/docker-configs/config-k8sgcr.yaml:/etc/docker/registry/config.yml registry:2.6.2;
+    sudo docker run -d --restart=always -p 9404:5000 --name quay-proxy -v $(pwd)/docker-configs/config-quay.yaml:/etc/docker/registry/config.yml registry:2.6.2;'
 
 
