@@ -1,0 +1,13 @@
+name: cma-operator
+image:
+   repo: quay.io/samsung_cnct/cma-operator:prod
+cma:
+   enabled: true 
+   endpoint: cluster-manager-api-cluster-manager-api:80
+   insecure: true 
+   apiProxyEndpoint: proxy.example.cnct.io
+   apiProxyTls: cma-api-proxy-tls
+bundles:
+   metrics: false 
+   nginxk8smon: false 
+   nodelabelbot5000: false 

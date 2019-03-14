@@ -1,0 +1,45 @@
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+[[ ${DEBUG:-1} ]] && set -o xtrace
+
+# $ROOT_PASSWORD should be set by caller.
+
+VM_PREFIX=${VM_PREFIX:-vm-$(date | md5sum | base64 | cut -c 1-5)}
+
+echo "creating vm"
+az vm create -n "${NAME_PREFIX}-${VM_PREFIX}" \
+    -g "${NAME_PREFIX}-group" \
+    --image "${VM_IMAGE}" \
+    --admin-username "${ADMIN_USER_NAME}" \
+    --ssh-key-value "${SSH_PUBLIC_KEY}" \
+    --vnet-name "${NAME_PREFIX}-vnet" \
+    --subnet "${NAME_PREFIX}-subnet"
+
+echo "disabling internet access on vm"
+az network nsg rule create -n DenyInternetAccess -g "${NAME_PREFIX}-group" \
+    --nsg-name "${NAME_PREFIX}-${VM_PREFIX}NSG"  --priority 4096 \
+    --source-address-prefixes VirtualNetwork --source-port-ranges '*' \
+    --destination-address-prefixes Internet --destination-port-ranges '*' \
+    --direction Outbound --access Deny
+
+echo "getting vm public IP"
+VM_IP=$(az vm show -g "${NAME_PREFIX}-group" -n "${NAME_PREFIX}-${VM_PREFIX}" -d --out json | jq -Mr '.publicIps')
+
+echo "enabling ssh as root on vm"
+# shellcheck disable=SC2086
+ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIVATE_KEY}" "${ADMIN_USER_NAME}"@${VM_IP} \
+    'export TERM=xterm;
+    sudo sed -e "s/^#PermitRootLogin\ yes/PermitRootLogin\ yes/" \
+             -e "s/^PasswordAuthentication no/PasswordAuthentication yes/" -i /etc/ssh/sshd_config;
+    sudo mkdir -p /root/.ssh;
+    sudo cp ~/.ssh/authorized_keys /root/.ssh;
+    sudo systemctl restart sshd'
+
+echo "setting root password on vm"
+# shellcheck disable=SC2086,SC2029
+ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIVATE_KEY}" root@${VM_IP} \
+    "export TERM=xterm;
+    echo '${SSH_USERNAME}:${ROOT_PASSWORD}' | chpasswd"

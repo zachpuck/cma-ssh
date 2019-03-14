@@ -1,0 +1,42 @@
+#!/bin/bash
+
+CURL='curl --fail --show-error -ksLX'
+CURL_OPTS=${CURL_OPTS:-""}
+
+DEBUG=${DEBUG:-1}
+
+[[ $DEBUG == 1 ]] && \
+  {
+    set -o xtrace
+    CURL_OPTS+="-vvv"
+  }
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+urlencode()
+{
+  python - "$@" <<E
+import urllib, sys
+print urllib.quote_plus(sys.argv[1])
+E
+}
+
+main()
+{
+  local encoded url
+
+  encoded=$(urlencode "${CMA_CALLBACK_URL}")
+  url="${CLUSTER_API}"
+  url+="/api/v1/cluster?name=${CLUSTER_NAME}&provider=ssh&"
+  url+="callback.url=${encoded}&callback.request_id=${CMA_CALLBACK_REQUESTID}"
+
+  # shellcheck disable=SC2086
+  $CURL DELETE "$url" \
+    -H 'Cache-Control: no-cache' \
+    -H 'Content-Type: application/json' \
+    ${CURL_OPTS}
+}
+
+main

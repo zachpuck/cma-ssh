@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cma-ssh-e2e-tests
+spec:
+  template:
+    spec:
+      containers:
+        - name: cma-ssh-e2e-tests
+          image: quay.io/samsung_cnct/cma-ssh-test-scripts:${PIPELINE_DOCKER_TAG}
+          env:
+            - name: CLUSTER_NAME
+              value: "${CLUSTER_NAME}"
+            - name: CLUSTER_API
+              value: "${CLUSTER_API}"
+            - name: CMA_CALLBACK_URL
+              value: "${CMA_CALLBACK_URL}"
+            - name: CMA_CALLBACK_REQUESTID
+              value: "${CMA_CALLBACK_REQUESTID}"
+            - name: K8S_VERSION
+              value: "${K8S_VERSION}"
+            - name: CONTROL_PLANE_PRIVATE_IP
+              value: "${CONTROL_PLANE_PRIVATE_IP}"
+            - name: WORKER01_PRIVATE_IP
+              value: "${WORKER01_PRIVATE_IP}"
+            - name: CONTROL_PLANE_PUBLIC_IP
+              value: "${CONTROL_PLANE_PUBLIC_IP}"
+            - name: WORKER01_PUBLIC_IP
+              value: "${WORKER01_PUBLIC_IP}"
+            - name: SSH_PORT
+              value: "${SSH_PORT}"
+            - name: SSH_USERNAME
+              value: "${SSH_USERNAME}"
+            - name: SSH_PASSWORD
+              value: "${SSH_PASSWORD}"
+            - name: DEBUG
+              value: "${DEBUG}"
+          command: ["/test/full-test.sh"]
+      restartPolicy: Never
+  backoffLimit: 4
