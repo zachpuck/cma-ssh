@@ -45,11 +45,6 @@ inputs:
       constraints: { minLength: 1 }
       description: version of centos to install (format publisher:Offer:Sku:Version)
       default: OpenLogic:CentOS:7.4:latest
-  rootPassword:
-    string:
-      constraints: { minLength: 1 }
-      description: vm root password
-      isSecret: true
 outputs:
   controlPlaneIP:
     string:
@@ -83,23 +78,6 @@ run:
           name:
           image: $(centosImageVersion)
           adminUsername: centos
-    - container:
-        image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
-        cmd: [ /enable-root.sh ]
-        dirs:
-          /docker-configs: $(dockerConfigs)
-        files:
-          /enable-root.sh:
-          /privateKey: $(sshPrivateKey)
-        envVars:
-          subscriptionId:
-          loginId:
-          loginSecret:
-          loginTenantId:
-          loginType:
-          resourceGroup: $(name)-group
-          name:
-          rootPassword:
     - container:
         image: { ref: 'azuresdk/azure-cli-python:rc2.0.52' }
         cmd: [ /setup-docker.sh ]

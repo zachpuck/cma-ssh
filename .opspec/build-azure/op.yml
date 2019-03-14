@@ -91,37 +91,66 @@ run:
         name:
       outputs:
         subnetID:
-  # creates a cmc cluster in azure using aks
-  - op:
-      ref: build-azure/create-aks
-      inputs:
-        subscriptionId:
-        loginId:
-        loginSecret:
-        name:
-        location:
-        loginType:
-        loginTenantId:
-        sshKeyValue:
-        k8sVersion:
-        clusterAccountId:
-        clusterAccountSecret:
-        vnetSubnetID: $(subnetID)
-  # create test vms and nginx proxy
-  - op:
-      ref: build-azure/create-airgap-infra
-      inputs:
-        subscriptionId:
-        loginId:
-        loginSecret:
-        name:
-        location:
-        loginType:
-        loginTenantId:
-        sshKeyValue:
-        sshPrivateKey:
-        centosImageVersion:
-        rootPassword:
+  - parallel:
+    # creates a cmc cluster in azure using aks
+    - op:
+        ref: build-azure/create-aks
+        inputs:
+          subscriptionId:
+          loginId:
+          loginSecret:
+          name:
+          location:
+          loginType:
+          loginTenantId:
+          sshKeyValue:
+          k8sVersion:
+          clusterAccountId:
+          clusterAccountSecret:
+          vnetSubnetID: $(subnetID)
+    # create proxy
+    - op:
+        ref: build-azure/create-airgap-infra
+        inputs:
+          subscriptionId:
+          loginId:
+          loginSecret:
+          name:
+          location:
+          loginType:
+          loginTenantId:
+          sshKeyValue:
+          sshPrivateKey:
+          centosImageVersion:
+    # create two nodes
+    - op:
+        ref: create-vm
+        inputs:
+          subscriptionId:
+          loginId:
+          loginSecret:
+          name:
+          location:
+          loginType:
+          loginTenantId:
+          sshKeyValue:
+          sshPrivateKey:
+          centosImageVersion:
+          rootPassword:
+    - op:
+        ref: create-vm
+        inputs:
+          subscriptionId:
+          loginId:
+          loginSecret:
+          name:
+          location:
+          loginType:
+          loginTenantId:
+          sshKeyValue:
+          sshPrivateKey:
+          centosImageVersion:
+          rootPassword:
   - op:
       ref: github.com/opspec-pkgs/azure.aks.get-kubeconfig#1.1.0
       inputs:
