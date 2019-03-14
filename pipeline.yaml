@@ -1,4 +1,26 @@
+---
 type: chart
+envValues:
+  - envVar: CLUSTER_API
+    value: "http://cluster-manager-api-cluster-manager-api"
+  - envVar: K8S_VERSION
+    value: "1.10.6"
+  - envVar: CMA_CALLBACK_URL
+    value: "https://example.cnct.io"
+  - envVar: KEY_HOME
+    value: "/var/tmp/cma-ssh/.ssh"
+  - envVar: CMA_CALLBACK_REQUESTID
+    value: "12345"
+  - envVar: AKS_K8S_VERSION
+    value: "1.12.6"
+  - envVar: AZURE_CLIENT_ID
+    secret: jobs/cma-ssh/AZURE_CLIENT_ID
+  - envVar: AZURE_CLIENT_SECRET
+    secret: jobs/cma-ssh/AZURE_CLIENT_SECRET
+  - envVar: AZURE_TENANT_ID
+    secret: jobs/cma-ssh/AZURE_TENANT_ID
+  - envVar: DEBUG
+    value: "0"
 builds:
   - image: samsung_cnct/cma-ssh
     context: cma-ssh
@@ -10,11 +32,19 @@ builds:
     chart: cma-ssh
     tagValue: images.bootstrap.tag
     dockerContext: build/docker/bootstrap
+  - image: samsung_cnct/cma-ssh-test-scripts
+    context: cma-ssh-test-scripts
+    dockerContext: .
 deployments:
   - chart: cma-ssh
     timeout: 600
     retries: 2
     setAppVersion: true
     release: cma-ssh
+test:
+  afterScript:
+    image: quay.io/samsung_cnct/kind:prod
+    script: scripts/e2e-tests.sh
+    shell: /bin/bash
 prod:
   doDeploy: none

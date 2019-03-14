@@ -1,0 +1,26 @@
+name: cluster-manager-api
+image:
+   repo: quay.io/samsung_cnct/cluster-manager-api:prod
+
+port: 80
+service:
+   port: 80
+   type: ClusterIP
+
+helpers:
+   aks:
+      enabled: false
+      endpoint: cma-aks-cma-aks:80
+      insecure: true
+   aws:
+      enabled: false
+      endpoint: cma-aws-cma-aws:80
+      insecure: true
+   vmware:
+      enabled: false
+      endpoint: cma-vmware-grpc.cnct.io:443
+      insecure: false
+   ssh:
+      enabled: true
+      endpoint: cma-ssh:80
+      insecure: true
