@@ -16,11 +16,17 @@ See [Protocol Documentation](https://github.com/samsung-cnct/cma-ssh/blob/master
 ### Requirements
 - Kubernetes 1.10+
 
-### Deploy
-```bash
-$ helm install deployments/helm/cma-ssh --name cma-ssh
-```
-*update values.yml with IPs
+### Deployment
+The default way to deploy CMA-SSH is by the provided helm chart located in the `deployment/helm/cma-ssh` directory.
+
+#### install via [helm](https://helm.sh/docs/using_helm/#quickstart)
+1. Locate the private IP of a k8s node that cma-ssh is going to be deployed on and will be used as the `install.bootstrapIp`.
+1. Locate the nginx proxy used by the airgap environment to be used as the  `install.airgapProxyIp`.
+1. Install helm chart passing in the above values:
+    ```bash
+    helm install deployments/helm/cma-ssh --name cma-ssh --set install.bootstrapIp="ip from step 1" --set install.airgapProxyIp="ip of step 2"
+    ```
+    *alternatively you can update `values.yaml` with IPs
 
 ### Utilizes:
 - [kubebuilder](https://github.com/kubernetes-sigs/kubebuilder)
