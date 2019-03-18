@@ -187,7 +187,7 @@ func InstallDocker(cfg CmdConfig, args map[string]string) error {
 
 	br := ssh.NewBatchRunner(cfg.sshClient, os.Stdout)
 	br.Run(
-		yum("docker"),
+		yum("docker-ce-18.06.2.ce"),
 		ssh.Command("sed -i 's/native.cgroupdriver=cgroupfs/native.cgroupdriver=systemd/g' /usr/lib/systemd/system/docker.service"),
 		mkdir("/etc/docker"),
 		writeToFile(file, daemonJson),

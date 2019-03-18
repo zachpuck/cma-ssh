@@ -18,6 +18,8 @@ package cluster
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -107,6 +109,14 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 		// Error reading the object - requeue the request.
 		glog.Errorf("error reading object cluster %s: %q", request.Name, err)
 		return reconcile.Result{}, err
+	}
+
+	if !util.IsValidKubernetesVersion(clusterInstance.Spec.KubernetesVersion) {
+		return reconcile.Result{},
+			fmt.Errorf("got kubernetes version %s: require kubernetes version in (%s)",
+				clusterInstance.Spec.KubernetesVersion,
+				strings.Join(util.KubernetesVersions(), " "),
+			)
 	}
 
 	if clusterInstance.ObjectMeta.DeletionTimestamp.IsZero() {
