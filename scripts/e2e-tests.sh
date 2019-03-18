@@ -107,9 +107,10 @@ helm --debug install --name cert-manager --namespace cert-manager stable/cert-ma
 helm --debug install --name nginx-ingress stable/nginx-ingress
 
 helm --debug install --name cma-ssh  \
-     --set image.repo=quay.io/samsung_cnct/cma-ssh:"${PIPELINE_DOCKER_TAG:-0.1.27}" \
+     --set images.bootstrap.tag="${PIPELINE_DOCKER_TAG}" \
+     --set images.operator.tag="${PIPELINE_DOCKER_TAG}" \
      --set install.bootstrapIp="${nodeIP}" \
-     --set install.airgapProxyIp="${proxyIP}"   \
+     --set install.airgapProxyIp="${proxyIP}" \
            cnct/cma-ssh --wait --timeout=600
 helm --debug install -f "$PIPELINE_WORKSPACE"/test/e2e/manifests/cma-values.yaml --name cluster-manager-api cnct/cluster-manager-api --wait --timeout=600
 helm --debug install -f "$PIPELINE_WORKSPACE"/test/e2e/manifests/cma-operator-values.yaml --name cma-operator cnct/cma-operator --wait --timeout=600
