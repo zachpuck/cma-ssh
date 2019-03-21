@@ -6,6 +6,8 @@ import (
 	"go/build"
 	"log"
 	"net/http"
+
+	"github.com/samsung-cnct/cma-ssh/pkg/util"
 )
 
 func importPathToDir(importPath string) string {
@@ -16,6 +18,6 @@ func importPathToDir(importPath string) string {
 	return p.Dir
 }
 
-var Assets http.FileSystem = http.Dir(
+var Assets = util.ZeroModTimeFileSystem{Source: http.Dir(
 	importPathToDir("github.com/samsung-cnct/cma-ssh/pkg/ssh/asset/data"),
-)
+)}
