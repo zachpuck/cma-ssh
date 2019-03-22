@@ -6,6 +6,7 @@ import (
 	v1alpha "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	pb "github.com/samsung-cnct/cma-ssh/pkg/generated/api"
 	"github.com/samsung-cnct/cma-ssh/pkg/ssh"
+	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	"github.com/samsung-cnct/cma-ssh/pkg/util/k8sutil"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
@@ -426,10 +427,7 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 func (s *Server) GetUpgradeClusterInformation(ctx context.Context, in *pb.GetUpgradeClusterInformationMsg) (*pb.GetUpgradeClusterInformationReply, error) {
 	// TODO: Do not hard code this list.
 	return &pb.GetUpgradeClusterInformationReply{
-		Versions: []string{
-			"1.10.6",
-			"1.11.2",
-		},
+		Versions: util.KubernetesVersions(),
 	}, nil
 }
 

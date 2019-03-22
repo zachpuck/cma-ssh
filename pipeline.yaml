@@ -4,7 +4,7 @@ envValues:
   - envVar: CLUSTER_API
     value: "http://cluster-manager-api-cluster-manager-api"
   - envVar: K8S_VERSION
-    value: "1.10.6"
+    value: "1.12.6"
   - envVar: CMA_CALLBACK_URL
     value: "https://example.cnct.io"
   - envVar: KEY_HOME

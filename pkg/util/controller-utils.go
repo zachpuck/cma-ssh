@@ -7,8 +7,28 @@ import (
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
 	"time"
 )
+
+// kubernetesVersions are the versions we support installing.
+// TODO: in future set this through ldflags in make
+const kubernetesVersions = "1.12.6 1.13.4"
+
+// KubernetesVersions() returns the list of all kubernetes versions cma-ssh supports.
+func KubernetesVersions() []string {
+	return strings.Split(kubernetesVersions, " ")
+}
+
+// IsValidKubernetesVersion checks whether the version requested is supported by cma-ssh.
+func IsValidKubernetesVersion(version string) bool {
+	for _, v := range KubernetesVersions() {
+		if v == version {
+			return true
+		}
+	}
+	return false
+}
 
 func GetClusterMachineList(c client.Client, clusterName string) ([]clusterv1alpha1.CnctMachine, error) {
 	machineList := &clusterv1alpha1.CnctMachineList{}
