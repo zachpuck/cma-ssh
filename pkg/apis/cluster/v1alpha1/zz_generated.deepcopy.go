@@ -241,6 +241,11 @@ func (in *MachineSpec) DeepCopyInto(out *MachineSpec) {
 		}
 	}
 	out.SshConfig = in.SshConfig
+	if in.ProviderID != nil {
+		in, out := &in.ProviderID, &out.ProviderID
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

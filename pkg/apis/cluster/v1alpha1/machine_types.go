@@ -41,6 +41,12 @@ type MachineSpec struct {
 	Labels map[string]string `json:"labels,omitempty"`
 
 	SshConfig MachineSshConfigInfo `json:"sshconfig,omitempty"`
+
+	// This field will be set by the actuators and consumed by higher level
+	// entities like autoscaler that will be interfacing with cluster-api as
+	// generic provider.
+	// +optional
+	ProviderID *string `json:"providerID,omitempty"`
 }
 
 // MachineSshConfigInfo defines the ssh configuration for the physical
