@@ -235,6 +235,54 @@
   version = "v1.1.5"
 
 [[projects]]
+  branch = "master"
+  digest = "1:57f7be78562c0822eb151db104f1b24f3dc009a3cd31b83230714b20a4ea136b"
+  name = "github.com/juju/collections"
+  packages = ["set"]
+  pruneopts = "T"
+  revision = "9be91dc79b7c185fa8b08e7ceceee40562055c83"
+
+[[projects]]
+  branch = "master"
+  digest = "1:60835a4fa946b3c4b595438a07d447305ed4fc9ce95a7a5d0c06ffeea490d5a9"
+  name = "github.com/juju/errors"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "e65537c515d77e35697c471d6c2755375cb3adc4"
+
+[[projects]]
+  branch = "master"
+  digest = "1:c8a2a54c0c66c13bbaa43fa98fb837b30343527d4d5e770402f6199786e217f0"
+  name = "github.com/juju/gomaasapi"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "8a8cec793ba70659ba95f1b9a491ba807169bfc3"
+
+[[projects]]
+  branch = "master"
+  digest = "1:faec920347e62a978fc8f9f73a19fcfbce71c6e47266ab1f67a39f65c4ae5404"
+  name = "github.com/juju/loggo"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "d976af380377adda50b2d34279f1dec3507504ac"
+
+[[projects]]
+  digest = "1:e67535e91447a130af9c055bcd01974536ce860187b766c3d15c78416c6772f1"
+  name = "github.com/juju/schema"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "29562ba24201043ee1dd1ef422ff1d16fc1cf29d"
+  version = "v1.0.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:4b2013b9af640d01fbd76981f72d4cbede6c0aa1e0432b9009c9c90c53da3c3a"
+  name = "github.com/juju/version"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "b64dbd566305c836274f0268fa59183a52906b36"
+
+[[projects]]
   digest = "1:3804a3a02964db8e6db3e5e7960ac1c1a9b12835642dd4f4ac4e56c749ec73eb"
   name = "github.com/markbates/inflect"
   packages = ["."]
@@ -374,6 +422,36 @@
   pruneopts = "T"
   revision = "7037620bf27b13fcdc10b1b17ddef82540db670b"
   version = "v0.1.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:efcb301594841f10f70dffea9585db1888e554c1176c9b9c6c2253d3e8a88ec1"
+  name = "github.com/samsung-cnct/cma-ssh"
+  packages = [
+    "cmd/cma-ssh/cmd",
+    "internal/apiserver",
+    "pkg/apis",
+    "pkg/apis/cluster/common",
+    "pkg/apis/cluster/v1alpha1",
+    "pkg/apiserver",
+    "pkg/controller",
+    "pkg/controller/cluster",
+    "pkg/controller/machine",
+    "pkg/generated/api",
+    "pkg/ssh",
+    "pkg/ssh/asset",
+    "pkg/ui/website",
+    "pkg/ui/website/api",
+    "pkg/ui/website/homepage",
+    "pkg/ui/website/swaggerjson",
+    "pkg/ui/website/swaggerui",
+    "pkg/util",
+    "pkg/util/k8sutil",
+    "pkg/version",
+    "pkg/webhook",
+  ]
+  pruneopts = "T"
+  revision = "f80cc4ed1d6db8c6e6b137ac2218127d81d28854"
 
 [[projects]]
   branch = "master"
@@ -664,6 +742,17 @@
   version = "v0.9.1"
 
 [[projects]]
+  branch = "v2"
+  digest = "1:5c50eb6a2415f6e901e59aaa493a2b170a4d798dab306c9ab2ca1e694aecff78"
+  name = "gopkg.in/mgo.v2"
+  packages = [
+    "bson",
+    "internal/json",
+  ]
+  pruneopts = "T"
+  revision = "9856a29383ce1c59f308dd1cf0363a79b5bef6b5"
+
+[[projects]]
   branch = "v1"
   digest = "1:0caa92e17bc0b65a98c63e5bc76a9e844cd5e56493f8fdbb28fad101a16254d9"
   name = "gopkg.in/tomb.v1"
@@ -742,6 +831,7 @@
     "pkg/apis/meta/internalversion",
     "pkg/apis/meta/v1",
     "pkg/apis/meta/v1/unstructured",
+    "pkg/apis/meta/v1/validation",
     "pkg/apis/meta/v1beta1",
     "pkg/conversion",
     "pkg/conversion/queryparams",
@@ -910,6 +1000,19 @@
   revision = "0317810137be915b9cf888946c6e115c1bfac693"
 
 [[projects]]
+  digest = "1:ef04c20bf6f1dcd5e1cd1fd27a65675649dfed58e89699fe2891cccc0a233efd"
+  name = "sigs.k8s.io/cluster-api"
+  packages = [
+    "pkg/apis/cluster/common",
+    "pkg/apis/cluster/v1alpha1",
+    "pkg/client/clientset_generated/clientset/scheme",
+    "pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1",
+  ]
+  pruneopts = "T"
+  revision = "3547f8dd93078c0b0f0b221ee1c2a57f96673081"
+  version = "0.0.0-alpha.4"
+
+[[projects]]
   digest = "1:ca3f51201a90f3a23bf35938ee910d2fb3095ece453cf56c8b723e935c194ebd"
   name = "sigs.k8s.io/controller-runtime"
   packages = [
@@ -986,11 +1089,33 @@
     "github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger/options",
     "github.com/grpc-ecosystem/grpc-gateway/runtime",
     "github.com/grpc-ecosystem/grpc-gateway/utilities",
+    "github.com/juju/gomaasapi",
     "github.com/masterminds/semver",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "github.com/pkg/errors",
     "github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc",
+    "github.com/samsung-cnct/cma-ssh/cmd/cma-ssh/cmd",
+    "github.com/samsung-cnct/cma-ssh/internal/apiserver",
+    "github.com/samsung-cnct/cma-ssh/pkg/apis",
+    "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common",
+    "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1",
+    "github.com/samsung-cnct/cma-ssh/pkg/apiserver",
+    "github.com/samsung-cnct/cma-ssh/pkg/controller",
+    "github.com/samsung-cnct/cma-ssh/pkg/controller/cluster",
+    "github.com/samsung-cnct/cma-ssh/pkg/controller/machine",
+    "github.com/samsung-cnct/cma-ssh/pkg/generated/api",
+    "github.com/samsung-cnct/cma-ssh/pkg/ssh",
+    "github.com/samsung-cnct/cma-ssh/pkg/ssh/asset",
+    "github.com/samsung-cnct/cma-ssh/pkg/ui/website",
+    "github.com/samsung-cnct/cma-ssh/pkg/ui/website/api",
+    "github.com/samsung-cnct/cma-ssh/pkg/ui/website/homepage",
+    "github.com/samsung-cnct/cma-ssh/pkg/ui/website/swaggerjson",
+    "github.com/samsung-cnct/cma-ssh/pkg/ui/website/swaggerui",
+    "github.com/samsung-cnct/cma-ssh/pkg/util",
+    "github.com/samsung-cnct/cma-ssh/pkg/util/k8sutil",
+    "github.com/samsung-cnct/cma-ssh/pkg/version",
+    "github.com/samsung-cnct/cma-ssh/pkg/webhook",
     "github.com/shurcooL/vfsgen",
     "github.com/soheilhy/cmux",
     "github.com/spf13/cobra",
@@ -1016,6 +1141,9 @@
     "k8s.io/client-go/tools/record",
     "k8s.io/code-generator/cmd/client-gen",
     "k8s.io/code-generator/cmd/deepcopy-gen",
+    "k8s.io/klog",
+    "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1",
+    "sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1",
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/config",
     "sigs.k8s.io/controller-runtime/pkg/controller",
