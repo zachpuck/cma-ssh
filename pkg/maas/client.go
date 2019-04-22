@@ -20,10 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clusterv1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"k8s.io/klog"
-	clusterv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
-	clusterv1client "sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1"
 
 	"github.com/juju/gomaasapi"
 )
@@ -33,15 +31,13 @@ const (
 )
 
 type Client struct {
-	Controller     gomaasapi.Controller
-	V1Alpha1Client clusterv1client.ClusterV1alpha1Interface
+	Controller gomaasapi.Controller
 }
 
 type ClientParams struct {
-	ApiURL         string
-	ApiVersion     string
-	ApiKey         string
-	V1Alpha1Client clusterv1client.ClusterV1alpha1Interface
+	ApiURL     string
+	ApiVersion string
+	ApiKey     string
 }
 
 func New(params *ClientParams) (Client, error) {
@@ -52,13 +48,14 @@ func New(params *ClientParams) (Client, error) {
 		return Client{}, fmt.Errorf("error creating controller with version: %v", err)
 	}
 
-	return Client{Controller: controller,
-		V1Alpha1Client: params.V1Alpha1Client}, nil
+	return Client{Controller: controller}, nil
 }
 
 // Create creates a machine
-func (c Client) Create(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine) error {
+func (c Client) Create(ctx context.Context, cluster *clusterv1.CnctCluster, machine *clusterv1.CnctMachine) error {
 	klog.Infof("Creating machine %s", machine.Name)
+
+	// TODO: Tag MAAS machine
 
 	// Allocate MAAS machine
 	allocateArgs := gomaasapi.AllocateMachineArgs{Tags: []string{}}
@@ -67,24 +64,7 @@ func (c Client) Create(ctx context.Context, cluster *clusterv1.Cluster, machine 
 		klog.Info("Create failed to allocate machine")
 		return fmt.Errorf("error allocating machine %s: %v", machine.Name, err)
 	}
-
-	// Update annotations on CAPI machine
 	providerID := m.SystemID()
-	machine.Spec.ProviderID = &providerID
-	machine, err = c.V1Alpha1Client.Machines(machine.Namespace).Update(machine)
-	if err != nil {
-		klog.Warningf("Create failed to annotate machine %s (%s): %v", machine.Name, providerID, err)
-
-		// Release MAAS machine
-		releaseArgs := gomaasapi.ReleaseMachinesArgs{SystemIDs: []string{providerID}}
-		if releaseErr := c.Controller.ReleaseMachines(releaseArgs); releaseErr != nil {
-			klog.Warningf("Create failed to release machine %s (%s): %v", machine.Name, providerID, err)
-		}
-
-		return nil
-	}
-
-	// TODO: Tag MAAS machine
 
 	// Deploy MAAS machine
 	startArgs := gomaasapi.StartArgs{
@@ -104,7 +84,7 @@ func (c Client) Create(ctx context.Context, cluster *clusterv1.Cluster, machine 
 }
 
 // Delete deletes a machine
-func (c Client) Delete(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine) error {
+func (c Client) Delete(ctx context.Context, cluster *clusterv1.CnctCluster, machine *clusterv1.CnctMachine) error {
 	if machine.Spec.ProviderID == nil {
 		klog.Warningf("can not delete  machine %s, providerID not set", machine.Name)
 		return fmt.Errorf("machine %s has not been created", machine.Name)
@@ -121,12 +101,12 @@ func (c Client) Delete(ctx context.Context, cluster *clusterv1.Cluster, machine 
 }
 
 // Update updates a machine
-func (c Client) Update(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine) error {
+func (c Client) Update(ctx context.Context, cluster *clusterv1.CnctCluster, machine *clusterv1.CnctMachine) error {
 	return nil
 }
 
 // Exists test for the existence of a machine
-func (c Client) Exist(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine) (bool, error) {
+func (c Client) Exist(ctx context.Context, cluster *clusterv1.CnctCluster, machine *clusterv1.CnctMachine) (bool, error) {
 	// ProviderID will be nil until Create completes successfully
 	if machine.Spec.ProviderID == nil {
 		return false, nil
