@@ -11,6 +11,11 @@ images:
       pullPolicy: Always
 
 # installation settings
+maas:
+  apiURL: http://192.168.2.24:5240/MAAS/
+  apiVersion: 2.0
+  apiKey: replace:this:key
+
 install:
    operator: true
    operatorIngress: false

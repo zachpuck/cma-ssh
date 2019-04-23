@@ -35,6 +35,12 @@ spec:
               value: "{{ .Values.install.bootstrapIp }}"
             - name: CMA_BOOTSTRAP_PORT
               value: "{{ .Values.service.bootstrap.nodePort }}"
+            - name: MAAS_API_URL
+              value: "{{ .Values.maas.apiURL }}"
+            - name: MAAS_API_VERSION
+              value: "{{ .Values.maas.apiVersion }}"
+            - name: MAAS_API_KEY
+              value: "{{ .Values.maas.apiKey }}"
           command: ["./cma-ssh"]
           args: ["--port", "{{ .Values.service.operator.targetPort }}", "--logtostderr", "--v", "{{ .Values.logLevel }}"]
           resources:
