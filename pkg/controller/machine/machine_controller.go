@@ -27,6 +27,7 @@ import (
 	errs "github.com/pkg/errors"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
+	"github.com/samsung-cnct/cma-ssh/pkg/maas"
 	"github.com/samsung-cnct/cma-ssh/pkg/ssh"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	"github.com/samsung-cnct/cma-ssh/pkg/util/k8sutil"
@@ -93,7 +94,7 @@ type ReconcileMachine struct {
 	record.EventRecorder
 }
 
-// Reconcile reads that stamakte of the cluster for a Machine object and makes changes based on the state read
+// Reconcile reads that state of the cluster for a Machine object and makes changes based on the state read
 // and what is in the Machine.Spec
 // +kubebuilder:rbac:groups=cluster.cnct.sds.samsung.com,resources=cnctmachines;cnctclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
@@ -275,7 +276,7 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.CnctMa
 
 func (r *ReconcileMachine) handleCreate(machineInstance *clusterv1alpha1.CnctMachine, clusterInstance *clusterv1alpha1.CnctCluster) (reconcile.Result, error) {
 	if machineInstance.Status.Phase == common.ProvisioningMachinePhase {
-		return reconcile.Result{}, nil
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Add the finalizer
@@ -295,8 +296,11 @@ func (r *ReconcileMachine) handleCreate(machineInstance *clusterv1alpha1.CnctMac
 		return reconcile.Result{}, err
 	}
 
-	// start bootstrap process
-	r.backgroundRunner(doBootstrap, machineInstance, "handleCreate")
+	err = createMachine(r, clusterInstance, machineInstance)
+	if err != nil {
+		// TODO: should we requeue the request?
+		return reconcile.Result{}, err
+	}
 
 	return reconcile.Result{}, nil
 }
@@ -345,6 +349,15 @@ func getCluster(c client.Client, namespace string, clusterName string) (*cluster
 	}
 
 	return clusterInstance, nil
+}
+
+func createMachine(r *ReconcileMachine, cluster *clusterv1alpha1.CnctCluster, machine *clusterv1alpha1.CnctMachine) error {
+	maasClient, err := maas.New(&maas.ClientParams{})
+	if err != nil {
+		return errs.Wrap(err, "could not create maas client")
+	}
+
+	return maasClient.Create(context.Background(), cluster,machine)
 }
 
 func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) error {
