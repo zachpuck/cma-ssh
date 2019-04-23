@@ -1,0 +1,5 @@
+.vagrant
+bionic.squashfs
+bionic.tar.gz
+output-vagrant
+packer_cache
