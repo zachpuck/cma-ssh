@@ -19,19 +19,30 @@ package cmd
 import (
 	"flag"
 	"fmt"
-	"github.com/golang/glog"
-	"github.com/samsung-cnct/cma-ssh/pkg/apis"
-	"github.com/samsung-cnct/cma-ssh/pkg/apiserver"
-	"github.com/samsung-cnct/cma-ssh/pkg/controller"
-	"github.com/samsung-cnct/cma-ssh/pkg/webhook"
-	"github.com/soheilhy/cmux"
-	"github.com/spf13/cobra"
 	"net"
 	"os"
+	"sync"
+
+	"github.com/golang/glog"
+	"github.com/soheilhy/cmux"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
-	"sync"
+
+	"github.com/samsung-cnct/cma-ssh/pkg/apis"
+	"github.com/samsung-cnct/cma-ssh/pkg/apiserver"
+	"github.com/samsung-cnct/cma-ssh/pkg/controller"
+	"github.com/samsung-cnct/cma-ssh/pkg/controller/machine"
+	"github.com/samsung-cnct/cma-ssh/pkg/maas"
+	"github.com/samsung-cnct/cma-ssh/pkg/webhook"
+)
+
+const (
+	apiURLKey     = "api_url"
+	apiVersionKey = "api_version"
+	apiKeyKey     = "api_key"
 )
 
 var (
@@ -44,6 +55,17 @@ var (
 		},
 	}
 )
+
+// init configures input and output.
+func init() {
+	rootCmd.Flags().Int("port", 9020, "Port to listen on")
+
+	viper.SetEnvPrefix("maas")
+	viper.BindEnv(apiURLKey)
+	viper.BindEnv(apiVersionKey)
+	viper.BindEnv(apiKeyKey)
+	viper.AutomaticEnv()
+}
 
 // Execute runs the root cobra command
 func Execute() {
@@ -58,10 +80,6 @@ func Execute() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-}
-
-func init() {
-	rootCmd.Flags().Int("port", 9020, "Port to listen on")
 }
 
 func operator(cmd *cobra.Command) {
@@ -94,6 +112,21 @@ func operator(cmd *cobra.Command) {
 	glog.Info("Setting up controller")
 	if err := controller.AddToManager(mgr); err != nil {
 		glog.Errorf("unable to register controllers to the manager: %q", err)
+		os.Exit(1)
+	}
+
+	// TODO: Determine if the Cluster controller needs access to MAAS
+	apiURL := viper.GetString(apiURLKey)
+	apiVersion := viper.GetString(apiVersionKey)
+	apiKey := viper.GetString(apiKeyKey)
+	maasClient, err := maas.New(&maas.ClientParams{ApiURL: apiURL, ApiVersion: apiVersion, ApiKey: apiKey})
+	if err != nil {
+		glog.Errorf("unable to create MAAS client for machine controller: %q", err)
+		os.Exit(1)
+	}
+	err = machine.AddWithActuator(mgr, maasClient)
+	if err != nil {
+		glog.Errorf("unable to register machine controller with the manager: %q", err)
 		os.Exit(1)
 	}
 
