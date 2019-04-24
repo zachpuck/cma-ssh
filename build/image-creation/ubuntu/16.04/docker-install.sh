@@ -43,13 +43,6 @@ mkdir -p /etc/systemd/system/docker.service.d
 mkdir /etc/docker
 cat <<EOF > /etc/docker/daemon.json
 {
-  "default-runtime": "nvidia",
-  "runtimes": {
-    "nvidia": {
-      "path": "/usr/bin/nvidia-container-runtime",
-      "runtimeArgs": []
-    }
-  }
   "exec-opts": ["native.cgroupdriver=systemd"],
   "log-driver": "json-file",
   "log-opts": {
