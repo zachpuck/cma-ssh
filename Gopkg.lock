@@ -1268,7 +1268,6 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/Masterminds/sprig",
     "github.com/emicklei/go-restful",
     "github.com/golang/glog",
     "github.com/golang/protobuf/proto",
