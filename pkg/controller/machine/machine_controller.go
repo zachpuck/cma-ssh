@@ -354,12 +354,7 @@ func getCluster(c client.Client, namespace string, clusterName string) (*cluster
 }
 
 func createMachine(r *ReconcileMachine, cluster *clusterv1alpha1.CnctCluster, machine *clusterv1alpha1.CnctMachine) error {
-	maasClient, err := maas.New(&maas.ClientParams{})
-	if err != nil {
-		return errs.Wrap(err, "could not create maas client")
-	}
-
-	return maasClient.Create(context.Background(), cluster, machine)
+	return r.MAASClient.Create(context.Background(), cluster, machine)
 }
 
 func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) error {
