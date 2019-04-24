@@ -80,7 +80,7 @@ output : { all : '| tee -a /var/log/cloud-init-output.log' }
 	// Deploy MAAS machine
 	startArgs := gomaasapi.StartArgs{
 		UserData:     userdataB64,
-		DistroSeries: "ubuntu-16.04-nvidia-k8s",
+		DistroSeries: "ubuntu-18.04-k8s",
 	}
 	err = m.Start(startArgs)
 	if err != nil {
