@@ -49,16 +49,17 @@ type backgroundMachineOp func(r *ReconcileMachine, machineInstance *clusterv1alp
 
 // Add creates a new Machine Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func AddWithActuator(mgr manager.Manager, maasClient maas.Client) error {
+	return add(mgr, newReconciler(mgr, maasClient))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, maasClient maas.Client) reconcile.Reconciler {
 	return &ReconcileMachine{
 		Client:        mgr.GetClient(),
 		scheme:        mgr.GetScheme(),
 		EventRecorder: mgr.GetRecorder("MachineController"),
+		MAASClient:    maasClient,
 	}
 }
 
@@ -92,6 +93,7 @@ type ReconcileMachine struct {
 	client.Client
 	scheme *runtime.Scheme
 	record.EventRecorder
+	MAASClient maas.Client
 }
 
 // Reconcile reads that state of the cluster for a Machine object and makes changes based on the state read
@@ -357,7 +359,7 @@ func createMachine(r *ReconcileMachine, cluster *clusterv1alpha1.CnctCluster, ma
 		return errs.Wrap(err, "could not create maas client")
 	}
 
-	return maasClient.Create(context.Background(), cluster,machine)
+	return maasClient.Create(context.Background(), cluster, machine)
 }
 
 func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) error {

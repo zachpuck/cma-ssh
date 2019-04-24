@@ -113,6 +113,13 @@ func operator(cmd *cobra.Command) {
 		os.Exit(1)
 	}
 
+	// TODO: Determine if the Cluster controller needs access to MAAS
+	apiURL := viper.GetString(apiURLKey)
+	apiVersion := viper.GetString(apiVersionKey)
+	apiKey := viper.GetString(apiKeyKey)
+	maasClient := maas.New(apiURL, apiVersion, apiKey)
+	machine.AddWithActuator(mgr, maasClient)
+
 	glog.Info("setting up webhooks")
 	if err := webhook.AddToManager(mgr); err != nil {
 		glog.Errorf("unable to register webhooks to the manager: %q", err)
