@@ -18,6 +18,7 @@ package maas
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	clusterv1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
@@ -66,12 +67,20 @@ func (c Client) Create(ctx context.Context, cluster *clusterv1.CnctCluster, mach
 	}
 	providerID := m.SystemID()
 
+	userdata := `#cloud-config
+runcmd:
+ - [ sh, -c, "swapoff -a" ]
+ - [sh, -c, "kubeadm init --pod-network-cidr 10.244.0.0/16"]
+ - [sh, -c, "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml"]
+
+output : { all : '| tee -a /var/log/cloud-init-output.log' }
+`
+	userdataB64 := base64.StdEncoding.EncodeToString([]byte(userdata))
+
 	// Deploy MAAS machine
 	startArgs := gomaasapi.StartArgs{
-		UserData:     "",
-		DistroSeries: "",
-		Kernel:       "",
-		Comment:      "",
+		UserData:     userdataB64,
+		DistroSeries: "ubuntu-16.04-nvidia-k8s",
 	}
 	err = m.Start(startArgs)
 	if err != nil {
