@@ -1,0 +1,54 @@
+{
+  "provisioners": [
+    {
+      "type": "shell",
+      "inline": [
+        "sudo mkdir -p /mnt/bionic/tmp"
+      ]
+    },
+    {
+      "type": "file",
+      "source": "iso/bionic-server-cloudimg-amd64.squashfs",
+      "destination": "bionic-server-cloudimg-amd64.squashfs"
+    },
+    {
+      "type": "file",
+      "source": "../scripts/docker-install.sh",
+      "destination": "docker-install.sh"
+    },
+    {
+      "type": "file",
+      "source": "../scripts/kubernetes-install.sh",
+      "destination": "kubernetes-install.sh"
+    },
+    {
+      "type": "shell",
+      "execute_command": "echo 'vagrant' | {{.Vars}} sudo -S -E bash '{{.Path}}'",
+      "script": "../scripts/setup.sh"
+    },
+    {
+      "type": "file",
+      "source": "bionic.tar.gz",
+      "destination": "bionic.tar.gz",
+      "direction": "download"
+    }
+  ],
+  "builders": [
+    {
+      "type": "vagrant",
+      "communicator": "ssh",
+      "source_path": "https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64-vagrant.box",
+      "checksum": "302ad80a5fb977a1a8cf14b01be4adf5",
+      "checksum_type": "md5",
+      "teardown_method": "destroy"
+    }
+  ],
+  "post-processors": [
+    [
+      {
+        "type": "artifice",
+        "files": ["bionic.squashfs"]
+      }
+    ]
+  ]
+}
