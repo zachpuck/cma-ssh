@@ -34,6 +34,8 @@ import (
 	"github.com/samsung-cnct/cma-ssh/pkg/apis"
 	"github.com/samsung-cnct/cma-ssh/pkg/apiserver"
 	"github.com/samsung-cnct/cma-ssh/pkg/controller"
+	"github.com/samsung-cnct/cma-ssh/pkg/controller/machine"
+	"github.com/samsung-cnct/cma-ssh/pkg/maas"
 	"github.com/samsung-cnct/cma-ssh/pkg/webhook"
 )
 
@@ -117,8 +119,16 @@ func operator(cmd *cobra.Command) {
 	apiURL := viper.GetString(apiURLKey)
 	apiVersion := viper.GetString(apiVersionKey)
 	apiKey := viper.GetString(apiKeyKey)
-	maasClient := maas.New(apiURL, apiVersion, apiKey)
-	machine.AddWithActuator(mgr, maasClient)
+	maasClient, err := maas.New(&maas.ClientParams{ApiURL: apiURL, ApiVersion: apiVersion, ApiKey: apiKey})
+	if err != nil {
+		glog.Errorf("unable to create MAAS client for machine controller: %q", err)
+		os.Exit(1)
+	}
+	err = machine.AddWithActuator(mgr, maasClient)
+	if err != nil {
+		glog.Errorf("unable to register machine controller with the manager: %q", err)
+		os.Exit(1)
+	}
 
 	glog.Info("setting up webhooks")
 	if err := webhook.AddToManager(mgr); err != nil {
