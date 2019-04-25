@@ -2,7 +2,7 @@
 # cma-ssh
 [![Build Status](https://jenkins.migrations.cnct.io/buildStatus/icon?job=cma-ssh/master)](https://jenkins.migrations.cnct.io/job/cma-ssh/job/master/)
 
-`cma-ssh` is an operator which manages the lifecycle of kubernetes clusters
+`cma-ssh` is an operator which manages the lifecycle of Kubernetes clusters
 (i.e. `CnctCluster` resources) and machines (`CnctMachine`). 
 
 ## Developement
