@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/masterminds/semver"
 	errs "github.com/pkg/errors"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
@@ -36,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -104,9 +104,8 @@ type ReconcileMachine struct {
 // +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the Machine machine
-	machineInstance := &clusterv1alpha1.CnctMachine{}
-	err := r.Get(context.Background(), request.NamespacedName, machineInstance)
-	if err != nil {
+	var machine clusterv1alpha1.CnctMachine
+	if err := r.Get(context.Background(), request.NamespacedName, &machine); err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// log.Error(err, "could not find machine", "machine", request)
@@ -117,76 +116,38 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
-	if err != nil {
+	var cluster clusterv1alpha1.CnctCluster
+	if err := r.Get(context.Background(), types.NamespacedName{Name: machine.Spec.ClusterRef, Namespace: machine.Namespace}, &cluster); err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
-			glog.Errorf("could not find cluster %s: %q", machineInstance.Spec.ClusterRef, err)
+			glog.Errorf("could not find cluster %s: %q", machine.Spec.ClusterRef, err)
 
-			machineInstance.Status.Phase = common.ErrorMachinePhase
-			err = r.updateStatus(machineInstance, corev1.EventTypeWarning, common.ErrResourceFailed,
-				common.MessageResourceFailed, machineInstance.GetName())
+			machine.Status.Phase = common.ErrorMachinePhase
+			err = r.updateStatus(&machine, corev1.EventTypeWarning, common.ErrResourceFailed,
+				common.MessageResourceFailed, machine.GetName())
 			if err != nil {
-				glog.Errorf("could not update status of object machine %s: %q", machineInstance.GetName(), err)
+				glog.Errorf("could not update status of object machine %s: %q", machine.GetName(), err)
 				return reconcile.Result{}, err
 			}
 			return reconcile.Result{}, err
 		}
 		// Error reading the object - requeue the request.
-		glog.Errorf("error reading object machine %s: %q", machineInstance.GetName(), err)
+		glog.Errorf("error reading object machine %s: %q", machine.GetName(), err)
 		return reconcile.Result{}, err
 	}
 
-	// if we are not being deleted
-	if machineInstance.DeletionTimestamp.IsZero() {
-		if machineInstance.Status.Phase == common.ReadyMachinePhase {
-			// Object is currently ready, so we need to check if
-			// the state change came in from cluster version change
-
-			// build semvers
-			machineKuberneteVersion, err := semver.NewVersion(machineInstance.Status.KubernetesVersion)
-			if err != nil {
-				glog.Errorf("could not parse object machine %s kubernetes version: %q",
-					machineInstance.GetName(), err)
-				return reconcile.Result{}, err
-			}
-
-			clusterKuberneteVersion, err := semver.NewVersion(clusterInstance.Spec.KubernetesVersion)
-			if err != nil {
-				glog.Errorf("could not parse cluster %s kubernetes version: %q",
-					clusterInstance.GetName(), err)
-				return reconcile.Result{}, err
-			}
-
-			// if cluster object kubernetes version is not equal to machine kubernetes version,
-			// trigger an upgrade
-			glog.Infof("Checking cluster version to see if upgrade is needed for machine %s",
-				machineInstance.GetName())
-			if !clusterKuberneteVersion.Equal(machineKuberneteVersion) {
-				glog.Infof("will upgrade %s to %s", machineInstance.GetName(),
-					clusterKuberneteVersion.String())
-				return r.handleUpgrade(machineInstance, clusterInstance)
-			} else {
-				glog.Infof("no upgrade is needed for machine %s", machineInstance.GetName())
-			}
-
-		} else if machineInstance.Status.Phase == common.ErrorMachinePhase {
-			// if object is in error state, just ignore and move on
-			return reconcile.Result{}, nil
-		} else if machineInstance.Status.Phase == common.UpgradingMachinePhase {
-			// if object is currently updating, ignore and move on
-			return reconcile.Result{}, nil
-		} else {
-			// if not an error, in progress update, or an update request, we must be
-			// creating a new machine. Trigger bootstrap
-			return r.handleCreate(machineInstance, clusterInstance)
-		}
-	} else {
-		// The object is being deleted, do a node delete
-		return r.handleDelete(machineInstance)
+	if !machine.DeletionTimestamp.IsZero() {
+		return r.handleDelete(&machine)
 	}
 
-	return reconcile.Result{}, nil
+	switch machine.Status.Phase {
+	case common.ProvisioningMachinePhase:
+		return r.handleWaitingForReady(&machine, &cluster)
+	case "":
+		return r.handleCreate(&machine, &cluster)
+	default:
+		return reconcile.Result{}, errs.Errorf("unknown phase %q", machine.Status.Phase)
+	}
 }
 
 func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.CnctMachine) (reconcile.Result, error) {
@@ -223,12 +184,35 @@ func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.CnctMac
 			return reconcile.Result{}, err
 		}
 
+		if err := deleteMachine(r, machineInstance); err != nil {
+			return reconcile.Result{Requeue: true, RequeueAfter: 5 * time.Second}, err
+		}
+
 		// start delete process
 		r.backgroundRunner(doDelete, machineInstance, "handleDelete")
 
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func deleteMachine(r *ReconcileMachine, machine *clusterv1alpha1.CnctMachine) error {
+	if machine.ObjectMeta.Annotations["maas-system-id"] == "" {
+		goto removeFinalizers
+	}
+
+	if err := r.MAASClient.Delete(context.Background(), nil, machine); err != nil {
+		return errs.Wrapf(err, "could not delete machine %s with system id %q", machine.Name, *machine.Spec.ProviderID)
+	}
+
+removeFinalizers:
+	machine.Finalizers = util.RemoveString(machine.Finalizers, clusterv1alpha1.MachineFinalizer)
+	if err := r.updateStatus(machine, corev1.EventTypeNormal,
+		common.ResourceStateChange, common.MessageResourceStateChange,
+		machine.GetName(), common.DeletingMachinePhase); err != nil {
+		glog.Errorf("failed to update status for machine %s: %q", machine.GetName(), err)
+	}
+	return nil
 }
 
 func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.CnctMachine, clusterInstance *clusterv1alpha1.CnctCluster) (reconcile.Result, error) {
@@ -276,34 +260,89 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.CnctMa
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileMachine) handleCreate(machineInstance *clusterv1alpha1.CnctMachine, clusterInstance *clusterv1alpha1.CnctCluster) (reconcile.Result, error) {
-	if machineInstance.Status.Phase == common.ProvisioningMachinePhase {
+const (
+	masterUserData = `#cloud-config
+runcmd:
+ - [ sh, -c, "swapoff -a" ]
+ - [sh, -c, "kubeadm init --pod-network-cidr 10.244.0.0/16 --token=andrew.isthebestfighter"]
+ - [sh, -c, "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml"]
+
+output : { all : '| tee -a /var/log/cloud-init-output.log' }
+`
+	workerUserData = `#cloud-config
+runcmd:
+ - [ sh, -c, "swapoff -a" ]
+ - [sh, -c, "kubeadm join --discovery-token=andrew.isthebestfighter --discovery-token-unsafe-skip-ca-verification %s"]
+
+output : { all : '| tee -a /var/log/cloud-init-output.log' }
+`
+)
+
+func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cluster *clusterv1alpha1.CnctCluster) (reconcile.Result, error) {
+	if machine.Status.Phase == common.ProvisioningMachinePhase {
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Add the finalizer
-	if !util.ContainsString(machineInstance.Finalizers, clusterv1alpha1.MachineFinalizer) {
-		machineInstance.Finalizers =
-			append(machineInstance.Finalizers, clusterv1alpha1.MachineFinalizer)
+	if !util.ContainsString(machine.Finalizers, clusterv1alpha1.MachineFinalizer) {
+		machine.Finalizers =
+			append(machine.Finalizers, clusterv1alpha1.MachineFinalizer)
 	}
 
 	// update status to "creating"
-	machineInstance.Status.Phase = common.ProvisioningMachinePhase
-	machineInstance.Status.KubernetesVersion = clusterInstance.Spec.KubernetesVersion
-	err := r.updateStatus(machineInstance, corev1.EventTypeNormal,
+	machine.Status.Phase = common.ProvisioningMachinePhase
+	machine.Status.KubernetesVersion = cluster.Spec.KubernetesVersion
+
+	var userdata string
+	if util.ContainsRole(machine.Spec.Roles, "master") {
+		userdata = masterUserData
+	} else {
+
+		machineList, err := util.GetClusterMachineList(r.Client, cluster.GetName())
+		if err != nil {
+			return reconcile.Result{Requeue: true}, err
+		}
+		master, err := util.GetMaster(machineList)
+		if err != nil {
+			// No master found
+			// TODO: set to error state
+			return reconcile.Result{}, err
+		}
+		masterIP := master.ObjectMeta.Annotations["maas-ip"]
+		if masterIP == "" {
+			return reconcile.Result{Requeue: true}, nil
+		}
+		userdata = fmt.Sprintf(workerUserData, masterIP+":6443")
+
+	}
+
+	maasMachine, err := r.MAASClient.Create(context.Background(), machine.Name, userdata)
+	if err != nil {
+		return reconcile.Result{Requeue: true}, err
+	}
+
+	if len(maasMachine.IPAddresses()) == 0 {
+		// FIXME: release machine
+		fmt.Println("machine ip is nil")
+		return reconcile.Result{}, fmt.Errorf("no ip")
+	}
+
+	machine.ObjectMeta.Annotations["maas-ip"] = maasMachine.IPAddresses()[0]
+	machine.ObjectMeta.Annotations["maas-system-id"] = maasMachine.SystemID()
+
+	err = r.updateStatus(machine, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
-		machineInstance.GetName(), common.ProvisioningMachinePhase)
+		machine.GetName(), common.ProvisioningMachinePhase)
 	if err != nil {
-		glog.Errorf("could not update status of machine %s: %q", machineInstance.GetName(), err)
+		glog.Errorf("could not update status of machine %s: %q", machine.GetName(), err)
 		return reconcile.Result{}, err
 	}
 
-	err = createMachine(r, clusterInstance, machineInstance)
-	if err != nil {
-		// TODO: should we requeue the request?
-		return reconcile.Result{}, err
-	}
+	return reconcile.Result{}, nil
+}
 
+func (r *ReconcileMachine) handleWaitingForReady(machine *clusterv1alpha1.CnctMachine, cluster *clusterv1alpha1.CnctCluster) (reconcile.Result, error) {
+	glog.Infof("")
 	return reconcile.Result{}, nil
 }
 
@@ -321,6 +360,7 @@ func (r *ReconcileMachine) updateStatus(machineInstance *clusterv1alpha1.CnctMac
 		return err
 	}
 
+	machineFreshInstance.ObjectMeta.Annotations = machineInstance.ObjectMeta.Annotations
 	machineFreshInstance.Finalizers = machineInstance.Finalizers
 	machineFreshInstance.Status.Phase = machineInstance.Status.Phase
 	machineFreshInstance.Status.KubernetesVersion = machineInstance.Status.KubernetesVersion
@@ -386,7 +426,22 @@ output : { all : '| tee -a /var/log/cloud-init-output.log' }
 `, master.Spec.SshConfig.Host+":6443")
 
 	}
-	return r.MAASClient.Create(context.Background(), machine.Name, userdata)
+
+	maasMachine, err := r.MAASClient.Create(context.Background(), machine.Name, userdata)
+	if err != nil {
+		return err
+	}
+
+	if len(maasMachine.IPAddresses()) == 0 {
+		// FIXME: release machine
+		fmt.Println("machine ip is nil")
+		return fmt.Errorf("no ip")
+	}
+
+	machine.ObjectMeta.Annotations["maas-ip"] = maasMachine.IPAddresses()[0]
+	machine.ObjectMeta.Annotations["maas-system-id"] = maasMachine.SystemID()
+
+	return nil
 }
 
 func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) error {
