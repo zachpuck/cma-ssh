@@ -14,6 +14,9 @@ images:
 maas:
    apiURL: http://192.168.2.24:5240/MAAS/
    apiVersion: 2.0
+   # MAAS API keys can be generated from the GUI. See
+   # https://docs.maas.io/2.1/en/manage-account#api-key
+   # for more information.
    apiKey: replace:this:key
 
 install:

@@ -1,6 +1,36 @@
 
-# CMA SSH Helper API
+# cma-ssh
 [![Build Status](https://jenkins.migrations.cnct.io/buildStatus/icon?job=cma-ssh/master)](https://jenkins.migrations.cnct.io/job/cma-ssh/job/master/)
+
+`cma-ssh` is an operator which manages the lifecycle of kubernetes clusters
+(i.e. `CnctCluster` resources) and machines (`CnctMachine`). 
+
+## Developement
+
+You will need to [generate an API Key][generate-an-api-key] using the MAAS GUI.
+
+To test `cma-ssh` you can use `kind` and `helm`. For example:
+
+```bash
+kind create cluster
+export KUBECONFIG="$(kind get kubeconfig-path --name="1")"
+
+kubectl create clusterrolebinding superpowers --clusterrole=cluster-admin --user=system:serviceaccount:kube-system:default
+kubectl create rolebinding superpowers --clusterrole=cluster-admin --user=system:serviceaccount:kube-system:default
+
+helm init
+
+# Set the `maas.apiKey` value for your user.
+vi deployments/helm/cma-ssh/values.yaml
+
+helm install --name cma-ssh deployments/helm/cma-ssh/
+kubectl get pods --watch
+```
+
+# Deprecated
+
+The instructions below are deprecated as we move towards a cloud-init approach
+to configuration instead of ssh.
 
 ## Overview
 
@@ -137,3 +167,5 @@ opctl run create-vm
 * currently requires manually deleting resources / resource group manually in the azure portal or cli
 
 * resource group will be named `<name>-group` from `args.yml` file.
+
+[generate-an-api-key]: https://docs.maas.io/2.1/en/manage-account#api-key
