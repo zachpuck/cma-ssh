@@ -62,7 +62,7 @@ func (c Client) Create(ctx context.Context, name, userdata string) error {
 	allocateArgs := gomaasapi.AllocateMachineArgs{Tags: []string{}}
 	m, _, err := c.Controller.AllocateMachine(allocateArgs)
 	if err != nil {
-		klog.Info("Create failed to allocate machine")
+		klog.Errorf("Create failed to allocate machine %s: %v", name, err)
 		return fmt.Errorf("error allocating machine %s: %v", name, err)
 	}
 	providerID := m.SystemID()
@@ -74,7 +74,7 @@ func (c Client) Create(ctx context.Context, name, userdata string) error {
 	}
 	err = m.Start(startArgs)
 	if err != nil {
-		klog.Infof("Create failed to deploy machine %s", name)
+		klog.Errorf("Create failed to deploy machine %s: %v", name, err)
 		return err
 	}
 
