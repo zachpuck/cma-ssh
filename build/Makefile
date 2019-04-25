@@ -93,6 +93,7 @@ generate:
 # Install dep will install dependencies
 install-dep:
 	go get -u github.com/golang/dep/cmd/dep
+	dep ensure
 	go install ./vendor/github.com/onsi/ginkgo/ginkgo
 	go install ./vendor/github.com/onsi/gomega/...
 	go install ./vendor/github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc

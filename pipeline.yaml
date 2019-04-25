@@ -41,10 +41,10 @@ deployments:
     retries: 2
     setAppVersion: true
     release: cma-ssh
-test:
-  afterScript:
-    image: quay.io/samsung_cnct/kind:prod
-    script: scripts/e2e-tests.sh
-    shell: /bin/bash
+#test:
+#  afterScript:
+#    image: quay.io/samsung_cnct/kind:prod
+#    script: scripts/e2e-tests.sh
+#    shell: /bin/bash
 prod:
   doDeploy: none

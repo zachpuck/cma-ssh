@@ -3,18 +3,18 @@ logLevel: 8
 images:
    operator:
       repository: quay.io/samsung_cnct/cma-ssh
-      tag: 0.1.34
+      tag: 0.1.36
       pullPolicy: Always
    bootstrap:
       repository: quay.io/samsung_cnct/cma-ssh-bootstrap
-      tag: 0.1.34
+      tag: 0.1.36
       pullPolicy: Always
 
 # installation settings
 maas:
-  apiURL: http://192.168.2.24:5240/MAAS/
-  apiVersion: 2.0
-  apiKey: replace:this:key
+   apiURL: http://192.168.2.24:5240/MAAS/
+   apiVersion: 2.0
+   apiKey: replace:this:key
 
 install:
    operator: true
