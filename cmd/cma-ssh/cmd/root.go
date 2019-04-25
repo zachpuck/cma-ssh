@@ -27,6 +27,7 @@ import (
 	"github.com/soheilhy/cmux"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
@@ -69,7 +70,10 @@ func init() {
 
 // Execute runs the root cobra command
 func Execute() {
+	klogFlagSet := &flag.FlagSet{}
+	klog.InitFlags(klogFlagSet)
 	rootCmd.Flags().AddGoFlagSet(flag.CommandLine)
+	rootCmd.Flags().AddGoFlagSet(klogFlagSet)
 	err := flag.CommandLine.Parse([]string{})
 	if err != nil {
 		fmt.Println(err)
