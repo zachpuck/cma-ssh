@@ -32,8 +32,7 @@ apt-get update
 apt-get install -y nvidia-docker2 \
                    docker-ce docker-ce-cli \
                    containerd.io libcuda1-384 \
-                   nvidia-384 \
-                   libcuda1-384
+                   nvidia-384
 sudo pkill -SIGHUP dockerd
 apt --purge autoremove -y
 apt autoclean -y
