@@ -354,7 +354,39 @@ func getCluster(c client.Client, namespace string, clusterName string) (*cluster
 }
 
 func createMachine(r *ReconcileMachine, cluster *clusterv1alpha1.CnctCluster, machine *clusterv1alpha1.CnctMachine) error {
-	return r.MAASClient.Create(context.Background(), cluster, machine)
+	masterUserData := `#cloud-config
+runcmd:
+ - [ sh, -c, "swapoff -a" ]
+ - [sh, -c, "kubeadm init --pod-network-cidr 10.244.0.0/16 --token=andrew.isthebestfighter"]
+ - [sh, -c, "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml"]
+
+output : { all : '| tee -a /var/log/cloud-init-output.log' }
+`
+
+	var userdata string
+	if util.ContainsRole(machine.Spec.Roles, "master") {
+		userdata = masterUserData
+	} else {
+
+		machineList, err := util.GetClusterMachineList(r.Client, cluster.GetName())
+		if err != nil {
+			return err
+		}
+		master, err := util.GetMaster(machineList)
+		if err != nil {
+			return err
+		}
+		userdata = fmt.Sprintf(`#cloud-config
+runcmd:
+ - [ sh, -c, "swapoff -a" ]
+ - [sh, -c, "kubeadm join --discovery-token=andrew.isthebestfighter %s"]
+ - [sh, -c, "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml"]
+
+output : { all : '| tee -a /var/log/cloud-init-output.log' }
+`, master.Spec.SshConfig.Host+":6443")
+
+	}
+	return r.MAASClient.Create(context.Background(), machine.Name, userdata)
 }
 
 func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) error {
