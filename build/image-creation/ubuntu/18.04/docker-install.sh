@@ -15,6 +15,10 @@ add-apt-repository \
 apt-get update -y
 apt-get install -y docker-ce docker-ce-cli \
                    containerd.io
+apt --purge autoremove -y
+apt autoclean -y
+apt clean -y
+
 mkdir -p /etc/systemd/system/docker.service.d
 mkdir /etc/docker
 cat <<EOF > /etc/docker/daemon.json
