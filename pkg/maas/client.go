@@ -53,8 +53,8 @@ func New(params *ClientParams) (Client, error) {
 }
 
 // Create creates a machine
-func (c Client) Create(ctx context.Context, cluster *clusterv1.CnctCluster, machine *clusterv1.CnctMachine) error {
-	klog.Infof("Creating machine %s", machine.Name)
+func (c Client) Create(ctx context.Context, name, userdata string) error {
+	klog.Infof("Creating machine %s", name)
 
 	// TODO: Tag MAAS machine
 
@@ -63,32 +63,22 @@ func (c Client) Create(ctx context.Context, cluster *clusterv1.CnctCluster, mach
 	m, _, err := c.Controller.AllocateMachine(allocateArgs)
 	if err != nil {
 		klog.Info("Create failed to allocate machine")
-		return fmt.Errorf("error allocating machine %s: %v", machine.Name, err)
+		return fmt.Errorf("error allocating machine %s: %v", name, err)
 	}
 	providerID := m.SystemID()
 
-	userdata := `#cloud-config
-runcmd:
- - [ sh, -c, "swapoff -a" ]
- - [sh, -c, "kubeadm init --pod-network-cidr 10.244.0.0/16"]
- - [sh, -c, "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml"]
-
-output : { all : '| tee -a /var/log/cloud-init-output.log' }
-`
-	userdataB64 := base64.StdEncoding.EncodeToString([]byte(userdata))
-
 	// Deploy MAAS machine
 	startArgs := gomaasapi.StartArgs{
-		UserData:     userdataB64,
-		DistroSeries: "ubuntu-18.04-k8s",
+		UserData:     base64.StdEncoding.EncodeToString([]byte(userdata)),
+		DistroSeries: "ubuntu-18.04-cnct-k8s-master",
 	}
 	err = m.Start(startArgs)
 	if err != nil {
-		klog.Infof("Create failed to deploy machine %s", machine.Name)
-		return nil
+		klog.Infof("Create failed to deploy machine %s", name)
+		return err
 	}
 
-	klog.Infof("Created machine %s (%s)", machine.Name, providerID)
+	klog.Infof("Created machine %s (%s)", name, providerID)
 	return nil
 }
 
