@@ -9,7 +9,7 @@
 
 The Kubernetes cluster on which the `cma-ssh` is installed must
 have network access to a MAAS server. Within the CNCT lab this
-means you must be in the Seattle off or logged onto the VPN.
+means you must be in the Seattle office or logged onto the VPN.
 Additionally you will need  to 
 [generate an API Key][generate-an-api-key] using the MAAS GUI.
 
