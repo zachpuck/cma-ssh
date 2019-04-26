@@ -7,7 +7,11 @@
 
 ## Developement
 
-You will need to [generate an API Key][generate-an-api-key] using the MAAS GUI.
+The Kubernetes cluster on which the `cma-ssh` is installed must
+have network access to a MAAS server. Within the CNCT lab this
+means you must be in the Seattle off or logged onto the VPN.
+Additionally you will need  to 
+[generate an API Key][generate-an-api-key] using the MAAS GUI.
 
 To test `cma-ssh` you can use `kind` and `helm`. For example:
 
