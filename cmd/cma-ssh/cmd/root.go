@@ -123,7 +123,7 @@ func operator(cmd *cobra.Command) {
 	apiURL := viper.GetString(apiURLKey)
 	apiVersion := viper.GetString(apiVersionKey)
 	apiKey := viper.GetString(apiKeyKey)
-	maasClient, err := maas.New(&maas.ClientParams{ApiURL: apiURL, ApiVersion: apiVersion, ApiKey: apiKey})
+	maasClient, err := maas.NewClient(&maas.NewClientParams{ApiURL: apiURL, ApiVersion: apiVersion, ApiKey: apiKey})
 	if err != nil {
 		glog.Errorf("unable to create MAAS client for machine controller: %q", err)
 		os.Exit(1)

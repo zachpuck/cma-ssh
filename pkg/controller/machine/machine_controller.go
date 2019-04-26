@@ -125,7 +125,7 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 			// Object not found, return.  Created objects are automatically garbage collected.
 			klog.Errorf("could not find cluster %s: %q", machine.Spec.ClusterRef, err)
 
-			return reconcile.Result{Requeue: true, RequeueAfter: 5*time.Second}, nil
+			return reconcile.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 		}
 		// Error reading the object - requeue the request.
 		klog.Errorf("error reading object machine %s: %q", machine.GetName(), err)
@@ -191,11 +191,12 @@ func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.CnctMac
 }
 
 func deleteMachine(r *ReconcileMachine, machine *clusterv1alpha1.CnctMachine) error {
-	if machine.ObjectMeta.Annotations["maas-system-id"] == "" {
+	systemID := machine.ObjectMeta.Annotations["maas-system-id"]
+	if systemID == "" {
 		goto removeFinalizers
 	}
 
-	if err := r.MAASClient.Delete(context.Background(), nil, machine); err != nil {
+	if err := r.MAASClient.Delete(context.Background(), &maas.DeleteRequest{SystemID: systemID}); err != nil {
 		return errs.Wrapf(err, "could not delete machine %s with system id %q", machine.Name, *machine.Spec.ProviderID)
 	}
 
@@ -254,10 +255,7 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.CnctMa
 	return reconcile.Result{}, nil
 }
 
-const (
-
-
-)
+const ()
 
 func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cluster *clusterv1alpha1.CnctCluster) (reconcile.Result, error) {
 	// Add the finalizer
@@ -307,12 +305,15 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 		return reconcile.Result{}, err
 	}
 
-	maasMachine, err := r.MAASClient.Create(context.Background(), machine.Name, userdata)
+	createResponse, err := r.MAASClient.Create(context.Background(), &maas.CreateRequest{
+		ProviderID: cluster.Name + "-" + machine.Name,
+		Distro:     "ubuntu-18.04-cnct-k8s-master",
+		Userdata:   userdata})
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	if len(maasMachine.IPAddresses()) == 0 {
+	if len(createResponse.IPAddresses) == 0 {
 		// FIXME: release machine
 		klog.Info("machine ip is nil")
 		r.MAASClient.Controller.ReleaseMachines(gomaasapi.ReleaseMachinesArgs{SystemIDs: []string{maasMachine.SystemID()}})
@@ -321,7 +322,7 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 
 	if isMaster {
 		klog.Info("create kubeconfig")
-		kubeconfig, err := bundle.Kubeconfig(cluster.Name, "https://"+ maasMachine.IPAddresses()[0]+":6443")
+		kubeconfig, err := bundle.Kubeconfig(cluster.Name, "https://"+maasMachine.IPAddresses()[0]+":6443")
 		if err != nil {
 			return reconcile.Result{}, nil
 		}
@@ -337,8 +338,8 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 	// update status to "creating"
 	machine.Status.Phase = common.ReadyMachinePhase
 	machine.Status.KubernetesVersion = cluster.Spec.KubernetesVersion
-	machine.ObjectMeta.Annotations["maas-ip"] = maasMachine.IPAddresses()[0]
-	machine.ObjectMeta.Annotations["maas-system-id"] = maasMachine.SystemID()
+	machine.ObjectMeta.Annotations["maas-ip"] = createResponse.IPAddresses[0]
+	machine.ObjectMeta.Annotations["maas-system-id"] = createResponse.SystemID
 	err = r.updateStatus(machine, corev1.EventTypeNormal,
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machine.GetName(), common.ProvisioningMachinePhase)
@@ -351,7 +352,7 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 }
 
 func masterUserdata(bundle *cert.CABundle) (string, error) {
-		const userdataTmpl = `#cloud-config
+	const userdataTmpl = `#cloud-config
 write_files:
  - encoding: b64
    content: %s
@@ -376,7 +377,7 @@ output : { all : '| tee -a /var/log/cloud-init-output.log' }
 }
 
 func workerUserdata(bundle *cert.CABundle, apiserverAddress string) (string, error) {
-	const 	userdataTmpl = `#cloud-config
+	const userdataTmpl = `#cloud-config
 runcmd:
  - [ sh, -c, "swapoff -a" ]
  - [ sh, -c, "kubeadm join --discovery-token=andrew.isthebestfighter --discovery-token-ca-cert-hash %s %s" ]

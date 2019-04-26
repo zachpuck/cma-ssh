@@ -21,27 +21,22 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	clusterv1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"k8s.io/klog"
 
 	"github.com/juju/gomaasapi"
-)
-
-const (
-	ClusterAPIMachineIDAnnotationKey = "cluster.k8s.io/providerID" // Indicates a machine has been allocated
 )
 
 type Client struct {
 	Controller gomaasapi.Controller
 }
 
-type ClientParams struct {
+type NewClientParams struct {
 	ApiURL     string
 	ApiVersion string
 	ApiKey     string
 }
 
-func New(params *ClientParams) (Client, error) {
+func NewClient(params *NewClientParams) (Client, error) {
 	controller, err := gomaasapi.NewController(gomaasapi.ControllerArgs{
 		BaseURL: params.ApiURL,
 		APIKey:  params.ApiKey})
@@ -52,74 +47,127 @@ func New(params *ClientParams) (Client, error) {
 	return Client{Controller: controller}, nil
 }
 
+type CreateRequest struct {
+	// ProviderID is a unique value created by the k8s controller and used
+	// to identify the machine allocated by MAAS. Before a machine is
+	// allocated, a MAAS tag containing the ProviderID must be set. This
+	// ensures the machine can be managed even if the k8s controller fails
+	// after allocation.
+	// TODO: Implement. Cf. https://samsung-cnct.atlassian.net/browse/HS19-158
+	ProviderID string
+
+	// Distro is the name of the OS image and kernel to install/boot.
+	Distro string
+
+	// Userdata is passed to the machine on boot and contains cloud-init
+	// configuration.
+	Userdata string
+}
+
+type CreateResponse struct {
+	// ProviderID is the unique value passed in CreateRequest.
+	ProviderID string
+
+	// IPAddresses is a list of IP addresses assigned to the machine.
+	IPAddresses []string
+
+	// SystemID is unique (within a MAAS controller) and is used to manage
+	// allocated machines.
+	// TODO: Replace or augement this with ProviderID.
+	SystemID string
+}
+
 // Create creates a machine
-func (c Client) Create(ctx context.Context, name, userdata string) (gomaasapi.Machine, error) {
-	klog.Infof("Creating machine %s", name)
+func (c Client) Create(ctx context.Context, request *CreateRequest) (*CreateResponse, error) {
+	klog.Infof("Creating machine %s", request.ProviderID)
 
 	// TODO: Tag MAAS machine
 
 	// Allocate MAAS machine
-	allocateArgs := gomaasapi.AllocateMachineArgs{Tags: []string{}}
+	allocateArgs := gomaasapi.AllocateMachineArgs{Tags: []string{request.ProviderID}}
 	m, _, err := c.Controller.AllocateMachine(allocateArgs)
 	if err != nil {
-		klog.Errorf("Create failed to allocate machine %s: %v", name, err)
-		return nil, fmt.Errorf("error allocating machine %s: %v", name, err)
+		klog.Errorf("Create failed to allocate machine %s: %v", request.ProviderID, err)
+		return nil, fmt.Errorf("error allocating machine %s: %v", request.ProviderID, err)
 	}
-	providerID := m.SystemID()
 
 	// Deploy MAAS machine
 	startArgs := gomaasapi.StartArgs{
-		UserData:     base64.StdEncoding.EncodeToString([]byte(userdata)),
-		DistroSeries: "ubuntu-18.04-cnct-k8s-master",
+		UserData:     base64.StdEncoding.EncodeToString([]byte(request.Userdata)),
+		DistroSeries: request.Distro,
 	}
 	err = m.Start(startArgs)
 	if err != nil {
-		klog.Errorf("Create failed to deploy machine %s: %v", name, err)
+		klog.Errorf("Create failed to deploy machine %s: %v", request.ProviderID, err)
 		return nil, err
 	}
 
-	klog.Infof("Created machine %s (%s)", name, providerID)
-	return m, nil
+	klog.Infof("Created machine %s (%s)", request.ProviderID, m.SystemID())
+
+	return &CreateResponse{
+		ProviderID:  request.ProviderID,
+		IPAddresses: m.IPAddresses(),
+		SystemID:    m.SystemID(),
+	}, nil
+}
+
+type DeleteRequest struct {
+	// ProviderID is the unique value passed in CreateRequest.
+	ProviderID string
+	// SystemID is the unique value passed in CreateResponse.
+	SystemID string
+}
+
+type DeleteResponse struct {
 }
 
 // Delete deletes a machine
-func (c Client) Delete(ctx context.Context, cluster *clusterv1.CnctCluster, machine *clusterv1.CnctMachine) error {
-	systemID := machine.ObjectMeta.Annotations["maas-system-id"]
-	if systemID == "" {
-		klog.Warningf("can not delete  machine %s, providerID not set", machine.Name)
-		return fmt.Errorf("machine %s has not been created", machine.Name)
+func (c Client) Delete(ctx context.Context, request *DeleteRequest) error {
+	if request.SystemID == "" {
+		klog.Warningf("can not delete  machine %s, providerID not set", request.ProviderID)
+		return fmt.Errorf("machine %s has not been created", request.ProviderID)
 	}
 
 	// Release MAAS machine
-	releaseArgs := gomaasapi.ReleaseMachinesArgs{SystemIDs: []string{systemID}}
+	releaseArgs := gomaasapi.ReleaseMachinesArgs{SystemIDs: []string{request.SystemID}}
 	if err := c.Controller.ReleaseMachines(releaseArgs); err != nil {
-		klog.Warningf("error releasing machine %s (%s): %v", machine.Name, systemID, err)
+		klog.Warningf("error releasing machine %s (%s): %v", request.ProviderID, request.SystemID, err)
 		return nil
 	}
 
 	return nil
 }
 
+type UpdateRequest struct {
+	// ProviderID is the unique value passed in CreateRequest.
+	ProviderID string
+}
+
 // Update updates a machine
-func (c Client) Update(ctx context.Context, cluster *clusterv1.CnctCluster, machine *clusterv1.CnctMachine) error {
+func (c Client) Update(ctx context.Context, request *UpdateRequest) error {
 	return nil
 }
 
+type ExistsRequest struct {
+	// ProviderID is the unique value passed in CreateRequest.
+	ProviderID string
+}
+
 // Exists test for the existence of a machine
-func (c Client) Exist(ctx context.Context, cluster *clusterv1.CnctCluster, machine *clusterv1.CnctMachine) (bool, error) {
+func (c Client) Exist(ctx context.Context, request *ExistsRequest) (bool, error) {
 	// ProviderID will be nil until Create completes successfully
-	if machine.Spec.ProviderID == nil {
+	if request.ProviderID == "" {
 		return false, nil
 	}
 
 	// Get list of machines with tag
-	machineArgs := gomaasapi.MachinesArgs{SystemIDs: []string{*machine.Spec.ProviderID}}
+	machineArgs := gomaasapi.MachinesArgs{SystemIDs: []string{request.ProviderID}}
 	machines, err := c.Controller.Machines(machineArgs)
 	if err != nil {
-		return false, fmt.Errorf("error listing machine %s (%s): %v", machine.Name, *machine.Spec.ProviderID, err)
+		return false, fmt.Errorf("error listing machine %s: %v", request.ProviderID, err)
 	}
 	if len(machines) != 1 {
-		return false, fmt.Errorf("expected 1 machine %s (%s), found %d", machine.Name, *machine.Spec.ProviderID, len(machines))
+		return false, fmt.Errorf("expected 1 machine %s, found %d", request.ProviderID, len(machines))
 	}
 
 	return true, nil
