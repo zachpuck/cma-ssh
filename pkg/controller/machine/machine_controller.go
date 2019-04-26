@@ -19,13 +19,16 @@ package machine
 import (
 	"bytes"
 	"context"
+	"encoding/pem"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/golang/glog"
 	errs "github.com/pkg/errors"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
+	"github.com/samsung-cnct/cma-ssh/pkg/cert"
 	"github.com/samsung-cnct/cma-ssh/pkg/maas"
 	"github.com/samsung-cnct/cma-ssh/pkg/ssh"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
@@ -143,6 +146,10 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 	switch machine.Status.Phase {
 	case common.ProvisioningMachinePhase:
 		return r.handleWaitingForReady(&machine, &cluster)
+	case common.DeletingMachinePhase:
+		return r.handleDelete(&machine)
+	case common.ErrorMachinePhase:
+		return reconcile.Result{}, nil
 	case "":
 		return r.handleCreate(&machine, &cluster)
 	default:
@@ -151,12 +158,6 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 }
 
 func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.CnctMachine) (reconcile.Result, error) {
-	// if already deleting, ignore
-	if machineInstance.Status.Phase == common.DeletingMachinePhase {
-		glog.Infof("Delete: Already deleting machine %s", machineInstance.GetName())
-		return reconcile.Result{}, nil
-	}
-
 	// get cluster status to determine whether we should proceed,
 	// i.e. if there is a create in progress, we wait for it to either finish or error
 	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
@@ -279,19 +280,11 @@ output : { all : '| tee -a /var/log/cloud-init-output.log' }
 )
 
 func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cluster *clusterv1alpha1.CnctCluster) (reconcile.Result, error) {
-	if machine.Status.Phase == common.ProvisioningMachinePhase {
-		return reconcile.Result{Requeue: true}, nil
-	}
-
 	// Add the finalizer
 	if !util.ContainsString(machine.Finalizers, clusterv1alpha1.MachineFinalizer) {
 		machine.Finalizers =
 			append(machine.Finalizers, clusterv1alpha1.MachineFinalizer)
 	}
-
-	// update status to "creating"
-	machine.Status.Phase = common.ProvisioningMachinePhase
-	machine.Status.KubernetesVersion = cluster.Spec.KubernetesVersion
 
 	var userdata string
 	if util.ContainsRole(machine.Spec.Roles, "master") {
@@ -327,6 +320,9 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 		return reconcile.Result{}, fmt.Errorf("no ip")
 	}
 
+	// update status to "creating"
+	machine.Status.Phase = common.ProvisioningMachinePhase
+	machine.Status.KubernetesVersion = cluster.Spec.KubernetesVersion
 	machine.ObjectMeta.Annotations["maas-ip"] = maasMachine.IPAddresses()[0]
 	machine.ObjectMeta.Annotations["maas-system-id"] = maasMachine.SystemID()
 
@@ -342,7 +338,7 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 }
 
 func (r *ReconcileMachine) handleWaitingForReady(machine *clusterv1alpha1.CnctMachine, cluster *clusterv1alpha1.CnctCluster) (reconcile.Result, error) {
-	glog.Infof("")
+	glog.Infof("figure out how to check if a machine is ready")
 	return reconcile.Result{}, nil
 }
 
@@ -442,6 +438,78 @@ output : { all : '| tee -a /var/log/cloud-init-output.log' }
 	machine.ObjectMeta.Annotations["maas-system-id"] = maasMachine.SystemID()
 
 	return nil
+}
+
+func generateCerts(hostname, hostip string) error {
+	rootCA, err := cert.FromCATemplate("samsung-cnct")
+	if err != nil {
+		return errs.Wrap(err, "could not generate root ca")
+	}
+
+	k8sCA, err := cert.FromCATemplate("kubernetes-ca")
+	if err != nil {
+		return errs.Wrap(err, "could not generate kubernetes-ca")
+	}
+
+	etcdCA, err := cert.FromCATemplate("etcd-ca")
+	if err != nil {
+		return errs.Wrap(err, "could not generate etcd-ca")
+	}
+
+	k8sFrontProxyCA, err := cert.FromCATemplate("kubernetes-front-proxy-ca")
+	if err != nil {
+		return errs.Wrap(err, "could not generate kubernetes-front-proxy-ca")
+	}
+
+	kubeEctd, err := cert.FromCertTemplate("kube-etcd", nil, []string{"localhost", "127.0.0.1"}, true, true)
+	if err != nil {
+		return errs.Wrap(err, "could not create kube-etcd cert")
+	}
+
+	kubeEtcdPeer, err := cert.FromCertTemplate("kube-etcd-peer", nil, []string{hostname, hostip, "localhost", "127.0.0.1"}, true, true)
+	if err != nil {
+		return errs.Wrap(err, "could not create kube-etcd-peer cert")
+	}
+
+	kubeEtcdHealthcheckClient, err := cert.FromCertTemplate("kube-etcd-healthcheck-client", nil, nil, false, true)
+	if err != nil {
+		return errs.Wrap(err, "could not create kube-etcd-healthcheck-client cert")
+	}
+
+	kubeApiServerEctdClient, err := cert.FromCertTemplate("kube-apiserver-etcd-client", []string{"system:masters"}, nil, false, true)
+	if err != nil {
+		return errs.Wrap(err, "could not create kube-apiserver-etcd-client cert")
+	}
+
+	kubeApiserver, err := cert.FromCertTemplate("kube-apiserver", nil, []string{hostname, hostip, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster", "kubernetes.default.svc.cluster.local"}, true, false)
+	if err != nil {
+		return errs.Wrap(err, "could not create kube-apiserver")
+	}
+
+	kubeApiserverKubeletClient, err := cert.FromCertTemplate("kube-apiserver-kubelet-client", []string{"system:masters"}, nil, false, true)
+	if err != nil {
+		return errs.Wrap(err, "could not create kube-apiserver-kubelet-client cert")
+	}
+
+	frontProxyClient, err := cert.FromCertTemplate("front-proxy-client", nil, nil, false, true)
+	if err != nil {
+		return errs.Wrap(err, "could not create front-proxy-client cert")
+	}
+
+	// TODO: create pem encoded certs
+
+	return nil
+}
+
+func pemEncode(certDer, keyDer []byte, cert, key io.Writer) error {
+	if err := pem.Encode(cert, &pem.Block{Type: "CERTIFICATE", Bytes: certDer}); err != nil {
+		return errs.Wrap(err, "failed to write data to cert.pem")
+	}
+
+	if err := pem.Encode(key, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyDer}); err != nil {
+		return errs.Wrap(err, "failed to write data to key.pem")
+	}
+
 }
 
 func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) error {
