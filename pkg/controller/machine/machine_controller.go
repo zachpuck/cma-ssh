@@ -497,6 +497,9 @@ func generateCerts(hostname, hostip string) error {
 	}
 
 	// TODO: create pem encoded certs
+	// https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/master/docs/04-certificate-authority.md
+	// https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#custom-certificates
+	// https://kubernetes.io/docs/setup/certificates/#configure-certificates-manually
 
 	return nil
 }
