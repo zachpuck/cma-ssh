@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"flag"
 	"fmt"
 	"io"
 	"math/big"
@@ -20,10 +19,6 @@ import (
 
 const (
 	rsaBits = 2048
-)
-
-var (
-	isCA = flag.Bool("ca", false, "whether this cert should be its own Certificate Authority")
 )
 
 func PemEncoded(cert, parent *x509.Certificate, key *rsa.PrivateKey, outcert, outkey io.Writer) error {
