@@ -3,10 +3,13 @@
 package cert
 
 import (
+	"archive/tar"
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -35,6 +38,143 @@ func PemEncoded(cert, parent *x509.Certificate, key *rsa.PrivateKey, outcert, ou
 		return errors.Wrap(err, "failed to write data to key.pem")
 	}
 	return nil
+}
+
+func NewCABundle() (*CABundle, error) {
+	rootCA, err := FromCATemplate("samsung-cnct")
+	if err != nil {
+		return nil, errors.Wrap(err, "could not generate root ca")
+	}
+	rootCAKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create root ca key")
+	}
+
+	k8sCA, err := FromCATemplate("kubernetes-ca")
+	if err != nil {
+		return nil, errors.Wrap(err, "could not generate kubernetes-ca")
+	}
+	k8sCAKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create k8s ca key")
+	}
+
+	etcdCA, err := FromCATemplate("etcd-ca")
+	if err != nil {
+		return nil, errors.Wrap(err, "could not generate etcd-ca")
+	}
+	etcdCAKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create etcd ca key")
+	}
+
+	k8sFrontProxyCA, err := FromCATemplate("kubernetes-front-proxy-ca")
+	if err != nil {
+		return nil, errors.Wrap(err, "could not generate kubernetes-front-proxy-ca")
+	}
+	k8sFrontProxyCAKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create kubernetes front proxy ca key")
+	}
+
+	kubeconfig, err := FromCertTemplate("kubernetes-admin", []string{"system:masters"}, nil, false, true)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create kubeconfig client cert")
+	}
+	kubeconfigKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create kubeconfig client key")
+	}
+
+	// https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/master/docs/04-certificate-authority.md
+	// https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#custom-certificates
+	// https://kubernetes.io/docs/setup/certificates/#configure-certificates-manually
+	return &CABundle{
+		Root:          rootCA,
+		RootKey:       rootCAKey,
+		K8s:           k8sCA,
+		K8sKey:        k8sCAKey,
+		Etcd:          etcdCA,
+		EtcdKey:     etcdCAKey,
+		FrontProxy:    k8sFrontProxyCA,
+		FrontProxyKey: k8sFrontProxyCAKey,
+		Kubeconfig: kubeconfig,
+		KubeconfigKey: kubeconfigKey,
+	}, nil
+}
+
+type CABundle struct {
+	Root, K8s, Etcd, FrontProxy, Kubeconfig               *x509.Certificate
+	RootKey, K8sKey, EtcdKey, FrontProxyKey, KubeconfigKey *rsa.PrivateKey
+}
+
+func (c CABundle) ToTar() (string, error) {
+	var rootCAPem, rootCAKeyPem bytes.Buffer
+	if err := PemEncoded(c.Root, c.Root, c.RootKey, &rootCAPem, &rootCAKeyPem); err != nil {
+		return "", errors.Wrap(err, "could not encode pem for root ca cert and key")
+	}
+
+	var k8sCAPem, k8sCAKeyPem bytes.Buffer
+	if err := PemEncoded(c.K8s, c.Root, c.K8sKey, &k8sCAPem, &k8sCAKeyPem); err != nil {
+		return "", errors.Wrap(err, "could not encode pem for k8s ca cert and key")
+	}
+
+	var etcdCAPem, etcdCAKeyPem bytes.Buffer
+	if err := PemEncoded(c.Etcd, c.Root, c.EtcdKey, &etcdCAPem, &etcdCAKeyPem); err != nil {
+		return "", errors.Wrap(err, "could not encode pem for etcd ca cert and key")
+	}
+
+	var k8sFrontProxyCAPem, k8sFrontProxyCAKeyPem bytes.Buffer
+	if err := PemEncoded(c.FrontProxy, c.Root, c.FrontProxyKey, &k8sFrontProxyCAPem, &k8sFrontProxyCAKeyPem); err != nil {
+		return "", errors.Wrap(err, "could not encode pem for kubernetes front proxy ca cert and key")
+	}
+
+	var tarball bytes.Buffer
+	enc := base64.NewEncoder(base64.StdEncoding, &tarball)
+	tw := tar.NewWriter(enc)
+	var files = []struct {
+		Name string
+		Body []byte
+		Mode int64
+	}{
+		{Name: "etcd/ca.crt", Body: etcdCAPem.Bytes(), Mode: 0644},
+		{Name: "etcd/ca.key", Body: etcdCAKeyPem.Bytes(), Mode: 0600},
+		{Name: "ca.crt", Body: k8sCAPem.Bytes(), Mode: 0644},
+		{Name: "ca.key", Body: k8sCAKeyPem.Bytes(), Mode: 0600},
+		{Name: "front-proxy-ca.crt", Body: k8sFrontProxyCAPem.Bytes(), Mode: 0644},
+		{Name: "front-proxy-ca.key", Body: k8sFrontProxyCAKeyPem.Bytes(), Mode: 0600},
+	}
+	hdr := tar.Header{
+		Name:     "etcd/",
+		Mode:     0755,
+		ModTime:  time.Now(),
+		Typeflag: tar.TypeDir,
+	}
+	if err := tw.WriteHeader(&hdr); err != nil {
+		return "", errors.Wrap(err, "could not write etcd dir tar header")
+	}
+	for _, file := range files {
+		hdr := &tar.Header{
+			Name:    file.Name,
+			Mode:    file.Mode,
+			ModTime: time.Now(),
+			Size:    int64(len(file.Body)),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return "", errors.Wrap(err, "could not write tar header")
+		}
+		if _, err := tw.Write(file.Body); err != nil {
+			return "", errors.Wrap(err, "could not write tar body")
+		}
+	}
+	if err := tw.Close(); err != nil {
+		return "", errors.Wrap(err, "could not close tar writer")
+	}
+	if err := enc.Close(); err != nil {
+		return "", errors.Wrap(err, "could not close b64 encoder")
+	}
+
+	return tarball.String(), nil
 }
 
 func FromCATemplate(commonName string) (*x509.Certificate, error) {

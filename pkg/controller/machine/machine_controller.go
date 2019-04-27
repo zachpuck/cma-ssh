@@ -17,12 +17,11 @@ limitations under the License.
 package machine
 
 import (
-	"archive/tar"
 	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/rsa"
-	"encoding/base64"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"time"
 
@@ -41,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -48,6 +48,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"sigs.k8s.io/yaml"
 )
 
 type backgroundMachineOp func(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) error
@@ -296,17 +297,22 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 			append(machine.Finalizers, clusterv1alpha1.MachineFinalizer)
 	}
 
-	certs, err := generateCerts()
-	if err != nil {
-		fmt.Println(err)
-		return reconcile.Result{}, err
-	}
-
 	var userdata string
+	var caBundle *cert.CABundle
 	if util.ContainsRole(machine.Spec.Roles, "master") {
-		userdata = fmt.Sprintf(masterUserData, certs)
-	} else {
+		var err error
+		caBundle, err = cert.NewCABundle()
+		if err != nil {
+			fmt.Println(err)
+			return reconcile.Result{}, err
+		}
 
+		caTar, err := caBundle.ToTar()
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		userdata = fmt.Sprintf(masterUserData, caTar)
+	} else {
 		machineList, err := util.GetClusterMachineList(r.Client, cluster.GetName())
 		if err != nil {
 			return reconcile.Result{Requeue: true}, err
@@ -347,6 +353,54 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 		machine.GetName(), common.ProvisioningMachinePhase)
 	if err != nil {
 		glog.Errorf("could not update status of machine %s: %q", machine.GetName(), err)
+		return reconcile.Result{}, err
+	}
+
+	// if we did not create ca don't create kubeconfig
+	if caBundle == nil {
+		return reconcile.Result{}, nil
+	}
+
+	config := api.NewConfig()
+	clusterConfig := api.NewCluster()
+	derBytes, err := x509.CreateCertificate(rand.Reader, caBundle.K8s, caBundle.Root, &caBundle.K8sKey.PublicKey, caBundle.K8sKey)
+	if err != nil {
+		return reconcile.Result{}, errs.Wrap(err, "Failed to create certificate")
+	}
+	clusterConfig.CertificateAuthorityData = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	clusterConfig.Server = "https://" + maasMachine.IPAddresses()[0] + ":6443"
+	config.Clusters[cluster.Name] = clusterConfig
+
+	var clientCert, clientKey bytes.Buffer
+	if err := cert.PemEncoded(caBundle.Kubeconfig, caBundle.K8s, caBundle.KubeconfigKey, &clientCert, &clientKey); err != nil {
+		return reconcile.Result{}, err
+	}
+	userConfig := api.NewAuthInfo()
+	userConfig.ClientCertificateData = clientCert.Bytes()
+	userConfig.ClientKeyData = clientCert.Bytes()
+	config.AuthInfos["kubernetes-admin"] = userConfig
+	configContext := api.NewContext()
+	configContext.AuthInfo = "kubernetes-admin"
+	configContext.Cluster = cluster.Name
+	config.Contexts["kubernetes-admin@"+cluster.Name] = configContext
+	config.CurrentContext = "kubernetes-admin@" + cluster.Name
+
+	kubeconfig, err := yaml.Marshal(config)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	dataMap := map[string][]byte{
+		"kubeconfig": kubeconfig,
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cluster-private-key",
+			Namespace: machine.Namespace,
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: dataMap,
+	}
+	if err := r.Client.Create(context.Background(), secret); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -454,118 +508,6 @@ output : { all : '| tee -a /var/log/cloud-init-output.log' }
 	machine.ObjectMeta.Annotations["maas-system-id"] = maasMachine.SystemID()
 
 	return nil
-}
-
-func generateCerts() (string, error) {
-	rootCA, err := cert.FromCATemplate("samsung-cnct")
-	if err != nil {
-		return "", errs.Wrap(err, "could not generate root ca")
-	}
-
-	k8sCA, err := cert.FromCATemplate("kubernetes-ca")
-	if err != nil {
-		return "", errs.Wrap(err, "could not generate kubernetes-ca")
-	}
-
-	etcdCA, err := cert.FromCATemplate("etcd-ca")
-	if err != nil {
-		return "", errs.Wrap(err, "could not generate etcd-ca")
-	}
-
-	k8sFrontProxyCA, err := cert.FromCATemplate("kubernetes-front-proxy-ca")
-	if err != nil {
-		return "", errs.Wrap(err, "could not generate kubernetes-front-proxy-ca")
-	}
-
-	// TODO: create pem encoded certs
-	// https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/master/docs/04-certificate-authority.md
-	// https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#custom-certificates
-	// https://kubernetes.io/docs/setup/certificates/#configure-certificates-manually
-
-	rootCAKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return "", errs.Wrap(err, "could not create root ca key")
-	}
-	var rootCAPem, rootCAKeyPem bytes.Buffer
-	if err := cert.PemEncoded(rootCA, rootCA, rootCAKey, &rootCAPem, &rootCAKeyPem); err != nil {
-		return "", errs.Wrap(err, "could not encode pem for root ca cert and key")
-	}
-
-	k8sCAKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return "", errs.Wrap(err, "could not create k8s ca key")
-	}
-	var k8sCAPem, k8sCAKeyPem bytes.Buffer
-	if err := cert.PemEncoded(k8sCA, rootCA, k8sCAKey, &k8sCAPem, &k8sCAKeyPem); err != nil {
-		return "", errs.Wrap(err, "could not encode pem for k8s ca cert and key")
-	}
-
-	etcdCAKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return "", errs.Wrap(err, "could not create etcd ca key")
-	}
-	var etcdCAPem, etcdCAKeyPem bytes.Buffer
-	if err := cert.PemEncoded(etcdCA, rootCA, etcdCAKey, &etcdCAPem, &etcdCAKeyPem); err != nil {
-		return "", errs.Wrap(err, "could not encode pem for etcd ca cert and key")
-	}
-
-	k8sFrontProxyCAKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return "", errs.Wrap(err, "could not create kubernetes front proxy ca key")
-	}
-	var k8sFrontProxyCAPem, k8sFrontProxyCAKeyPem bytes.Buffer
-	if err := cert.PemEncoded(k8sFrontProxyCA, rootCA, k8sFrontProxyCAKey, &k8sFrontProxyCAPem, &k8sFrontProxyCAKeyPem); err != nil {
-		return "", errs.Wrap(err, "could not encode pem for kubernetes front proxy ca cert and key")
-	}
-
-	var tarball bytes.Buffer
-	enc := base64.NewEncoder(base64.StdEncoding, &tarball)
-	tw := tar.NewWriter(enc)
-	var files = []struct {
-		Name string
-		Body []byte
-		Mode int64
-	}{
-		{Name: "etcd/ca.crt", Body: etcdCAPem.Bytes(), Mode: 0644},
-		{Name: "etcd/ca.key", Body: etcdCAKeyPem.Bytes(), Mode: 0600},
-		{Name: "ca.crt", Body: k8sCAPem.Bytes(), Mode: 0644},
-		{Name: "ca.key", Body: k8sCAKeyPem.Bytes(), Mode: 0600},
-		{Name: "front-proxy-ca.crt", Body: k8sFrontProxyCAPem.Bytes(), Mode: 0644},
-		{Name: "front-proxy-ca.key", Body: k8sFrontProxyCAKeyPem.Bytes(), Mode: 0600},
-	}
-	hdr := tar.Header{
-		Name:     "etcd/",
-		Mode:     0755,
-		ModTime:  time.Now(),
-		Typeflag: tar.TypeDir,
-	}
-	if err := tw.WriteHeader(&hdr); err != nil {
-		return "", errs.Wrap(err, "could not write etcd dir tar header")
-	}
-	for _, file := range files {
-		hdr := &tar.Header{
-			Name:    file.Name,
-			Mode:    file.Mode,
-			ModTime: time.Now(),
-			Size:    int64(len(file.Body)),
-		}
-		if err := tw.WriteHeader(hdr); err != nil {
-			return "", errs.Wrap(err, "could not write tar header")
-		}
-		if _, err := tw.Write(file.Body); err != nil {
-			return "", errs.Wrap(err, "could not write tar body")
-		}
-	}
-	if err := tw.Close(); err != nil {
-		return "", errs.Wrap(err, "could not close tar writer")
-	}
-	if err := enc.Close(); err != nil {
-		return "", errs.Wrap(err, "could not close b64 encoder")
-	}
-
-	// TODO store in secret
-	// TODO add kubeconfig
-	return tarball.String(), nil
 }
 
 func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) error {
