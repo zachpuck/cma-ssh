@@ -17,11 +17,13 @@ limitations under the License.
 package machine
 
 import (
+	"archive/tar"
 	"bytes"
 	"context"
-	"encoding/pem"
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/base64"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/golang/glog"
@@ -263,17 +265,25 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.CnctMa
 
 const (
 	masterUserData = `#cloud-config
+write_files:
+ - encoding: b64
+   content: %s
+   owner: root:root
+   path: /etc/kubernetes/pki/certs.tar
+   permissions: '0600'
+
 runcmd:
  - [ sh, -c, "swapoff -a" ]
- - [sh, -c, "kubeadm init --pod-network-cidr 10.244.0.0/16 --token=andrew.isthebestfighter"]
- - [sh, -c, "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml"]
+ - [ sh, -c, "tar xf /etc/kubernetes/pki/certs.tar -C /etc/kubernetes/pki" ]
+ - [sh, -c, "kubeadm init --pod-network-cidr 10.244.0.0/16 --token=andrew.isthebestfighter" ]
+ - [sh, -c, "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml" ]
 
 output : { all : '| tee -a /var/log/cloud-init-output.log' }
 `
 	workerUserData = `#cloud-config
 runcmd:
  - [ sh, -c, "swapoff -a" ]
- - [sh, -c, "kubeadm join --discovery-token=andrew.isthebestfighter --discovery-token-unsafe-skip-ca-verification %s"]
+ - [sh, -c, "kubeadm join --discovery-token=andrew.isthebestfighter --discovery-token-unsafe-skip-ca-verification %s" ]
 
 output : { all : '| tee -a /var/log/cloud-init-output.log' }
 `
@@ -286,9 +296,15 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 			append(machine.Finalizers, clusterv1alpha1.MachineFinalizer)
 	}
 
+	certs, err := generateCerts()
+	if err != nil {
+		fmt.Println(err)
+		return reconcile.Result{}, err
+	}
+
 	var userdata string
 	if util.ContainsRole(machine.Spec.Roles, "master") {
-		userdata = masterUserData
+		userdata = fmt.Sprintf(masterUserData, certs)
 	} else {
 
 		machineList, err := util.GetClusterMachineList(r.Client, cluster.GetName())
@@ -440,60 +456,25 @@ output : { all : '| tee -a /var/log/cloud-init-output.log' }
 	return nil
 }
 
-func generateCerts(hostname, hostip string) error {
+func generateCerts() (string, error) {
 	rootCA, err := cert.FromCATemplate("samsung-cnct")
 	if err != nil {
-		return errs.Wrap(err, "could not generate root ca")
+		return "", errs.Wrap(err, "could not generate root ca")
 	}
 
 	k8sCA, err := cert.FromCATemplate("kubernetes-ca")
 	if err != nil {
-		return errs.Wrap(err, "could not generate kubernetes-ca")
+		return "", errs.Wrap(err, "could not generate kubernetes-ca")
 	}
 
 	etcdCA, err := cert.FromCATemplate("etcd-ca")
 	if err != nil {
-		return errs.Wrap(err, "could not generate etcd-ca")
+		return "", errs.Wrap(err, "could not generate etcd-ca")
 	}
 
 	k8sFrontProxyCA, err := cert.FromCATemplate("kubernetes-front-proxy-ca")
 	if err != nil {
-		return errs.Wrap(err, "could not generate kubernetes-front-proxy-ca")
-	}
-
-	kubeEctd, err := cert.FromCertTemplate("kube-etcd", nil, []string{"localhost", "127.0.0.1"}, true, true)
-	if err != nil {
-		return errs.Wrap(err, "could not create kube-etcd cert")
-	}
-
-	kubeEtcdPeer, err := cert.FromCertTemplate("kube-etcd-peer", nil, []string{hostname, hostip, "localhost", "127.0.0.1"}, true, true)
-	if err != nil {
-		return errs.Wrap(err, "could not create kube-etcd-peer cert")
-	}
-
-	kubeEtcdHealthcheckClient, err := cert.FromCertTemplate("kube-etcd-healthcheck-client", nil, nil, false, true)
-	if err != nil {
-		return errs.Wrap(err, "could not create kube-etcd-healthcheck-client cert")
-	}
-
-	kubeApiServerEctdClient, err := cert.FromCertTemplate("kube-apiserver-etcd-client", []string{"system:masters"}, nil, false, true)
-	if err != nil {
-		return errs.Wrap(err, "could not create kube-apiserver-etcd-client cert")
-	}
-
-	kubeApiserver, err := cert.FromCertTemplate("kube-apiserver", nil, []string{hostname, hostip, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster", "kubernetes.default.svc.cluster.local"}, true, false)
-	if err != nil {
-		return errs.Wrap(err, "could not create kube-apiserver")
-	}
-
-	kubeApiserverKubeletClient, err := cert.FromCertTemplate("kube-apiserver-kubelet-client", []string{"system:masters"}, nil, false, true)
-	if err != nil {
-		return errs.Wrap(err, "could not create kube-apiserver-kubelet-client cert")
-	}
-
-	frontProxyClient, err := cert.FromCertTemplate("front-proxy-client", nil, nil, false, true)
-	if err != nil {
-		return errs.Wrap(err, "could not create front-proxy-client cert")
+		return "", errs.Wrap(err, "could not generate kubernetes-front-proxy-ca")
 	}
 
 	// TODO: create pem encoded certs
@@ -501,18 +482,90 @@ func generateCerts(hostname, hostip string) error {
 	// https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#custom-certificates
 	// https://kubernetes.io/docs/setup/certificates/#configure-certificates-manually
 
-	return nil
-}
-
-func pemEncode(certDer, keyDer []byte, cert, key io.Writer) error {
-	if err := pem.Encode(cert, &pem.Block{Type: "CERTIFICATE", Bytes: certDer}); err != nil {
-		return errs.Wrap(err, "failed to write data to cert.pem")
+	rootCAKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return "", errs.Wrap(err, "could not create root ca key")
+	}
+	var rootCAPem, rootCAKeyPem bytes.Buffer
+	if err := cert.PemEncoded(rootCA, rootCA, rootCAKey, &rootCAPem, &rootCAKeyPem); err != nil {
+		return "", errs.Wrap(err, "could not encode pem for root ca cert and key")
 	}
 
-	if err := pem.Encode(key, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyDer}); err != nil {
-		return errs.Wrap(err, "failed to write data to key.pem")
+	k8sCAKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return "", errs.Wrap(err, "could not create k8s ca key")
+	}
+	var k8sCAPem, k8sCAKeyPem bytes.Buffer
+	if err := cert.PemEncoded(k8sCA, rootCA, k8sCAKey, &k8sCAPem, &k8sCAKeyPem); err != nil {
+		return "", errs.Wrap(err, "could not encode pem for k8s ca cert and key")
 	}
 
+	etcdCAKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return "", errs.Wrap(err, "could not create etcd ca key")
+	}
+	var etcdCAPem, etcdCAKeyPem bytes.Buffer
+	if err := cert.PemEncoded(etcdCA, rootCA, etcdCAKey, &etcdCAPem, &etcdCAKeyPem); err != nil {
+		return "", errs.Wrap(err, "could not encode pem for etcd ca cert and key")
+	}
+
+	k8sFrontProxyCAKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return "", errs.Wrap(err, "could not create kubernetes front proxy ca key")
+	}
+	var k8sFrontProxyCAPem, k8sFrontProxyCAKeyPem bytes.Buffer
+	if err := cert.PemEncoded(k8sFrontProxyCA, rootCA, k8sFrontProxyCAKey, &k8sFrontProxyCAPem, &k8sFrontProxyCAKeyPem); err != nil {
+		return "", errs.Wrap(err, "could not encode pem for kubernetes front proxy ca cert and key")
+	}
+
+	var tarball bytes.Buffer
+	enc := base64.NewEncoder(base64.StdEncoding, &tarball)
+	tw := tar.NewWriter(enc)
+	var files = []struct {
+		Name string
+		Body []byte
+		Mode int64
+	}{
+		{Name: "etcd/ca.crt", Body: etcdCAPem.Bytes(), Mode: 0644},
+		{Name: "etcd/ca.key", Body: etcdCAKeyPem.Bytes(), Mode: 0600},
+		{Name: "ca.crt", Body: k8sCAPem.Bytes(), Mode: 0644},
+		{Name: "ca.key", Body: k8sCAKeyPem.Bytes(), Mode: 0600},
+		{Name: "front-proxy-ca.crt", Body: k8sFrontProxyCAPem.Bytes(), Mode: 0644},
+		{Name: "front-proxy-ca.key", Body: k8sFrontProxyCAKeyPem.Bytes(), Mode: 0600},
+	}
+	hdr := tar.Header{
+		Name:     "etcd/",
+		Mode:     0755,
+		ModTime:  time.Now(),
+		Typeflag: tar.TypeDir,
+	}
+	if err := tw.WriteHeader(&hdr); err != nil {
+		return "", errs.Wrap(err, "could not write etcd dir tar header")
+	}
+	for _, file := range files {
+		hdr := &tar.Header{
+			Name:    file.Name,
+			Mode:    file.Mode,
+			ModTime: time.Now(),
+			Size:    int64(len(file.Body)),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return "", errs.Wrap(err, "could not write tar header")
+		}
+		if _, err := tw.Write(file.Body); err != nil {
+			return "", errs.Wrap(err, "could not write tar body")
+		}
+	}
+	if err := tw.Close(); err != nil {
+		return "", errs.Wrap(err, "could not close tar writer")
+	}
+	if err := enc.Close(); err != nil {
+		return "", errs.Wrap(err, "could not close b64 encoder")
+	}
+
+	// TODO store in secret
+	// TODO add kubeconfig
+	return tarball.String(), nil
 }
 
 func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) error {

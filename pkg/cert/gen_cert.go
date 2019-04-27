@@ -22,7 +22,7 @@ const (
 )
 
 func PemEncoded(cert, parent *x509.Certificate, key *rsa.PrivateKey, outcert, outkey io.Writer) error {
-	derBytes, err := x509.CreateCertificate(rand.Reader, cert, parent, key.PublicKey, key)
+	derBytes, err := x509.CreateCertificate(rand.Reader, cert, parent, &key.PublicKey, key)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create certificate")
 	}
@@ -39,8 +39,7 @@ func PemEncoded(cert, parent *x509.Certificate, key *rsa.PrivateKey, outcert, ou
 
 func FromCATemplate(commonName string) (*x509.Certificate, error) {
 	notBefore := time.Now()
-
-	notAfter := notBefore.Add(365 * 24 * time.Hour)
+	notAfter := notBefore.Add(10 * 365 * 24 * time.Hour)
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
