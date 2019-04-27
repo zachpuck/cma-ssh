@@ -372,7 +372,7 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 	config.Clusters[cluster.Name] = clusterConfig
 
 	var clientCert, clientKey bytes.Buffer
-	if err := cert.PemEncoded(caBundle.Kubeconfig, caBundle.K8s, caBundle.KubeconfigKey, &clientCert, &clientKey); err != nil {
+	if err := cert.PemEncoded(caBundle.Kubeconfig, caBundle.K8s, caBundle.KubeconfigKey, caBundle.K8sKey, &clientCert, &clientKey); err != nil {
 		return reconcile.Result{}, err
 	}
 	userConfig := api.NewAuthInfo()

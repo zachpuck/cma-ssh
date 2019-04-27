@@ -5,6 +5,7 @@ package cert
 import (
 	"archive/tar"
 	"bytes"
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -24,8 +25,8 @@ const (
 	rsaBits = 2048
 )
 
-func PemEncoded(cert, parent *x509.Certificate, key *rsa.PrivateKey, outcert, outkey io.Writer) error {
-	derBytes, err := x509.CreateCertificate(rand.Reader, cert, parent, &key.PublicKey, key)
+func PemEncoded(cert, parent *x509.Certificate, key, priv crypto.Signer, outcert, outkey io.Writer) error {
+	derBytes, err := x509.CreateCertificate(rand.Reader, cert, parent, key.Public(), priv)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create certificate")
 	}
@@ -34,7 +35,7 @@ func PemEncoded(cert, parent *x509.Certificate, key *rsa.PrivateKey, outcert, ou
 		return errors.Wrap(err, "failed to write data to cert.pem")
 	}
 
-	if err := pem.Encode(outkey, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}); err != nil {
+	if err := pem.Encode(outkey, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key.(*rsa.PrivateKey))}); err != nil {
 		return errors.Wrap(err, "failed to write data to key.pem")
 	}
 	return nil
@@ -95,37 +96,37 @@ func NewCABundle() (*CABundle, error) {
 		K8s:           k8sCA,
 		K8sKey:        k8sCAKey,
 		Etcd:          etcdCA,
-		EtcdKey:     etcdCAKey,
+		EtcdKey:       etcdCAKey,
 		FrontProxy:    k8sFrontProxyCA,
 		FrontProxyKey: k8sFrontProxyCAKey,
-		Kubeconfig: kubeconfig,
+		Kubeconfig:    kubeconfig,
 		KubeconfigKey: kubeconfigKey,
 	}, nil
 }
 
 type CABundle struct {
-	Root, K8s, Etcd, FrontProxy, Kubeconfig               *x509.Certificate
+	Root, K8s, Etcd, FrontProxy, Kubeconfig                *x509.Certificate
 	RootKey, K8sKey, EtcdKey, FrontProxyKey, KubeconfigKey *rsa.PrivateKey
 }
 
 func (c CABundle) ToTar() (string, error) {
 	var rootCAPem, rootCAKeyPem bytes.Buffer
-	if err := PemEncoded(c.Root, c.Root, c.RootKey, &rootCAPem, &rootCAKeyPem); err != nil {
+	if err := PemEncoded(c.Root, c.Root, c.RootKey, c.RootKey, &rootCAPem, &rootCAKeyPem); err != nil {
 		return "", errors.Wrap(err, "could not encode pem for root ca cert and key")
 	}
 
 	var k8sCAPem, k8sCAKeyPem bytes.Buffer
-	if err := PemEncoded(c.K8s, c.Root, c.K8sKey, &k8sCAPem, &k8sCAKeyPem); err != nil {
+	if err := PemEncoded(c.K8s, c.Root, c.K8sKey, c.RootKey, &k8sCAPem, &k8sCAKeyPem); err != nil {
 		return "", errors.Wrap(err, "could not encode pem for k8s ca cert and key")
 	}
 
 	var etcdCAPem, etcdCAKeyPem bytes.Buffer
-	if err := PemEncoded(c.Etcd, c.Root, c.EtcdKey, &etcdCAPem, &etcdCAKeyPem); err != nil {
+	if err := PemEncoded(c.Etcd, c.Root, c.EtcdKey, c.RootKey, &etcdCAPem, &etcdCAKeyPem); err != nil {
 		return "", errors.Wrap(err, "could not encode pem for etcd ca cert and key")
 	}
 
 	var k8sFrontProxyCAPem, k8sFrontProxyCAKeyPem bytes.Buffer
-	if err := PemEncoded(c.FrontProxy, c.Root, c.FrontProxyKey, &k8sFrontProxyCAPem, &k8sFrontProxyCAKeyPem); err != nil {
+	if err := PemEncoded(c.FrontProxy, c.Root, c.FrontProxyKey, c.RootKey, &k8sFrontProxyCAPem, &k8sFrontProxyCAKeyPem); err != nil {
 		return "", errors.Wrap(err, "could not encode pem for kubernetes front proxy ca cert and key")
 	}
 
