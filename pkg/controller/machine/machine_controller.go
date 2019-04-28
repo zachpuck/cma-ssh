@@ -17,11 +17,7 @@ limitations under the License.
 package machine
 
 import (
-	"bytes"
 	"context"
-	"crypto/rand"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"time"
 
@@ -37,7 +33,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -363,21 +358,12 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 
 	config := api.NewConfig()
 	clusterConfig := api.NewCluster()
-	derBytes, err := x509.CreateCertificate(rand.Reader, caBundle.K8s, caBundle.Root, &caBundle.K8sKey.PublicKey, caBundle.K8sKey)
-	if err != nil {
-		return reconcile.Result{}, errs.Wrap(err, "Failed to create certificate")
-	}
-	clusterConfig.CertificateAuthorityData = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	clusterConfig.CertificateAuthorityData = caBundle.K8s
 	clusterConfig.Server = "https://" + maasMachine.IPAddresses()[0] + ":6443"
 	config.Clusters[cluster.Name] = clusterConfig
-
-	var clientCert, clientKey bytes.Buffer
-	if err := cert.PemEncoded(caBundle.Kubeconfig, caBundle.K8s, caBundle.KubeconfigKey, caBundle.K8sKey, &clientCert, &clientKey); err != nil {
-		return reconcile.Result{}, err
-	}
 	userConfig := api.NewAuthInfo()
-	userConfig.ClientCertificateData = clientCert.Bytes()
-	userConfig.ClientKeyData = clientCert.Bytes()
+	userConfig.ClientCertificateData = caBundle.Kubeconfig
+	userConfig.ClientKeyData = caBundle.KubeconfigKey
 	config.AuthInfos["kubernetes-admin"] = userConfig
 	configContext := api.NewContext()
 	configContext.AuthInfo = "kubernetes-admin"
@@ -457,157 +443,6 @@ func getCluster(c client.Client, namespace string, clusterName string) (*cluster
 	}
 
 	return clusterInstance, nil
-}
-
-func createMachine(r *ReconcileMachine, cluster *clusterv1alpha1.CnctCluster, machine *clusterv1alpha1.CnctMachine) error {
-	masterUserData := `#cloud-config
-runcmd:
- - [ sh, -c, "swapoff -a" ]
- - [sh, -c, "kubeadm init --pod-network-cidr 10.244.0.0/16 --token=andrew.isthebestfighter"]
- - [sh, -c, "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml"]
-
-output : { all : '| tee -a /var/log/cloud-init-output.log' }
-`
-
-	var userdata string
-	if util.ContainsRole(machine.Spec.Roles, "master") {
-		userdata = masterUserData
-	} else {
-
-		machineList, err := util.GetClusterMachineList(r.Client, cluster.GetName())
-		if err != nil {
-			return err
-		}
-		master, err := util.GetMaster(machineList)
-		if err != nil {
-			return err
-		}
-		userdata = fmt.Sprintf(`#cloud-config
-runcmd:
- - [ sh, -c, "swapoff -a" ]
- - [sh, -c, "kubeadm join --discovery-token=andrew.isthebestfighter %s"]
- - [sh, -c, "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml"]
-
-output : { all : '| tee -a /var/log/cloud-init-output.log' }
-`, master.Spec.SshConfig.Host+":6443")
-
-	}
-
-	maasMachine, err := r.MAASClient.Create(context.Background(), machine.Name, userdata)
-	if err != nil {
-		return err
-	}
-
-	if len(maasMachine.IPAddresses()) == 0 {
-		// FIXME: release machine
-		fmt.Println("machine ip is nil")
-		return fmt.Errorf("no ip")
-	}
-
-	machine.ObjectMeta.Annotations["maas-ip"] = maasMachine.IPAddresses()[0]
-	machine.ObjectMeta.Annotations["maas-system-id"] = maasMachine.SystemID()
-
-	return nil
-}
-
-func doBootstrap(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) error {
-	// create config for ssh commands
-	cfg, err := NewCmdConfig(r.Client, machineInstance, privateKey)
-	if err != nil {
-		return err
-	}
-
-	// Setup bootstrap repo
-	if err := InstallBootstrapRepo(cfg, nil); err != nil {
-		return err
-	}
-
-	// install local nginx proxy
-	if err := InstallNginx(cfg, nil); err != nil {
-		return err
-	}
-
-	// install docker
-	if err := InstallDocker(cfg, nil); err != nil {
-		return err
-	}
-
-	// install kubernetes components
-	if err := InstallKubernetes(cfg, nil); err != nil {
-		return err
-	}
-
-	// if this is a master, proceed with bootstrap
-	if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleMaster) {
-		// run kubeadm init
-		if err := KubeadmInit(cfg, nil); err != nil {
-			return err
-		}
-	} else if util.ContainsRole(machineInstance.Spec.Roles, common.MachineRoleWorker) {
-		// on worker, see if master is able to run kubeadm
-		// if it is, run kubeadm token create and use the token to
-		// do kubeadm join.
-		// otherwise wait for a bit and try again.
-
-		// get machine list
-		machineList := &clusterv1alpha1.CnctMachineList{}
-		err := r.List(
-			context.Background(),
-			&client.ListOptions{LabelSelector: labels.Everything()},
-			machineList,
-		)
-		if err != nil {
-			return err
-		}
-
-		masterMachine, err := util.GetMaster(machineList.Items)
-		if err != nil {
-			return err
-		}
-		masterConfig, err := NewCmdConfig(r.Client, masterMachine, privateKey)
-		if err != nil {
-			return err
-		}
-		var token []byte
-		err = util.Retry(120, 10*time.Second, func() error {
-			// run kubeadm create token on master machine, get token back
-			glog.Infof("Trying to get kubeadm token from master %s for node %s",
-				masterMachine.GetName(), machineInstance.GetName())
-			token, err = KubeadmTokenCreate(masterConfig, nil)
-			if err != nil {
-				glog.Infof("Waiting for kubeadm to be able to create a token on master %s for machine %s",
-					masterMachine.GetName(), machineInstance.GetName())
-				return err
-			}
-
-			glog.Infof("Got master kubeadm token: %s", string(token[:]))
-			return nil
-		})
-		if err != nil {
-			glog.Errorf("Failed to get kubeadm token from master %s for machine %s in time: %q",
-				masterMachine.GetName(), machineInstance.GetName(), err)
-			return err
-		}
-
-		// run kubeadm join on worker machine
-		args := map[string]string{
-			"token":  string(bytes.TrimSpace(token)),
-			"master": masterMachine.Spec.SshConfig.Host,
-		}
-		if err := KubeadmJoin(cfg, args); err != nil {
-			return err
-		}
-	}
-
-	// Set status to ready
-	machineInstance.Status.Phase = common.ReadyMachinePhase
-	err = r.updateStatus(machineInstance, corev1.EventTypeNormal,
-		common.ResourceStateChange, common.MessageResourceStateChange,
-		machineInstance.GetName(), common.ReadyMachinePhase)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func doUpgrade(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) error {
@@ -765,10 +600,6 @@ func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine,
 			machineInstance.Spec.SshConfig.Host,
 		)
 	}
-	if err != nil {
-		glog.Errorf("failed to clean up physical node for machine %s Manual cleanup might be required for %s",
-			machineInstance.GetName(), machineInstance.Spec.SshConfig.Host)
-	}
 
 	machineInstance.Finalizers =
 		util.RemoveString(machineInstance.Finalizers, clusterv1alpha1.MachineFinalizer)
@@ -796,7 +627,7 @@ func (r *ReconcileMachine) backgroundRunner(op backgroundMachineOp,
 	// get the cluster instance
 	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
 	if err != nil {
-		glog.Errorf("Could not get cluster %s: %q", clusterInstance.GetName(), err)
+		glog.Errorf("Could not get cluster %q: %s", machineInstance.Spec.ClusterRef, err)
 		return
 	}
 
