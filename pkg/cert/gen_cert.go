@@ -17,6 +17,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/tools/clientcmd/api/latest"
 )
 
 const (
@@ -119,8 +122,8 @@ func NewCABundle() (*CABundle, error) {
 		EtcdKey:       etcdKeyPem,
 		FrontProxy:    k8sFrontProxyPem,
 		FrontProxyKey: k8sFrontProxyKeyPem,
-		Kubeconfig:    kubeconfigPem,
-		KubeconfigKey: kubeconfigKeyPem,
+		K8sClient:    kubeconfigPem,
+		K8sClientKey: kubeconfigKeyPem,
 	}, nil
 }
 
@@ -130,7 +133,82 @@ type CABundle struct {
 	K8s, K8sKey               []byte
 	Etcd, EtcdKey             []byte
 	FrontProxy, FrontProxyKey []byte
-	Kubeconfig, KubeconfigKey []byte
+	K8sClient, K8sClientKey []byte
+}
+
+const (
+	mapKeyRoot = "root.crt"
+	mapKeyRootKey = "root.key"
+	mapKeyK8s = "ca.crt"
+	mapKeyK8sKey = "ca.key"
+	mapKeyEtcd = "etcd.crt"
+	mapKeyEtcdKey = "etcd.key"
+	mapKeyFrontProxy = "front-proxy.crt"
+	mapKeyFrontProxyKey = "front-proxy.key"
+	mapKeyK8sClient = "k8s-client.crt"
+	mapKeyK8sClientKey = "k8s-client.key"
+)
+
+func (c *CABundle) Set(key string, value []byte) {
+	switch key {
+	case mapKeyRoot:
+		c.Root = value
+	case mapKeyRootKey:
+		c.RootKey = value
+	case mapKeyK8s:
+		c.K8s = value
+	case mapKeyK8sKey:
+		c.K8sKey = value
+	case mapKeyEtcd:
+		c.Etcd = value
+	case mapKeyEtcdKey:
+		c.EtcdKey = value
+	case mapKeyFrontProxy:
+		c.FrontProxy = value
+	case mapKeyFrontProxyKey:
+		c.FrontProxyKey = value
+	case mapKeyK8sClient:
+		c.K8sClient = value
+	case mapKeyK8sClientKey:
+		c.K8sClientKey = value
+	}
+}
+
+func CABundleFromMap(m map[string][]byte) (*CABundle, error) {
+	keys := []string{
+		mapKeyRoot,
+		mapKeyRootKey,
+		mapKeyK8s,
+		mapKeyK8sKey,
+		mapKeyEtcd,
+		mapKeyEtcdKey,
+		mapKeyFrontProxy,
+		mapKeyFrontProxyKey,
+		mapKeyK8sClient,
+		mapKeyK8sClientKey,
+	}
+	bundle := &CABundle{}
+	for _, key := range keys {
+		val, ok := m[key]
+		if !ok {
+			return nil, fmt.Errorf("key %s not found in data", key)
+		}
+		bundle.Set(key, val)
+	}
+	return bundle, nil
+}
+
+func (c CABundle) MergeWithMap(m map[string][]byte) {
+	m[mapKeyRoot] = c.Root
+	m[mapKeyRootKey] = c.RootKey
+	m[mapKeyK8s] = c.K8s
+	m[mapKeyK8sKey] = c.K8sKey
+	m[mapKeyEtcd] = c.Etcd
+	m[mapKeyEtcdKey] = c.EtcdKey
+	m[mapKeyFrontProxy] = c.FrontProxy
+	m[mapKeyFrontProxyKey] = c.FrontProxyKey
+	m[mapKeyK8sClient] = c.K8sClient
+	m[mapKeyK8sClientKey] = c.K8sClientKey
 }
 
 func (c CABundle) ToTar() (string, error) {
@@ -180,6 +258,38 @@ func (c CABundle) ToTar() (string, error) {
 	}
 
 	return tarball.String(), nil
+}
+
+func (c *CABundle) Kubeconfig(name, apiserverAddress string) ([]byte, error) {
+	clusterName := name
+	userName := "kubernetes-admin"
+	contextName := fmt.Sprintf("%s@%s", userName, clusterName)
+	config := &api.Config{
+		Clusters: map[string]*api.Cluster{
+			clusterName: {
+				Server:                   apiserverAddress,
+				CertificateAuthorityData: c.K8s,
+			},
+		},
+		Contexts: map[string]*api.Context{
+			contextName: {
+				Cluster:  name,
+				AuthInfo: "kubernetes-admin",
+			},
+		},
+		AuthInfos:      map[string]*api.AuthInfo{},
+		CurrentContext: contextName,
+	}
+
+	config.AuthInfos[userName] = &api.AuthInfo{
+		ClientKeyData: c.K8sClientKey,
+		ClientCertificateData: c.K8sClient,
+	}
+	kubeconfig, err := runtime.Encode(latest.Codec, config)
+	if err != nil {
+		return nil, err
+	}
+	return kubeconfig, nil
 }
 
 func FromCATemplate(commonName string) (*x509.Certificate, error) {
