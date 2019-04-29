@@ -300,7 +300,7 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 		if !ok || masterIP == "" {
 			return reconcile.Result{Requeue: true}, nil
 		}
-		apiserverAddress := fmt.Sprintf("https://%s:6443", masterIP)
+		apiserverAddress := fmt.Sprintf("%s:6443", masterIP)
 		userdata, err = workerUserdata(bundle, apiserverAddress)
 	}
 	if err != nil {
