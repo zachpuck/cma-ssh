@@ -53,7 +53,7 @@ func New(params *ClientParams) (Client, error) {
 }
 
 // Create creates a machine
-func (c Client) Create(ctx context.Context, name, userdata string) error {
+func (c Client) Create(ctx context.Context, name, userdata string) (gomaasapi.Machine, error) {
 	klog.Infof("Creating machine %s", name)
 
 	// TODO: Tag MAAS machine
@@ -63,7 +63,7 @@ func (c Client) Create(ctx context.Context, name, userdata string) error {
 	m, _, err := c.Controller.AllocateMachine(allocateArgs)
 	if err != nil {
 		klog.Errorf("Create failed to allocate machine %s: %v", name, err)
-		return fmt.Errorf("error allocating machine %s: %v", name, err)
+		return nil, fmt.Errorf("error allocating machine %s: %v", name, err)
 	}
 	providerID := m.SystemID()
 
@@ -75,24 +75,25 @@ func (c Client) Create(ctx context.Context, name, userdata string) error {
 	err = m.Start(startArgs)
 	if err != nil {
 		klog.Errorf("Create failed to deploy machine %s: %v", name, err)
-		return err
+		return nil, err
 	}
 
 	klog.Infof("Created machine %s (%s)", name, providerID)
-	return nil
+	return m, nil
 }
 
 // Delete deletes a machine
 func (c Client) Delete(ctx context.Context, cluster *clusterv1.CnctCluster, machine *clusterv1.CnctMachine) error {
-	if machine.Spec.ProviderID == nil {
+	systemID := machine.ObjectMeta.Annotations["maas-system-id"]
+	if systemID == "" {
 		klog.Warningf("can not delete  machine %s, providerID not set", machine.Name)
 		return fmt.Errorf("machine %s has not been created", machine.Name)
 	}
 
 	// Release MAAS machine
-	releaseArgs := gomaasapi.ReleaseMachinesArgs{SystemIDs: []string{*machine.Spec.ProviderID}}
+	releaseArgs := gomaasapi.ReleaseMachinesArgs{SystemIDs: []string{systemID}}
 	if err := c.Controller.ReleaseMachines(releaseArgs); err != nil {
-		klog.Warningf("error releasing machine %s (%s): %v", machine.Name, *machine.Spec.ProviderID, err)
+		klog.Warningf("error releasing machine %s (%s): %v", machine.Name, systemID, err)
 		return nil
 	}
 
