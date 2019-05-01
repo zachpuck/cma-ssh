@@ -316,8 +316,7 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 
 	if len(createResponse.IPAddresses) == 0 {
 		klog.Info("Error machine (%s) ip is nil, releasing", providerID)
-		r.MAASClient.Delete(&maas.DeleteRequest{ProviderID: createResponse.ProviderID,
-			SystemID: createResponse.SystemID})
+		r.MAASClient.Delete(context.Background(), &maas.DeleteRequest{ProviderID: createResponse.ProviderID, SystemID: createResponse.SystemID})
 		return reconcile.Result{}, nil
 	}
 
