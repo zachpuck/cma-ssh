@@ -255,8 +255,6 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.CnctMa
 	return reconcile.Result{}, nil
 }
 
-const ()
-
 func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cluster *clusterv1alpha1.CnctCluster) (reconcile.Result, error) {
 	// Add the finalizer
 	if !util.ContainsString(machine.Finalizers, clusterv1alpha1.MachineFinalizer) {
