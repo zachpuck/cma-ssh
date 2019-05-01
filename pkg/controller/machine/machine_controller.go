@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/juju/gomaasapi"
 	errs "github.com/pkg/errors"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
