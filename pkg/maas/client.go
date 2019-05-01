@@ -71,8 +71,13 @@ type CreateResponse struct {
 	// IPAddresses is a list of IP addresses assigned to the machine.
 	IPAddresses []string
 
-	// SystemID is unique (within a MAAS controller) and is used to manage
-	// allocated machines.
+	// SystemID is a unique value created by the MAAS controller and used
+	// to manage machines. Each MAAS machine has a SystemID generated during
+	// the Enlistment phase. This ID is used to refer to allocated machines
+	// when modifying them (including when releasing them). For more information
+	// regarding MAAS see the official documentation or webook:
+	// https://docs.maas.io/2.5/en/api
+	// https://github.com/davidewatson/cluster-api-webhooks-maas/pull/1
 	// TODO: Replace or augement this with ProviderID.
 	SystemID string
 }
