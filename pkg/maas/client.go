@@ -89,7 +89,7 @@ func (c Client) Create(ctx context.Context, request *CreateRequest) (*CreateResp
 	// TODO: Tag MAAS machine
 
 	// Allocate MAAS machine
-	allocateArgs := gomaasapi.AllocateMachineArgs{Tags: []string{request.ProviderID}}
+	allocateArgs := gomaasapi.AllocateMachineArgs{Tags: []string{}}
 	m, _, err := c.Controller.AllocateMachine(allocateArgs)
 	if err != nil {
 		klog.Errorf("Create failed to allocate machine %s: %v", request.ProviderID, err)
