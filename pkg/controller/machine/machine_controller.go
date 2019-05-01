@@ -303,8 +303,11 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 		return reconcile.Result{}, err
 	}
 
+	// TODO: ProviderID should be unique. One way to ensure this is to generate
+	// a UUID. Cf. k8s.io/apimachinery/pkg/util/uuid
+	providerID := fmt.Sprintf("%s-%s", cluster.Name, machine.Name)
 	createResponse, err := r.MAASClient.Create(context.Background(), &maas.CreateRequest{
-		ProviderID: cluster.Name + "-" + machine.Name,
+		ProviderID: providerID,
 		Distro:     "ubuntu-18.04-cnct-k8s-master",
 		Userdata:   userdata})
 	if err != nil {
@@ -312,9 +315,9 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 	}
 
 	if len(createResponse.IPAddresses) == 0 {
-		// FIXME: release machine
-		klog.Info("machine ip is nil")
-		r.MAASClient.Controller.ReleaseMachines(gomaasapi.ReleaseMachinesArgs{SystemIDs: []string{createResponse.SystemID}})
+		klog.Info("Error machine (%s) ip is nil, releasing", providerID)
+		r.MAASClient.Delete(&maas.DeleteRequest{ProviderID: createResponse.ProviderID,
+			SystemID: createResponse.SystemID})
 		return reconcile.Result{}, nil
 	}
 
