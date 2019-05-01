@@ -18,7 +18,6 @@ package cluster
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/golang/glog"
@@ -94,12 +93,14 @@ type ReconcileCluster struct {
 // +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+
 	// Fetch the Cluster instance
 	cluster := &clusterv1alpha1.CnctCluster{}
+
 	err := r.Get(context.Background(), request.NamespacedName, cluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Object not found, return.  Created objects are automatically garbage collected.
+			// Object not found, return. Created objects are automatically garbage collected.
 			//log.Error(err, "could not find cluster", "cluster", request)
 			return reconcile.Result{}, nil
 		}
@@ -108,55 +109,11 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	switch cluster.Status.Phase {
-	case "":
-		if err := createClusterSecrets(r.Client, cluster); err != nil {
-			return reconcile.Result{Requeue: true}, err
-		}
-		cluster.Status.Phase = common.RunningClusterPhase
-		cluster.ObjectMeta.Finalizers = append(cluster.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
-		err = r.updateStatus(
-			cluster,
-			corev1.EventTypeNormal,
-			common.ResourceStateChange,
-			common.MessageResourceStateChange,
-			cluster.GetName(),
-			common.RunningClusterPhase,
-		)
-		if err != nil {
-			glog.Errorf("could not update cluster %s status: %q", cluster.GetName(), err)
-			return reconcile.Result{Requeue: true}, err
-		}
-	}
-	return reconcile.Result{}, nil
-	/* TODO: determine parts of this we need
-	if !util.IsValidKubernetesVersion(cluster.Spec.KubernetesVersion) {
-		return reconcile.Result{},
-			fmt.Errorf("got kubernetes version %s: require kubernetes version in (%s)",
-				cluster.Spec.KubernetesVersion,
-				strings.Join(util.KubernetesVersions(), " "),
-			)
-	}
-
-	if cluster.ObjectMeta.DeletionTimestamp.IsZero() {
-		// The object is not being deleted, add the finalizer and update the object.
-		if !util.ContainsString(cluster.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer) {
-			cluster.ObjectMeta.Finalizers =
-				append(cluster.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
-			cluster.Status.Phase = common.ReconcilingClusterPhase
-
-			err = r.updateStatus(cluster, corev1.EventTypeNormal,
-				common.ResourceStateChange, common.MessageResourceStateChange,
-				cluster.GetName(), common.ReconcilingClusterPhase)
-			if err != nil {
-				glog.Errorf("could not update status of cluster %s: %q", cluster.GetName(), err)
-				return reconcile.Result{}, err
-			}
-		}
-
-	} else {
+	if !cluster.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is being deleted
 		if util.ContainsString(cluster.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer) {
+			glog.Info("deleting cluster...")
+
 			// update status to "deleting"
 			if cluster.Status.Phase != common.StoppingClusterPhase {
 				cluster.Status.Phase = common.StoppingClusterPhase
@@ -164,7 +121,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 					common.ResourceStateChange, common.MessageResourceStateChange,
 					cluster.GetName(), common.StoppingClusterPhase)
 				if err != nil {
-					glog.Errorf("could not update status of cluster %s: %q", cluster.GetName(), err)
+					glog.Errorf("could not update status of cluster %q: %q", cluster.GetName(), err)
 					return reconcile.Result{}, err
 				}
 			}
@@ -172,7 +129,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			// there is a finalizer so we check if there are any machines left
 			machineList, err := util.GetClusterMachineList(r.Client, cluster.GetName())
 			if err != nil {
-				glog.Errorf("could not list Machines for object cluster %s: %q", cluster.GetName(), err)
+				glog.Errorf("could not list Machines for object cluster %q: %q", cluster.GetName(), err)
 				return reconcile.Result{}, err
 			}
 
@@ -186,7 +143,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 					err = r.Delete(context.Background(), &machine)
 					if err != nil {
 						if !errors.IsNotFound(err) {
-							glog.Errorf("could not delete machine %s for cluster %s: %q",
+							glog.Errorf("could not delete machine %q for cluster %q: %q",
 								machine.GetName(), cluster.GetName(), err)
 						}
 					}
@@ -196,81 +153,83 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			}
 
 			// if no Machines left to be deleted
-			// remove our finalizer from the list and update it.
-			cluster.ObjectMeta.Finalizers =
-				util.RemoveString(cluster.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
-			return reconcile.Result{}, r.Update(context.Background(), cluster)
+			// set phase to deleted so secrets can be deleted and finalizer
+			// can be removed
+			cluster.Status.Phase = common.DeletingClusterPhase
 		}
+	}
+
+	switch cluster.Status.Phase {
+	case "":
+		if err := createClusterSecrets(r.Client, cluster); err != nil {
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cluster-private-key",
+					Namespace: cluster.Namespace,
+				},
+			}
+
+			if secret == nil {
+				glog.Errorf("Failed to create cluster secrets: %s\n", err)
+				return reconcile.Result{Requeue: true}, err
+			}
+		}
+		glog.Info("cluster secrets created")
+		cluster.Status.Phase = common.RunningClusterPhase
+		cluster.ObjectMeta.Finalizers = append(cluster.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
+		err = r.updateStatus(
+			cluster,
+			corev1.EventTypeNormal,
+			common.ResourceStateChange,
+			common.MessageResourceStateChange,
+			cluster.GetName(),
+			common.RunningClusterPhase,
+		)
+		if err != nil {
+			glog.Errorf("could not update cluster %q status: %q", cluster.GetName(), err)
+			return reconcile.Result{Requeue: true}, err
+		}
+	case common.DeletingClusterPhase:
+		if err := deleteClusterSecrets(r.Client, cluster); err != nil {
+			glog.Errorf("Failed to delete cluster secrets: %s\n", err)
+			return reconcile.Result{Requeue: true}, err
+		}
+		glog.Info("cluster secrets deleted")
+		cluster.ObjectMeta.Finalizers =
+			util.RemoveString(cluster.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
+
+		glog.Info("cluster is deleted")
+		cluster.Status.Phase = ""
+		return reconcile.Result{}, r.Update(context.Background(), cluster)
 	}
 
 	machineList, err := util.GetClusterMachineList(r.Client, cluster.GetName())
 	if err != nil {
-		glog.Errorf("could not list Machines for cluster %s: %q", cluster.GetName(), err)
+		glog.Errorf("could not list Machines for cluster %q: %q", cluster.GetName(), err)
 		return reconcile.Result{}, err
 	}
 
 	clusterStatus, apiEndpoint := util.GetStatus(machineList)
 	if cluster.Status.Phase != clusterStatus || cluster.Status.APIEndpoint != apiEndpoint {
-
-		// if cluster is ready, update or create the kubeconfig secret
-		if clusterStatus == common.RunningClusterPhase {
-			// make sure private key secret is there, do not requeue if it is not found, this is a fatal error.
-			privateKeySecret, err := k8sutil.GetSecret(r.Client, cluster.Spec.Secret, cluster.GetNamespace())
-			if err != nil {
-				glog.Errorf("could not find cluster %s private key secret %s: %q",
-					cluster.GetName(), cluster.Spec.Secret, err)
-				return reconcile.Result{}, nil
-			}
-
-			// get machine list
-			machineList := &clusterv1alpha1.CnctMachineList{}
-			err = r.List(
-				context.Background(),
-				&client.ListOptions{LabelSelector: labels.Everything()},
-				machineList)
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-
-			masterMachine, err := util.GetMaster(machineList.Items)
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-
-			cfg, err := machine.NewCmdConfig(r.Client, masterMachine, privateKeySecret.Data["private-key"])
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-			// get kubeconfig
-			kubeConfig, err := machine.GetKubeConfig(cfg, nil)
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-
-			err = k8sutil.CreateKubeconfigSecret(r.Client, cluster, r.scheme, kubeConfig)
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-		}
-
 		cluster.Status.Phase = clusterStatus
 		cluster.Status.APIEndpoint = apiEndpoint
 		err = r.updateStatus(cluster, corev1.EventTypeNormal,
 			common.ResourceStateChange, common.MessageResourceStateChange, cluster.GetName(), clusterStatus)
 		if err != nil {
-			glog.Errorf("could not update cluster %s status: %q", cluster.GetName(), err)
+			glog.Errorf("could not update cluster %q status: %q", cluster.GetName(), err)
 		}
 	}
 	return reconcile.Result{}, err
-	*/
 }
 
 func createClusterSecrets(k8sClient client.Client, cluster *clusterv1alpha1.CnctCluster) error {
 	bundle, err := cert.NewCABundle()
+
 	if err != nil {
-		fmt.Println(err)
+		glog.Error(err)
 		return err
 	}
+
 	dataMap := map[string][]byte{}
 	bundle.MergeWithMap(dataMap)
 	secret := &corev1.Secret{
@@ -281,9 +240,23 @@ func createClusterSecrets(k8sClient client.Client, cluster *clusterv1alpha1.Cnct
 		Type: corev1.SecretTypeOpaque,
 		Data: dataMap,
 	}
-	if err := k8sClient.Create(context.Background(), secret); err != nil {
-		return err
+
+	return k8sClient.Create(context.Background(), secret)
+}
+
+// how does one GET a secret from k8s?
+func deleteClusterSecrets(k8sClient client.Client, cluster *clusterv1alpha1.CnctCluster) error {
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cluster-private-key",
+			Namespace: cluster.Namespace,
+		},
 	}
+
+	if secret != nil {
+		return k8sClient.Delete(context.Background(), secret)
+	}
+
 	return nil
 }
 
