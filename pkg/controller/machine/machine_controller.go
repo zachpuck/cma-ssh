@@ -314,13 +314,13 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 	if len(createResponse.IPAddresses) == 0 {
 		// FIXME: release machine
 		klog.Info("machine ip is nil")
-		r.MAASClient.Controller.ReleaseMachines(gomaasapi.ReleaseMachinesArgs{SystemIDs: []string{maasMachine.SystemID()}})
+		r.MAASClient.Controller.ReleaseMachines(gomaasapi.ReleaseMachinesArgs{SystemIDs: []string{createResponse.SystemID}})
 		return reconcile.Result{}, nil
 	}
 
 	if isMaster {
 		klog.Info("create kubeconfig")
-		kubeconfig, err := bundle.Kubeconfig(cluster.Name, "https://"+maasMachine.IPAddresses()[0]+":6443")
+		kubeconfig, err := bundle.Kubeconfig(cluster.Name, "https://"+createResponse.IPAddresses[0]+":6443")
 		if err != nil {
 			return reconcile.Result{}, nil
 		}
