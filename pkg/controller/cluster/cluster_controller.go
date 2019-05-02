@@ -95,7 +95,6 @@ type ReconcileCluster struct {
 func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the Cluster instance
 	cluster := &clusterv1alpha1.CnctCluster{}
-
 	err := r.Get(context.Background(), request.NamespacedName, cluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -112,7 +111,6 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 		// The object is being deleted
 		if util.ContainsString(cluster.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer) {
 			glog.Info("deleting cluster...")
-
 			// update status to "deleting"
 			if cluster.Status.Phase != common.StoppingClusterPhase {
 				cluster.Status.Phase = common.StoppingClusterPhase
@@ -223,7 +221,6 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 
 func createClusterSecrets(k8sClient client.Client, cluster *clusterv1alpha1.CnctCluster) error {
 	bundle, err := cert.NewCABundle()
-
 	if err != nil {
 		glog.Error(err)
 		return err
