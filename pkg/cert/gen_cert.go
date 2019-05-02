@@ -122,8 +122,8 @@ func NewCABundle() (*CABundle, error) {
 		EtcdKey:       etcdKeyPem,
 		FrontProxy:    k8sFrontProxyPem,
 		FrontProxyKey: k8sFrontProxyKeyPem,
-		K8sClient:    kubeconfigPem,
-		K8sClientKey: kubeconfigKeyPem,
+		K8sClient:     kubeconfigPem,
+		K8sClientKey:  kubeconfigKeyPem,
 	}, nil
 }
 
@@ -133,20 +133,20 @@ type CABundle struct {
 	K8s, K8sKey               []byte
 	Etcd, EtcdKey             []byte
 	FrontProxy, FrontProxyKey []byte
-	K8sClient, K8sClientKey []byte
+	K8sClient, K8sClientKey   []byte
 }
 
 const (
-	mapKeyRoot = "root.crt"
-	mapKeyRootKey = "root.key"
-	mapKeyK8s = "ca.crt"
-	mapKeyK8sKey = "ca.key"
-	mapKeyEtcd = "etcd.crt"
-	mapKeyEtcdKey = "etcd.key"
-	mapKeyFrontProxy = "front-proxy.crt"
+	mapKeyRoot          = "root.crt"
+	mapKeyRootKey       = "root.key"
+	mapKeyK8s           = "ca.crt"
+	mapKeyK8sKey        = "ca.key"
+	mapKeyEtcd          = "etcd.crt"
+	mapKeyEtcdKey       = "etcd.key"
+	mapKeyFrontProxy    = "front-proxy.crt"
 	mapKeyFrontProxyKey = "front-proxy.key"
-	mapKeyK8sClient = "k8s-client.crt"
-	mapKeyK8sClientKey = "k8s-client.key"
+	mapKeyK8sClient     = "k8s-client.crt"
+	mapKeyK8sClientKey  = "k8s-client.key"
 )
 
 func (c *CABundle) Set(key string, value []byte) {
@@ -282,7 +282,7 @@ func (c *CABundle) Kubeconfig(name, apiserverAddress string) ([]byte, error) {
 	}
 
 	config.AuthInfos[userName] = &api.AuthInfo{
-		ClientKeyData: c.K8sClientKey,
+		ClientKeyData:         c.K8sClientKey,
 		ClientCertificateData: c.K8sClient,
 	}
 	kubeconfig, err := runtime.Encode(latest.Codec, config)

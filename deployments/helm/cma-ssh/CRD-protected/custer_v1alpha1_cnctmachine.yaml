@@ -22,34 +22,40 @@ spec:
     openAPIV3Schema:
       properties:
         apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
           type: string
         kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
           type: string
         metadata:
           type: object
         spec:
           properties:
             clusterref:
+              description: name of the Cluster object this node belongs to
+              type: string
+            instanceType:
+              description: InstanceType references the type of machine to provision
+                in maas based on cpu, gpu, memory tags
               type: string
             labels:
               type: object
+            providerID:
+              description: This field will be set by the actuators and consumed by
+                higher level entities like autoscaler that will be interfacing with
+                cluster-api as generic provider.
+              type: string
             roles:
               items:
                 type: string
               type: array
-            sshconfig:
-              properties:
-                host:
-                  type: string
-                port:
-                  format: int32
-                  type: integer
-                publichost:
-                  type: string
-                username:
-                  type: string
-              type: object
             taints:
+              description: The full, authoritative list of taints to apply to the
+                corresponding Node.
               items:
                 type: object
               type: array
@@ -57,11 +63,31 @@ spec:
         status:
           properties:
             kubernetesVersion:
+              description: Kubernetes version of the node, should be equal to corresponding
+                cluster version
               type: string
             lastUpdated:
+              description: When was this status last observed
               format: date-time
               type: string
             phase:
+              description: Machine status
+              type: string
+            sshConfig:
+              description: SshConfig used to record ssh configuration of physical
+                machine
+              properties:
+                host:
+                  description: maas machine ip
+                  type: string
+                port:
+                  format: int32
+                  type: integer
+                username:
+                  type: string
+              type: object
+            systemId:
+              description: SystemId references the maas system id.
               type: string
           required:
           - kubernetesVersion

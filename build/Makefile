@@ -62,12 +62,30 @@ run: manifests generate fmt vet
 manifests:
 	go run $(PROJECTDIR)/vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go crd --output-dir $(PROJECTDIR)/crd
 	go run $(PROJECTDIR)/vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go rbac --name rbac --output-dir $(PROJECTDIR)/rbac
+	mkdir -p $(PROJECTDIR)/build/kustomize/crd/protected/cluster/base
+	mkdir -p $(PROJECTDIR)/build/kustomize/crd/unprotected/cluster/base
+	mkdir -p $(PROJECTDIR)/build/kustomize/crd/protected/machine/base
+	mkdir -p $(PROJECTDIR)/build/kustomize/crd/unprotected/machine/base
+	mkdir -p $(PROJECTDIR)/build/kustomize/crd/protected/machineset/base
+	mkdir -p $(PROJECTDIR)/build/kustomize/crd/unprotected/machineset/base
+	mkdir -p $(PROJECTDIR)/build/kustomize/rbac/role/base
+	mkdir -p $(PROJECTDIR)/build/kustomize/rbac/rolebinding/base
+	cp -rf $(PROJECTDIR)/rbac/rbac_role.yaml $(PROJECTDIR)/build/kustomize/rbac/role/base
+	cp -rf $(PROJECTDIR)/rbac/rbac_role_binding.yaml $(PROJECTDIR)/build/kustomize/rbac/rolebinding/base
+	cp -rf $(PROJECTDIR)/crd/cluster_v1alpha1_cnctcluster.yaml $(PROJECTDIR)/build/kustomize/crd/unprotected/cluster/base
+	cp -rf $(PROJECTDIR)/crd/cluster_v1alpha1_cnctcluster.yaml $(PROJECTDIR)/build/kustomize/crd/protected/cluster/base
+	cp -rf $(PROJECTDIR)/crd/cluster_v1alpha1_cnctmachine.yaml $(PROJECTDIR)/build/kustomize/crd/unprotected/machine/base
+	cp -rf $(PROJECTDIR)/crd/cluster_v1alpha1_cnctmachine.yaml $(PROJECTDIR)/build/kustomize/crd/protected/machine/base
+	cp -rf $(PROJECTDIR)/crd/cluster_v1alpha1_cnctmachineset.yaml $(PROJECTDIR)/build/kustomize/crd/protected/machineset/base
+	cp -rf $(PROJECTDIR)/crd/cluster_v1alpha1_cnctmachineset.yaml $(PROJECTDIR)/build/kustomize/crd/unprotected/machineset/base
 	output=$$(kustomize build build/kustomize/rbac/role); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/RBAC/rbac_role.yaml
 	output=$$(kustomize build build/kustomize/rbac/rolebinding); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/RBAC/rbac_role_binding.yaml
 	output=$$(kustomize build build/kustomize/crd/protected/cluster); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/CRD-protected/cluster_v1alpha1_cnctcluster.yaml
 	output=$$(kustomize build build/kustomize/crd/protected/machine); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/CRD-protected/custer_v1alpha1_cnctmachine.yaml
+	output=$$(kustomize build build/kustomize/crd/protected/machineset); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/CRD/cluster_v1alpha1_cnctmachineset.yaml
 	output=$$(kustomize build build/kustomize/crd/unprotected/cluster); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/CRD/cluster_v1alpha1_cnctcluster.yaml
 	output=$$(kustomize build build/kustomize/crd/unprotected/machine); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/CRD/cluster_v1alpha1_cnctmachine.yaml
+	output=$$(kustomize build build/kustomize/crd/unprotected/machineset); echo "$$output" > $(PROJECTDIR)/deployments/helm/cma-ssh/CRD/cluster_v1alpha1_cnctmachineset.yaml
 
 # Run go fmt against code
 fmt:

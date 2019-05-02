@@ -34,14 +34,11 @@ type CmdConfig struct {
 }
 
 func NewCmdConfig(kubeClient client.Client, machineInstance *clusterv1alpha1.CnctMachine, privateKey []byte) (CmdConfig, error) {
-	sshConfig := machineInstance.Spec.SshConfig
+	sshConfig := machineInstance.Status.SshConfig
 
 	var host string
-	if len(sshConfig.PublicHost) > 0 {
-		host = sshConfig.PublicHost
-	} else {
-		host = sshConfig.Host
-	}
+	host = sshConfig.Host
+
 	addr := fmt.Sprintf("%v:%v", host, sshConfig.Port)
 	sshClient, err := ssh.NewClient(addr, sshConfig.Username, privateKey)
 	if err != nil {
@@ -157,7 +154,7 @@ func InstallNginx(cfg CmdConfig, args map[string]string) error {
 		fmt.Sprintf(
 			newHostFmt,
 			cfg.templateData.ProxyIp,
-			cfg.machineInstance.Spec.SshConfig.Host,
+			cfg.machineInstance.Status.SshConfig.Host,
 			string(hostname),
 		),
 	)

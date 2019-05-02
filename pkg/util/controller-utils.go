@@ -61,7 +61,7 @@ func GetStatus(machines []clusterv1alpha1.CnctMachine) (common.ClusterStatusPhas
 	apiEndpoint := ""
 	for _, machine := range machines {
 		if machine.Status.Phase == common.ReadyMachinePhase && ContainsRole(machine.Spec.Roles, common.MachineRoleMaster) {
-			apiEndpoint = machine.Spec.SshConfig.Host + ":" + common.ApiEnpointPort
+			apiEndpoint = machine.Status.SshConfig.Host + ":" + common.ApiEnpointPort
 		}
 	}
 

@@ -1,0 +1,17 @@
+apiVersion: cluster.cnct.sds.samsung.com/v1alpha1
+kind: CnctMachineSet
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: cnctmachineset-sample
+spec:
+  # Add fields here
+  replicas: 1
+  machineTemplate:
+    Spec:
+      clusterref: cluster
+      roles:
+        - worker
+      labels:
+        role: worker
+      InstanceType: small

@@ -1,8 +1,6 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  annotations:
-    helm.sh/resource-policy: keep
   creationTimestamp: null
   labels:
     app.kubernetes.io/instance: '{{.Release.Name}}'
@@ -11,12 +9,12 @@ metadata:
     app.kubernetes.io/version: '{{.Chart.AppVersion | replace "+" "_" | trunc 63}}'
     controller-tools.k8s.io: "1.0"
     helm.sh/chart: '{{include "cma-ssh.chart" .}}'
-  name: cnctclusters.cluster.cnct.sds.samsung.com
+  name: cnctmachinesets.cluster.cnct.sds.samsung.com
 spec:
   group: cluster.cnct.sds.samsung.com
   names:
-    kind: CnctCluster
-    plural: cnctclusters
+    kind: CnctMachineSet
+    plural: cnctmachinesets
   scope: Namespaced
   validation:
     openAPIV3Schema:
@@ -35,53 +33,53 @@ spec:
           type: object
         spec:
           properties:
-            clusterNetwork:
-              description: Cluster network configuration
+            machineTemplate:
+              description: MachineTemplate defines the desired state of each instance
+                of Machine
               properties:
-                pods:
-                  description: The network ranges from which POD networks are allocated.
-                  properties:
-                    cidrBlock:
-                      type: string
-                  required:
-                  - cidrBlock
+                metadata:
                   type: object
-                serviceDomain:
-                  description: Domain name for services.
-                  type: string
-                services:
-                  description: The network ranges from which service VIPs are allocated.
+                spec:
                   properties:
-                    cidrBlock:
+                    clusterref:
+                      description: name of the Cluster object this node belongs to
                       type: string
-                  required:
-                  - cidrBlock
+                    instanceType:
+                      description: InstanceType references the type of machine to
+                        provision in maas based on cpu, gpu, memory tags
+                      type: string
+                    labels:
+                      type: object
+                    providerID:
+                      description: This field will be set by the actuators and consumed
+                        by higher level entities like autoscaler that will be interfacing
+                        with cluster-api as generic provider.
+                      type: string
+                    roles:
+                      items:
+                        type: string
+                      type: array
+                    taints:
+                      description: The full, authoritative list of taints to apply
+                        to the corresponding Node.
+                      items:
+                        type: object
+                      type: array
                   type: object
-              required:
-              - services
-              - pods
-              - serviceDomain
               type: object
-            kubernetesVersion:
-              type: string
-            secret:
-              description: name of the private key secret for machines
-              type: string
-          required:
-          - clusterNetwork
-          - kubernetesVersion
+            replicas:
+              description: Replicas defines the number of type Machine
+              format: int64
+              type: integer
           type: object
         status:
           properties:
-            apiendpoint:
-              description: API endpoint
-              type: string
             lastUpdated:
               description: When was this status last observed
               format: date-time
               type: string
             phase:
-              description: Cluster status
+              description: MachineSet status
               type: string
           type: object
   version: v1alpha1

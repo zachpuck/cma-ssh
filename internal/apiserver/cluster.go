@@ -121,12 +121,6 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 				ClusterRef: in.Name,
 				Roles:      []common.MachineRoles{common.MachineRoleMaster, common.MachineRoleEtcd},
 				Labels:     machineLabels,
-				SshConfig: v1alpha.MachineSshConfigInfo{
-					Username:   machineConfig.Username,
-					Host:       machineConfig.Host,
-					Port:       uint32(machineConfig.Port),
-					PublicHost: machineConfig.Publichost,
-				},
 			},
 		}
 
@@ -155,12 +149,6 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 				ClusterRef: in.Name,
 				Roles:      []common.MachineRoles{common.MachineRoleWorker},
 				Labels:     machineLabels,
-				SshConfig: v1alpha.MachineSshConfigInfo{
-					Username:   machineConfig.Username,
-					Host:       machineConfig.Host,
-					Port:       uint32(machineConfig.Port),
-					PublicHost: machineConfig.Publichost,
-				},
 			},
 		}
 
@@ -372,12 +360,6 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 				ClusterRef: clusterInstance.GetName(),
 				Roles:      []common.MachineRoles{common.MachineRoleWorker},
 				Labels:     machineLabels,
-				SshConfig: v1alpha.MachineSshConfigInfo{
-					Username:   addedNode.Username,
-					Host:       addedNode.Host,
-					Port:       uint32(addedNode.Port),
-					PublicHost: publicHost,
-				},
 			},
 		}
 
