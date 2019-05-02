@@ -93,7 +93,6 @@ type ReconcileCluster struct {
 // +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-
 	// Fetch the Cluster instance
 	cluster := &clusterv1alpha1.CnctCluster{}
 
@@ -155,7 +154,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			// if no Machines left to be deleted
 			// set phase to deleted so secrets can be deleted and finalizer
 			// can be removed
-			cluster.Status.Phase = common.DeletingClusterPhase
+			cluster.Status.Phase = common.StoppingClusterPhase
 		}
 	}
 
@@ -189,7 +188,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			glog.Errorf("could not update cluster %q status: %q", cluster.GetName(), err)
 			return reconcile.Result{Requeue: true}, err
 		}
-	case common.DeletingClusterPhase:
+	case common.StoppingClusterPhase:
 		if err := deleteClusterSecrets(r.Client, cluster); err != nil {
 			glog.Errorf("Failed to delete cluster secrets: %s\n", err)
 			return reconcile.Result{Requeue: true}, err
