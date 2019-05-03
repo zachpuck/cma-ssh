@@ -34,6 +34,24 @@ const (
 	ErrorMachinePhase MachineStatusPhase = "ErrorMachine"
 )
 
+type MachineSetStatusPhase string
+
+const (
+	UnspecifiedMachineSetPhase MachineSetStatusPhase = "Unspecified"
+
+	// resource is ready
+	ReadyMachineSetPhase MachineSetStatusPhase = "ReadyMachineSet"
+
+	// resource is actively working to complete a change, such as creating a machine
+	ReconcilingMachineSetPhase MachineSetStatusPhase = "ReconcilingMachineSet"
+
+	// resources are deleting
+	DeletingMachineSetPhase MachineSetStatusPhase = "DeletingMachineSet"
+
+	// resources are in an error state
+	ErrorMachineSetPhase MachineSetStatusPhase = "ErrorMachineSet"
+)
+
 type ClusterStatusPhase string
 
 const (

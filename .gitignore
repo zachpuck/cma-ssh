@@ -10,6 +10,15 @@ bin
 # Test binary, build with `go test -c`
 *.test
 
+build/kustomize/crd/protected/cluster/base/
+build/kustomize/crd/unprotected/cluster/base/
+build/kustomize/crd/protected/machine/base/
+build/kustomize/crd/unprotected/machine/base/
+build/kustomize/crd/protected/machineset/base/
+build/kustomize/crd/unprotected/machineset/base/
+build/kustomize/rbac/role/base/
+build/kustomize/rbac/rolebinding/base/
+
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 

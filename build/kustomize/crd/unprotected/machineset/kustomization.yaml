@@ -1,0 +1,5 @@
+resources:
+  - base/cluster_v1alpha1_cnctmachineset.yaml
+
+patches:
+  - crd_helm_patch.yaml

@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	runtimeSchema "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
@@ -262,6 +263,18 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 			append(machine.Finalizers, clusterv1alpha1.MachineFinalizer)
 	}
 
+	// Set owner ref
+	machineOwnerRef := []metav1.OwnerReference{
+		*metav1.NewControllerRef(cluster,
+			runtimeSchema.GroupVersionKind{
+				Group:   clusterv1alpha1.SchemeGroupVersion.Group,
+				Version: clusterv1alpha1.SchemeGroupVersion.Version,
+				Kind:    "CnctCluster",
+			},
+		),
+	}
+	machine.OwnerReferences = machineOwnerRef
+
 	klog.Infoln("get cluster-private-key secret")
 	secret := corev1.Secret{}
 	if err := r.Client.Get(context.Background(), client.ObjectKey{Name: "cluster-private-key", Namespace: machine.Namespace}, &secret); err != nil {
@@ -314,7 +327,7 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 	}
 
 	if len(createResponse.IPAddresses) == 0 {
-		klog.Info("Error machine (%s) ip is nil, releasing", providerID)
+		klog.Infof("Error machine (%s) ip is nil, releasing", providerID)
 		r.MAASClient.Delete(context.Background(), &maas.DeleteRequest{ProviderID: createResponse.ProviderID, SystemID: createResponse.SystemID})
 		return reconcile.Result{}, nil
 	}
@@ -598,7 +611,7 @@ func doDelete(r *ReconcileMachine, machineInstance *clusterv1alpha1.CnctMachine,
 			err,
 			"failed to clean up physical node for machine %s Manual cleanup might be required for %s",
 			machineInstance.GetName(),
-			machineInstance.Spec.SshConfig.Host,
+			machineInstance.Status.SshConfig.Host,
 		)
 	}
 

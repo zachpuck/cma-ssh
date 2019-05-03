@@ -98,7 +98,7 @@ func GetMachineName(clusterName string, hostIp string, manager manager.Manager) 
 	}
 
 	for _, machine := range machineList {
-		if machine.Spec.SshConfig.Host == hostIp {
+		if machine.Status.SshConfig.Host == hostIp {
 			return machine.GetName(), nil
 		}
 	}

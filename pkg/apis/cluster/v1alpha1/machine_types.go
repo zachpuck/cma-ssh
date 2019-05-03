@@ -40,13 +40,14 @@ type MachineSpec struct {
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
-	SshConfig MachineSshConfigInfo `json:"sshconfig,omitempty"`
-
 	// This field will be set by the actuators and consumed by higher level
 	// entities like autoscaler that will be interfacing with cluster-api as
 	// generic provider.
 	// +optional
 	ProviderID *string `json:"providerID,omitempty"`
+
+	// InstanceType references the type of machine to provision in maas based on cpu, gpu, memory tags
+	InstanceType string `json:"instanceType,omitempty"`
 }
 
 // MachineSshConfigInfo defines the ssh configuration for the physical
@@ -54,9 +55,8 @@ type MachineSpec struct {
 type MachineSshConfigInfo struct {
 	Username string `json:"username,omitempty"`
 
+	// maas machine ip
 	Host string `json:"host,omitempty"`
-
-	PublicHost string `json:"publichost,omitempty"`
 
 	Port uint32 `json:"port,omitempty"`
 }
@@ -70,8 +70,14 @@ type MachineStatus struct {
 	// Machine status
 	Phase common.MachineStatusPhase `json:"phase,omitempty"`
 
-	// kubernetes version of the node, should be equal to corresponding cluster version
+	// Kubernetes version of the node, should be equal to corresponding cluster version
 	KubernetesVersion string `json:"kubernetesVersion"`
+
+	// SshConfig used to record ssh configuration of physical machine
+	SshConfig MachineSshConfigInfo `json:"sshConfig,omitempty"`
+
+	// SystemId references the maas system id.
+	SystemId string `json:"systemId,omitempty"`
 }
 
 // +genclient

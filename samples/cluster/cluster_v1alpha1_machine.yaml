@@ -12,12 +12,7 @@ spec:
     - master
   labels:
     role: controlPlane
-  sshconfig:
-    publichost: 40.118.188.103
-    host: 10.240.0.9
-    port: 22
-    username: root
-    secret: cluster-private-key
+  InstanceType: small
 ---
 apiVersion: cluster.cnct.sds.samsung.com/v1alpha1
 kind: CnctMachine
@@ -32,9 +27,4 @@ spec:
   - worker
   labels:
     role: worker
-  sshconfig:
-    publichost: 40.78.50.137
-    host: 10.240.0.10
-    port: 22
-    username: root
-    secret: cluster-private-key
+  InstanceType: small
