@@ -33,40 +33,10 @@ spec:
           type: object
         spec:
           properties:
-            clusterNetwork:
-              description: Cluster network configuration
-              properties:
-                pods:
-                  description: The network ranges from which POD networks are allocated.
-                  properties:
-                    cidrBlock:
-                      type: string
-                  required:
-                  - cidrBlock
-                  type: object
-                serviceDomain:
-                  description: Domain name for services.
-                  type: string
-                services:
-                  description: The network ranges from which service VIPs are allocated.
-                  properties:
-                    cidrBlock:
-                      type: string
-                  required:
-                  - cidrBlock
-                  type: object
-              required:
-              - services
-              - pods
-              - serviceDomain
-              type: object
             kubernetesVersion:
-              type: string
-            secret:
-              description: name of the private key secret for machines
+              description: Desired Kubernetes version
               type: string
           required:
-          - clusterNetwork
           - kubernetesVersion
           type: object
         status:

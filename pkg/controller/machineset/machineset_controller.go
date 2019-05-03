@@ -64,9 +64,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.CnctMachine{}},
 		&handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &clusterv1alpha1.CnctMachineSet{},
-	})
+			IsController: true,
+			OwnerType:    &clusterv1alpha1.CnctMachineSet{},
+		})
 	if err != nil {
 		return err
 	}

@@ -33,7 +33,8 @@ func (m MachineToClusterMapper) Map(obj handler.MapObject) []reconcile.Request {
 
 	// Add  the Cluster referred to by the machine
 	for _, cluster := range clusters.Items {
-		if cluster.GetName() == machine.Spec.ClusterRef {
+		clusterName := GetClusterNameFromMachineOwnerRef(machine)
+		if cluster.GetName() == clusterName {
 			res = append(res, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      cluster.GetName(),

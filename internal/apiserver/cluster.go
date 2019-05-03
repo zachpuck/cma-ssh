@@ -43,7 +43,6 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 		},
 		Spec: v1alpha.ClusterSpec{
 			KubernetesVersion: in.K8SVersion,
-			Secret:            "cluster-private-key",
 		},
 	}
 	err = client.Create(ctx, clusterObject)
@@ -68,9 +67,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 				},
 			},
 			Spec: v1alpha.MachineSpec{
-				ClusterRef: in.Name,
-				Roles:      []common.MachineRoles{common.MachineRoleMaster, common.MachineRoleEtcd},
-				Labels:     machineLabels,
+				Roles: []common.MachineRoles{common.MachineRoleMaster, common.MachineRoleEtcd},
 			},
 		}
 
@@ -96,9 +93,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 				},
 			},
 			Spec: v1alpha.MachineSpec{
-				ClusterRef: in.Name,
-				Roles:      []common.MachineRoles{common.MachineRoleWorker},
-				Labels:     machineLabels,
+				Roles: []common.MachineRoles{common.MachineRoleWorker},
 			},
 		}
 
@@ -278,9 +273,7 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 				},
 			},
 			Spec: v1alpha.MachineSpec{
-				ClusterRef: clusterInstance.GetName(),
-				Roles:      []common.MachineRoles{common.MachineRoleWorker},
-				Labels:     machineLabels,
+				Roles: []common.MachineRoles{common.MachineRoleWorker},
 			},
 		}
 
