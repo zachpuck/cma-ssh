@@ -21,9 +21,9 @@ import (
 )
 
 var (
-	version   string = ""
-	gitCommit string = ""
-	buildDate string = ""
+	version   = ""
+	gitCommit = ""
+	buildDate = ""
 )
 
 type Info struct {

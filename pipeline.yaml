@@ -27,11 +27,6 @@ builds:
     chart: cma-ssh
     tagValue: images.operator.tag
     dockerContext: .
-  - image: samsung_cnct/cma-ssh-bootstrap
-    context: bootstrap
-    chart: cma-ssh
-    tagValue: images.bootstrap.tag
-    dockerContext: build/docker/bootstrap
   - image: samsung_cnct/cma-ssh-test-scripts
     context: cma-ssh-test-scripts
     dockerContext: .

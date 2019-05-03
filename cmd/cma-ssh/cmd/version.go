@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+
 	"github.com/samsung-cnct/cma-ssh/pkg/version"
 	"github.com/spf13/cobra"
 )

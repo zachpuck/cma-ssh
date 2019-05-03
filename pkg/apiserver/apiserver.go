@@ -2,18 +2,19 @@ package apiserver
 
 import (
 	"context"
-	"github.com/golang/glog"
-	"github.com/grpc-ecosystem/grpc-gateway/runtime"
+	"net/http"
+	"strconv"
+
 	"github.com/samsung-cnct/cma-ssh/internal/apiserver"
+	pb "github.com/samsung-cnct/cma-ssh/pkg/generated/api"
+	"github.com/samsung-cnct/cma-ssh/pkg/ui/website"
+
+	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/soheilhy/cmux"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-	"net/http"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"strconv"
-
-	pb "github.com/samsung-cnct/cma-ssh/pkg/generated/api"
-	"github.com/samsung-cnct/cma-ssh/pkg/ui/website"
 )
 
 type ServerOptions struct {
@@ -53,9 +54,9 @@ func (r *ApiServer) addGRPCServer(tcpMux cmux.CMux) {
 	grpcListener := tcpMux.MatchWithWriters(cmux.HTTP2MatchHeaderFieldPrefixSendSettings("content-type", "application/grpc"))
 	// Start servers
 	go func() {
-		glog.Info("Starting gRPC Server")
+		klog.Info("Starting gRPC Server")
 		if err := grpcServer.Serve(grpcListener); err != nil {
-			glog.Errorf("Unable to start external gRPC server: %q", err)
+			klog.Errorf("Unable to start external gRPC server: %q", err)
 		}
 	}()
 }
@@ -70,10 +71,10 @@ func (r *ApiServer) addRestAndWebsite(tcpMux cmux.CMux, grpcPortNumber int) {
 		httpServer := http.Server{
 			Handler: router,
 		}
-		glog.Info("Starting HTTP/1 Server")
+		klog.Info("Starting HTTP/1 Server")
 		err := httpServer.Serve(httpListener)
 		if err != nil {
-			glog.Errorf("Failed to start http server Serve(): %q", err)
+			klog.Errorf("Failed to start http server Serve(): %q", err)
 		}
 	}()
 
@@ -84,7 +85,7 @@ func (r *ApiServer) addgRPCRestGateway(router *http.ServeMux, grpcPortNumber int
 	gwmux := runtime.NewServeMux()
 	err := pb.RegisterClusterHandlerFromEndpoint(context.Background(), gwmux, "localhost:"+strconv.Itoa(grpcPortNumber), dopts)
 	if err != nil {
-		glog.Errorf("Failed to register handler from enpoint: %q", err)
+		klog.Errorf("Failed to register handler from enpoint: %q", err)
 	}
 	router.Handle("/api/", gwmux)
 }

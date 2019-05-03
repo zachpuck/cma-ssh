@@ -1,13 +1,10 @@
 package apiserver
 
 import (
-	"github.com/golang/glog"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	v1alpha "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	pb "github.com/samsung-cnct/cma-ssh/pkg/generated/api"
-	"github.com/samsung-cnct/cma-ssh/pkg/ssh"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
-	"github.com/samsung-cnct/cma-ssh/pkg/util/k8sutil"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -15,23 +12,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/klog"
 	clientlib "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*pb.CreateClusterReply, error) {
-	var public, private []byte
-	var err error
-	if in.PrivateKey == "" {
-		public, private, err = PrepareNodes(in)
-		if err != nil {
-			glog.Errorf("Failed to prepare nodes: %q", err)
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-	} else {
-		private = []byte(in.PrivateKey)
-		public = []byte("")
-	}
-
 	// get client
 	client := s.Manager.GetClient()
 
@@ -41,28 +26,9 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 			Name: in.Name,
 		},
 	}
-	err = client.Create(ctx, namespace)
+	err := client.Create(ctx, namespace)
 	if err != nil {
-		glog.Errorf("Failed to create cluster namespace %s: %q", namespace.Name, err)
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	// create secret
-	dataMap := make(map[string][]byte)
-	dataMap["private-key"] = private
-	dataMap["public-key"] = public
-	dataMap["pass-phrase"] = []byte("")
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cluster-private-key",
-			Namespace: in.Name,
-		},
-		Type: corev1.SecretTypeOpaque,
-		Data: dataMap,
-	}
-	err = k8sutil.CreateSecret(client, secret)
-	if err != nil {
-		glog.Errorf("Failed to create cluster private key %s: %q", secret.Name, err)
+		klog.Errorf("Failed to create cluster namespace %s: %q", namespace.Name, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -76,29 +42,13 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 			},
 		},
 		Spec: v1alpha.ClusterSpec{
-			ClusterNetwork: v1alpha.ClusterNetworkingConfig{
-				Services: v1alpha.NetworkRanges{
-					CIDRBlock: "10.96.0.0/12",
-				},
-				Pods: v1alpha.NetworkRanges{
-					CIDRBlock: "10.244.0.0/16",
-				},
-				ServiceDomain: "cluster.local",
-			},
 			KubernetesVersion: in.K8SVersion,
 			Secret:            "cluster-private-key",
 		},
 	}
 	err = client.Create(ctx, clusterObject)
 	if err != nil {
-		glog.Errorf("Failed to create cluster object %s: %q", clusterObject.GetName(), err)
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	err = k8sutil.SetSecretOwner(client, secret, clusterObject, s.Manager.GetScheme())
-	if err != nil {
-		glog.Errorf("Failed to set private key secret %s owner %s: %q",
-			secret.GetName(), clusterObject.GetName(), err)
+		klog.Errorf("Failed to create cluster object %s: %q", clusterObject.GetName(), err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -126,7 +76,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 
 		err = client.Create(ctx, machineObject)
 		if err != nil {
-			glog.Errorf("Failed to create control plane machine object %s: %q", machineObject.GetName(), err)
+			klog.Errorf("Failed to create control plane machine object %s: %q", machineObject.GetName(), err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
@@ -154,7 +104,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 
 		err = client.Create(ctx, machineObject)
 		if err != nil {
-			glog.Errorf("Failed to create worker machine object %s: %q", machineObject.GetName(), err)
+			klog.Errorf("Failed to create worker machine object %s: %q", machineObject.GetName(), err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
@@ -177,7 +127,7 @@ func (s *Server) GetCluster(ctx context.Context, in *pb.GetClusterMsg) (*pb.GetC
 	// get kubeconfig secret
 	kubeconfigBytes, err := GetKubeConfig(in.Name, s.Manager)
 	if err != nil {
-		glog.Infof("Could not get kubeconfig secret for cluster %s: %q", in.Name, err)
+		klog.Infof("Could not get kubeconfig secret for cluster %s: %q", in.Name, err)
 	}
 
 	// get cluster
@@ -192,7 +142,7 @@ func (s *Server) GetCluster(ctx context.Context, in *pb.GetClusterMsg) (*pb.GetC
 		if errors.IsNotFound(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
-		glog.Errorf("Could not query for cluster %s: %q", in.Name, err)
+		klog.Errorf("Could not query for cluster %s: %q", in.Name, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -224,13 +174,13 @@ func (s *Server) DeleteCluster(ctx context.Context, in *pb.DeleteClusterMsg) (*p
 		if errors.IsNotFound(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
-		glog.Errorf("Could not query for cluster %s: %q", in.Name, err)
+		klog.Errorf("Could not query for cluster %s: %q", in.Name, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	err = client.Delete(ctx, clusterInstance)
 	if err != nil {
-		glog.Errorf("Could not delete cluster cr %s: %q", in.Name, err)
+		klog.Errorf("Could not delete cluster cr %s: %q", in.Name, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -244,7 +194,7 @@ func (s *Server) DeleteCluster(ctx context.Context, in *pb.DeleteClusterMsg) (*p
 	if err == nil {
 		err = client.Delete(ctx, namespace)
 		if err != nil {
-			glog.Errorf("Could not delete namespace %s: %q", in.Name, err)
+			klog.Errorf("Could not delete namespace %s: %q", in.Name, err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
@@ -263,7 +213,7 @@ func (s *Server) GetClusterList(ctx context.Context, in *pb.GetClusterListMsg) (
 		&clientlib.ListOptions{LabelSelector: labels.Everything()},
 		clusterCrList)
 	if err != nil {
-		glog.Errorf("could not list cluster CRs: %q", err)
+		klog.Errorf("could not list cluster CRs: %q", err)
 		return &pb.GetClusterListReply{
 			Ok: false,
 		}, err
@@ -309,40 +259,11 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 		if errors.IsNotFound(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
-		glog.Errorf("Could not query for cluster %s: %q", in.Name, err)
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	// get the private key secret
-	privateKeySecret, err := k8sutil.GetSecret(client, clusterInstance.Spec.Secret, clusterInstance.GetNamespace())
-	if err != nil {
-		glog.Errorf("Could not query for cluster %s private key secret %s: %q",
-			clusterInstance.GetName(), clusterInstance.Spec.Secret, err)
+		klog.Errorf("Could not query for cluster %s: %q", in.Name, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	for _, addedNode := range in.AddNodes {
-		publicHost := addedNode.Publichost
-		if publicHost == "" {
-			publicHost = addedNode.Host
-		}
-
-		sshParams := ssh.MachineParams{
-			Username:   addedNode.Username,
-			Host:       addedNode.Host,
-			PublicHost: publicHost,
-			Port:       addedNode.Port,
-			Password:   addedNode.Password,
-		}
-
-		if string(privateKeySecret.Data["public-key"][:]) != "" {
-			err = ssh.SetupPrivateKeyAccess(sshParams,
-				privateKeySecret.Data["private-key"], privateKeySecret.Data["public-key"])
-			if err != nil {
-				glog.Errorf("Could not setup node %s for public key access: %q", publicHost, err)
-				return nil, status.Error(codes.Internal, err.Error())
-			}
-		}
 
 		machineLabels := map[string]string{}
 		for _, label := range addedNode.Labels {
@@ -365,7 +286,7 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 
 		err = client.Create(ctx, machineObject)
 		if err != nil {
-			glog.Errorf("Failed to create worker machine object %s: %q", machineObject.GetName(), err)
+			klog.Errorf("Failed to create worker machine object %s: %q", machineObject.GetName(), err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
@@ -373,13 +294,13 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 	for _, removedNode := range in.RemoveNodes {
 		machineName, err := GetMachineName(clusterInstance.GetName(), removedNode.Host, s.Manager)
 		if err != nil {
-			glog.Errorf("Failed to get machine name for node %s: %q", removedNode.Host, err)
+			klog.Errorf("Failed to get machine name for node %s: %q", removedNode.Host, err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 
 		if machineName == "" {
-			glog.Errorf("Got empty machine name for node %s", removedNode.Host)
-			return nil, status.Error(codes.Internal, err.Error())
+			klog.Errorf("Got empty machine name for node %s", removedNode.Host)
+			return nil, status.Error(codes.Internal, "machine is empty")
 		}
 
 		machineObject := &v1alpha.CnctMachine{}
@@ -392,13 +313,13 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 			if errors.IsNotFound(err) {
 				return nil, status.Error(codes.NotFound, err.Error())
 			}
-			glog.Errorf("Could not get machine %s: %q", machineName, err)
+			klog.Errorf("Could not get machine %s: %q", machineName, err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 
 		err = client.Delete(ctx, machineObject)
 		if err != nil {
-			glog.Errorf("Could not delete machine %s: %q", machineName, err)
+			klog.Errorf("Could not delete machine %s: %q", machineName, err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
@@ -429,7 +350,7 @@ func (s *Server) UpgradeCluster(ctx context.Context, in *pb.UpgradeClusterMsg) (
 		if errors.IsNotFound(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
-		glog.Errorf("Could not query for cluster %s: %q", in.Name, err)
+		klog.Errorf("Could not query for cluster %s: %q", in.Name, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -437,7 +358,7 @@ func (s *Server) UpgradeCluster(ctx context.Context, in *pb.UpgradeClusterMsg) (
 	clusterInstance.Spec.KubernetesVersion = in.Version
 	err = client.Update(ctx, clusterInstance)
 	if err != nil {
-		glog.Errorf("Could update cluster %s: %q", in.Name, err)
+		klog.Errorf("Could update cluster %s: %q", in.Name, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 

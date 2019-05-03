@@ -2,9 +2,11 @@ package util
 
 import (
 	"context"
-	"github.com/golang/glog"
+
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
+
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -25,7 +27,7 @@ func (m ClusterToMachineMapper) Map(obj handler.MapObject) []reconcile.Request {
 
 	machines := &clusterv1alpha1.CnctMachineList{}
 	if err := m.List(context.Background(), &client.ListOptions{}, machines); err != nil {
-		glog.Errorf("could not get list of machines: %q", err)
+		klog.Errorf("could not get list of machines: %q", err)
 		return res
 	}
 

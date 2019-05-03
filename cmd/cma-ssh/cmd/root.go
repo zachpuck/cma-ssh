@@ -23,7 +23,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/golang/glog"
 	"github.com/soheilhy/cmux"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -88,34 +87,34 @@ func Execute() {
 
 func operator(cmd *cobra.Command) {
 	// Get a config to talk to the apiserver
-	glog.Info("setting up client for manager")
+	klog.Info("setting up client for manager")
 	cfg, err := config.GetConfig()
 	if err != nil {
-		glog.Errorf("unable to set up client config: %q", err)
+		klog.Errorf("unable to set up client config: %q", err)
 		os.Exit(1)
 	}
 
 	// Create a new Cmd to provide shared dependencies and start components
-	glog.Info("setting up manager")
+	klog.Info("setting up manager")
 	mgr, err := manager.New(cfg, manager.Options{})
 	if err != nil {
-		glog.Errorf("unable to set up overall controller manager: %q", err)
+		klog.Errorf("unable to set up overall controller manager: %q", err)
 		os.Exit(1)
 	}
 
-	glog.Info("Registering Components.")
+	klog.Info("Registering Components.")
 
 	// Setup Scheme for all resources
-	glog.Info("setting up scheme")
+	klog.Info("setting up scheme")
 	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
-		glog.Errorf("unable add APIs to scheme: %q", err)
+		klog.Errorf("unable add APIs to scheme: %q", err)
 		os.Exit(1)
 	}
 
 	// Setup all Controllers
-	glog.Info("Setting up controller")
+	klog.Info("Setting up controller")
 	if err := controller.AddToManager(mgr); err != nil {
-		glog.Errorf("unable to register controllers to the manager: %q", err)
+		klog.Errorf("unable to register controllers to the manager: %q", err)
 		os.Exit(1)
 	}
 
@@ -125,37 +124,37 @@ func operator(cmd *cobra.Command) {
 	apiKey := viper.GetString(apiKeyKey)
 	maasClient, err := maas.NewClient(&maas.NewClientParams{ApiURL: apiURL, ApiVersion: apiVersion, ApiKey: apiKey})
 	if err != nil {
-		glog.Errorf("unable to create MAAS client for machine controller: %q", err)
+		klog.Errorf("unable to create MAAS client for machine controller: %q", err)
 		os.Exit(1)
 	}
 	err = machine.AddWithActuator(mgr, maasClient)
 	if err != nil {
-		glog.Errorf("unable to register machine controller with the manager: %q", err)
+		klog.Errorf("unable to register machine controller with the manager: %q", err)
 		os.Exit(1)
 	}
 
-	glog.Info("setting up webhooks")
+	klog.Info("setting up webhooks")
 	if err := webhook.AddToManager(mgr); err != nil {
-		glog.Errorf("unable to register webhooks to the manager: %q", err)
+		klog.Errorf("unable to register webhooks to the manager: %q", err)
 		os.Exit(1)
 	}
 
 	// get flags
 	portNumber, err := cmd.Flags().GetInt("port")
 	if err != nil {
-		glog.Errorf("Could not get port: %q", err)
+		klog.Errorf("Could not get port: %q", err)
 	}
 
-	glog.Info("Creating Web Server")
+	klog.Info("Creating Web Server")
 	tcpMux := createWebServer(&apiserver.ServerOptions{PortNumber: portNumber}, mgr)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		glog.Infof("Starting to serve requests on port %d", portNumber)
+		klog.Infof("Starting to serve requests on port %d", portNumber)
 		if err := tcpMux.Serve(); err != nil {
-			glog.Errorf("unable serve requests: %q", err)
+			klog.Errorf("unable serve requests: %q", err)
 			os.Exit(1)
 		}
 	}()
@@ -163,14 +162,14 @@ func operator(cmd *cobra.Command) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		glog.Info("Starting the Cmd")
+		klog.Info("Starting the Cmd")
 		if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-			glog.Errorf("unable to run the manager: %q", err)
+			klog.Errorf("unable to run the manager: %q", err)
 			os.Exit(1)
 		}
 	}()
 
-	glog.Info("Waiting for controllers to shut down gracefully")
+	klog.Info("Waiting for controllers to shut down gracefully")
 	wg.Wait()
 }
 

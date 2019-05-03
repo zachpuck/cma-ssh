@@ -3,12 +3,12 @@ package util
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
-	"time"
 )
 
 // kubernetesVersions are the versions we support installing.
@@ -18,16 +18,6 @@ const kubernetesVersions = "1.12.6 1.13.4"
 // KubernetesVersions() returns the list of all kubernetes versions cma-ssh supports.
 func KubernetesVersions() []string {
 	return strings.Split(kubernetesVersions, " ")
-}
-
-// IsValidKubernetesVersion checks whether the version requested is supported by cma-ssh.
-func IsValidKubernetesVersion(version string) bool {
-	for _, v := range KubernetesVersions() {
-		if v == version {
-			return true
-		}
-	}
-	return false
 }
 
 func GetClusterMachineList(c client.Client, clusterName string) ([]clusterv1alpha1.CnctMachine, error) {
@@ -177,24 +167,4 @@ func GetMaster(machines []clusterv1alpha1.CnctMachine) (*clusterv1alpha1.CnctMac
 	}
 
 	return nil, fmt.Errorf("could not find master node")
-}
-
-func Retry(attempts int, sleep time.Duration, fn func() error) error {
-	if err := fn(); err != nil {
-		if s, ok := err.(stop); ok {
-			// Return the original error for later checking
-			return s.error
-		}
-
-		if attempts--; attempts > 0 {
-			time.Sleep(sleep)
-			return Retry(attempts, sleep, fn)
-		}
-		return err
-	}
-	return nil
-}
-
-type stop struct {
-	error
 }

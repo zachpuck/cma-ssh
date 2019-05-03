@@ -1,6 +1,5 @@
 IMAGE = quay.io/samsung_cnct/cma-ssh
 VERSION = v0.1.0
-KUBERNETES_VERSIONS = 1.12.6 1.13.4
 DIR := ${CURDIR}
 REGISTRY ?= quay.io/samsung_cnct
 TARGET= cma-ssh
@@ -11,18 +10,30 @@ DOCKER = docker
 DOCKER_BUILD ?= $(DOCKER) run --rm -v $(DIR):$(BUILDMNT) -w $(BUILDMNT) $(IMAGE) /bin/sh -c
 HOST_GOOS ?= $(shell go env GOOS)
 HOST_GOARCH ?= $(shell go env GOARCH)
-GO_SYSTEM_FLAGS ?= GOOS=$(HOST_GOOS) GOARCH=$(HOST_GOARCH)
-KUBERNETES_LDFLAG ?= $(GOTARGET)/pkg/apis/cluster/v1alpha1.kubernetesVersions=$(KUBERNETES_VERSIONS)
+GO = go1.12.4
+GO_SYSTEM_FLAGS ?= GOOS=$(HOST_GOOS) GOARCH=$(HOST_GOARCH) GO111MODULE=on
+GOFILES = $(shell find ./ -type f -name '*.go')
 
-all: generate test cma-ssh
+all: cma-ssh
+
+clean:
+	rm -rf bin
+	rm -f cma-ssh
+
+$(GO):
+	GO111MODULE=off go get -u golang.org/dl/$(GO)
+	GO111MODULE=off $(GO) download
+
+cma-ssh: $(GOFILES)
+	CGO_ENABLED=0 $(GO_SYSTEM_FLAGS) $(GO) build -o $(TARGET) cmd/cma-ssh/main.go
+
+bin:
+	mkdir bin
+
+bin/deepcopy-gen: bin
+	$(GO_SYSTEM_FLAGS) GOBIN=$(DIR)/bin $(GO) install k8s.io/code-generator/cmd/deepcopy-gen
 
 .PHONY: build-dependencies-container
-
-cma-ssh: build-dependencies-container
-	$(DOCKER_BUILD) 'CGO_ENABLED=0 $(GO_SYSTEM_FLAGS) \
-	go build -o $(TARGET) \
-	-ldflags='\''-X "$(KUBERNETES_LDFLAG)"'\'' \
-	cmd/cma-ssh/main.go'
 
 build-dependencies-container:
 	docker build -t $(IMAGE) -f build/docker/build-tools/Dockerfile build/docker/build-tools
@@ -30,8 +41,8 @@ build-dependencies-container:
 test: build-dependencies-container
 	$(DOCKER_BUILD) 'go test -v ./...'
 
-generate: build-dependencies-container
-	$(DOCKER_BUILD) 'go generate ./...'
+generate: bin/deepcopy-gen
+	PATH=${CURDIR}/bin:$(PATH) $(GO) generate ./...
 
-dep-ensure: build-dependencies-container
-	$(DOCKER_BUILD) 'dep ensure -v'
+clean-test: build-dependencies-container
+	$(DOCKER_BUILD) 'make go1.12.4 && make'

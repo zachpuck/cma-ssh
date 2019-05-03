@@ -1,4 +1,3 @@
-
 # cma-ssh
 [![Build Status](https://jenkins.migrations.cnct.io/buildStatus/icon?job=cma-ssh/master)](https://jenkins.migrations.cnct.io/job/cma-ssh/job/master/)
 
@@ -6,6 +5,39 @@
 (i.e. `CnctCluster` resources) and machines (`CnctMachine`). 
 
 ## Developement
+
+### Building `cma-ssh`
+
+There are a few steps you should run to get your development environment set up.
+
+```bash
+make go1.12.4
+```
+
+Now whenever you want to build you should run.
+
+```bash
+go1.12.4 build -o cma-ssh cmd/cma-ssh/main.go
+```
+
+If you need to regenerate files you can do it with the following commands.
+
+```bash
+# the first time you generate files
+make generate
+# after the first time you can use either
+make generate
+# or
+go1.12.4 generate ./...
+```
+
+If you want to test a clean build (no deps installed) or you love long build times.
+
+```bash
+make clean-test
+```
+
+### Running `cma-ssh`
 
 The Kubernetes cluster on which the `cma-ssh` is installed must
 have network access to a MAAS server. Within the CNCT lab this

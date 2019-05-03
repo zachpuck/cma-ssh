@@ -12,7 +12,6 @@ import (
 	"net"
 	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
@@ -49,40 +48,12 @@ type ClusterParams struct {
 
 // NewClient returns a client with the underlying net.Conn and an ssh.Client.
 // You must close the ssh.Client and the net.Conn.
-func NewClient(address, user string, privateKey []byte) (*Client, error) {
-	signer, err := ssh.ParsePrivateKey(privateKey)
-	if err != nil {
-		return nil, err
-	}
-	c, err := net.Dial("tcp", address)
-	if err != nil {
-		return nil, err
-	}
-	conn, newCh, reqCh, err := ssh.NewClientConn(c, address, &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{
-			ssh.PublicKeys(signer),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         10 * time.Minute,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	client := ssh.NewClient(conn, newCh, reqCh)
-	return &Client{c: c, Client: client}, nil
-}
 
 // BatchRunner is used for running multiple ssh commands on a single client.
 type BatchRunner struct {
 	client *Client
 	out    io.Writer
 	err    error
-}
-
-func NewBatchRunner(c *Client, out io.Writer) *BatchRunner {
-	return &BatchRunner{client: c, out: out}
 }
 
 func (b *BatchRunner) Err() error {
@@ -165,20 +136,9 @@ type Cmd struct {
 }
 
 // Command is a convenience method to create Cmd.
-func Command(command string) Cmd {
-	return Cmd{
-		Command: command,
-	}
-}
 
 // CommandWithInput is a convenience method to create Cmd that takes input from
 // a supplied io.Reader.
-func CommandWithInput(command string, r io.Reader) Cmd {
-	return Cmd{
-		Command: command,
-		Stdin:   r,
-	}
-}
 
 // Run executes the command on the client. It handles creating ssh sessions.
 func (c Cmd) Run(client *Client) error {
