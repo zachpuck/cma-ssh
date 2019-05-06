@@ -27,18 +27,12 @@ const MachineFinalizer = "cnctmachine.cluster.cnct.sds.samsung.com"
 
 // MachineSpec defines the desired state of Machine
 type MachineSpec struct {
-	// name of the Cluster object this node belongs to
-	ClusterRef string `json:"clusterref,omitempty"`
-
 	// The full, authoritative list of taints to apply to the corresponding
 	// Node.
 	// +optional
 	Taints []corev1.Taint `json:"taints,omitempty"`
 
 	Roles []common.MachineRoles `json:"roles,omitempty"`
-
-	// +optional
-	Labels map[string]string `json:"labels,omitempty"`
 
 	// This field will be set by the actuators and consumed by higher level
 	// entities like autoscaler that will be interfacing with cluster-api as

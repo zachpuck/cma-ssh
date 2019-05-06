@@ -35,15 +35,10 @@ spec:
           type: object
         spec:
           properties:
-            clusterref:
-              description: name of the Cluster object this node belongs to
-              type: string
             instanceType:
               description: InstanceType references the type of machine to provision
                 in maas based on cpu, gpu, memory tags
               type: string
-            labels:
-              type: object
             providerID:
               description: This field will be set by the actuators and consumed by
                 higher level entities like autoscaler that will be interfacing with

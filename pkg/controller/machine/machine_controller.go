@@ -116,11 +116,13 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
+	// Get cluster based on machine owner reference.
 	var cluster clusterv1alpha1.CnctCluster
-	if err := r.Get(context.Background(), types.NamespacedName{Name: machine.Spec.ClusterRef, Namespace: machine.Namespace}, &cluster); err != nil {
+	clusterName := util.GetClusterNameFromMachineOwnerRef(&machine)
+	if err := r.Get(context.Background(), types.NamespacedName{Name: clusterName, Namespace: machine.Namespace}, &cluster); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
-			klog.Errorf("could not find cluster %s: %q", machine.Spec.ClusterRef, err)
+			klog.Errorf("could not find cluster %s: %q", clusterName, err)
 
 			return reconcile.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 		}
@@ -153,7 +155,8 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.CnctMachine) (reconcile.Result, error) {
 	// get cluster status to determine whether we should proceed,
 	// i.e. if there is a create in progress, we wait for it to either finish or error
-	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
+	clusterName := util.GetClusterNameFromMachineOwnerRef(machineInstance)
+	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), clusterName)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -164,7 +167,7 @@ func (r *ReconcileMachine) handleDelete(machineInstance *clusterv1alpha1.CnctMac
 		return reconcile.Result{}, err
 	}
 	if !util.IsReadyForDeletion(machineList) {
-		klog.Infof("Delete: Waiting for cluster %s to finish reconciling", machineInstance.Spec.ClusterRef)
+		klog.Infof("Delete: Waiting for cluster %s to finish reconciling", clusterName)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -215,7 +218,8 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.CnctMa
 
 	// get cluster status to determine whether we should proceed,
 	// i.e. if there is a create in progress, we wait for it to either finish or error
-	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), machineInstance.Spec.ClusterRef)
+	clusterName := util.GetClusterNameFromMachineOwnerRef(machineInstance)
+	clusterInstance, err := getCluster(r.Client, machineInstance.GetNamespace(), clusterName)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -232,7 +236,7 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.CnctMa
 	}
 	// if not ok to upgrade, try later
 	if !ok {
-		klog.Infof("Upgrade: Waiting for cluster %s to finish reconciling", machineInstance.Spec.ClusterRef)
+		klog.Infof("Upgrade: Waiting for cluster %s to finish reconciling", clusterName)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
