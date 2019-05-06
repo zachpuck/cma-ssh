@@ -36,7 +36,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeSchema "k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -116,28 +115,13 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	// Get cluster based on machine owner reference.
-	var cluster clusterv1alpha1.CnctCluster
-	clusterName := util.GetClusterNameFromMachineOwnerRef(&machine)
-	if err := r.Get(context.Background(), types.NamespacedName{Name: clusterName, Namespace: machine.Namespace}, &cluster); err != nil {
-		if apierrors.IsNotFound(err) {
-			// Object not found, return.  Created objects are automatically garbage collected.
-			klog.Errorf("could not find cluster %s: %q", clusterName, err)
-
-			return reconcile.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
-		}
-		// Error reading the object - requeue the request.
-		klog.Errorf("error reading object machine %s: %q", machine.GetName(), err)
-		return reconcile.Result{}, err
-	}
-
 	if !machine.DeletionTimestamp.IsZero() {
 		return r.handleDelete(&machine)
 	}
 
 	switch machine.Status.Phase {
 	case common.ProvisioningMachinePhase:
-		return r.handleWaitingForReady(&machine, &cluster)
+		return r.handleWaitingForReady(&machine)
 	case common.DeletingMachinePhase:
 		return r.handleDelete(&machine)
 	case common.ErrorMachinePhase:
@@ -145,7 +129,7 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 	case common.ReadyMachinePhase:
 		return reconcile.Result{}, nil
 	case "":
-		return r.handleCreate(&machine, &cluster)
+		return r.handleCreate(&machine)
 	default:
 		klog.Errorf("unknown phase %q", machine.Status.Phase)
 		return reconcile.Result{}, nil
@@ -253,7 +237,26 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.CnctMa
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cluster *clusterv1alpha1.CnctCluster) (reconcile.Result, error) {
+func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine) (reconcile.Result, error) {
+	// Get cluster based on machine owner reference.
+	var cluster clusterv1alpha1.CnctCluster
+	clusterName := machine.Namespace
+	err := r.Get(
+		context.Background(),
+		client.ObjectKey{Name: clusterName, Namespace: machine.Namespace},
+		&cluster,
+	)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// Either has not been created yet or has been deleted
+			klog.Errorf("could not find cluster %s: %q", clusterName, err)
+			return reconcile.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+		}
+		// Error reading the object - requeue the request.
+		klog.Errorf("error reading object machine %s: %q", machine.GetName(), err)
+		return reconcile.Result{}, err
+	}
+
 	// Add the finalizer
 	if !util.ContainsString(machine.Finalizers, clusterv1alpha1.MachineFinalizer) {
 		klog.Infoln("adding finalizer to machine")
@@ -263,7 +266,7 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine, cl
 
 	// Set owner ref
 	machineOwnerRef := []metav1.OwnerReference{
-		*metav1.NewControllerRef(cluster,
+		*metav1.NewControllerRef(&cluster,
 			runtimeSchema.GroupVersionKind{
 				Group:   clusterv1alpha1.SchemeGroupVersion.Group,
 				Version: clusterv1alpha1.SchemeGroupVersion.Version,
@@ -405,7 +408,7 @@ output : { all : '| tee -a /var/log/cloud-init-output.log' }
 	return userdata, nil
 }
 
-func (r *ReconcileMachine) handleWaitingForReady(machine *clusterv1alpha1.CnctMachine, cluster *clusterv1alpha1.CnctCluster) (reconcile.Result, error) {
+func (r *ReconcileMachine) handleWaitingForReady(machine *clusterv1alpha1.CnctMachine) (reconcile.Result, error) {
 	klog.Infof("figure out how to check if a machine is ready")
 	return reconcile.Result{}, nil
 }
