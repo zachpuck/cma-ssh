@@ -33,6 +33,12 @@ bin:
 bin/deepcopy-gen: bin
 	$(GO_SYSTEM_FLAGS) GOBIN=$(DIR)/bin $(GO) install k8s.io/code-generator/cmd/deepcopy-gen
 
+bin/controller-gen: bin
+	$(GO_SYSTEM_FLAGS) GOBIN=$(DIR)/bin $(GO) install sigs.k8s.io/controller-tools/cmd/controller-gen
+
+bin/kustomize: bin
+	$(GO_SYSTEM_FLAGS) GOBIN=$(DIR)/bin $(GO) install sigs.k8s.io/kustomize
+
 .PHONY: build-dependencies-container
 
 build-dependencies-container:
@@ -46,3 +52,33 @@ generate: bin/deepcopy-gen
 
 clean-test: build-dependencies-container
 	$(DOCKER_BUILD) 'make go1.12.4 && make'
+
+# Generate manifests e.g. CRD, RBAC etc.
+# generate parts of helm chart
+manifests: bin/controller-gen bin/kustomize
+	bin/controller-gen crd --output-dir ${CURDIR}/crd
+	bin/controller-gen rbac --name rbac --output-dir ${CURDIR}/rbac
+	mkdir -p ${CURDIR}/build/kustomize/crd/protected/cluster/base
+	mkdir -p ${CURDIR}/build/kustomize/crd/unprotected/cluster/base
+	mkdir -p ${CURDIR}/build/kustomize/crd/protected/machine/base
+	mkdir -p ${CURDIR}/build/kustomize/crd/unprotected/machine/base
+	mkdir -p ${CURDIR}/build/kustomize/crd/protected/machineset/base
+	mkdir -p ${CURDIR}/build/kustomize/crd/unprotected/machineset/base
+	mkdir -p ${CURDIR}/build/kustomize/rbac/role/base
+	mkdir -p ${CURDIR}/build/kustomize/rbac/rolebinding/base
+	cp -rf ${CURDIR}/rbac/rbac_role.yaml ${CURDIR}/build/kustomize/rbac/role/base
+	cp -rf ${CURDIR}/rbac/rbac_role_binding.yaml ${CURDIR}/build/kustomize/rbac/rolebinding/base
+	cp -rf ${CURDIR}/crd/cluster_v1alpha1_cnctcluster.yaml ${CURDIR}/build/kustomize/crd/unprotected/cluster/base
+	cp -rf ${CURDIR}/crd/cluster_v1alpha1_cnctcluster.yaml ${CURDIR}/build/kustomize/crd/protected/cluster/base
+	cp -rf ${CURDIR}/crd/cluster_v1alpha1_cnctmachine.yaml ${CURDIR}/build/kustomize/crd/unprotected/machine/base
+	cp -rf ${CURDIR}/crd/cluster_v1alpha1_cnctmachine.yaml ${CURDIR}/build/kustomize/crd/protected/machine/base
+	cp -rf ${CURDIR}/crd/cluster_v1alpha1_cnctmachineset.yaml ${CURDIR}/build/kustomize/crd/protected/machineset/base
+	cp -rf ${CURDIR}/crd/cluster_v1alpha1_cnctmachineset.yaml ${CURDIR}/build/kustomize/crd/unprotected/machineset/base
+	output=$$(bin/kustomize build build/kustomize/rbac/role); echo "$$output" > ${CURDIR}/deployments/helm/cma-ssh/RBAC/rbac_role.yaml
+	output=$$(bin/kustomize build build/kustomize/rbac/rolebinding); echo "$$output" > ${CURDIR}/deployments/helm/cma-ssh/RBAC/rbac_role_binding.yaml
+	output=$$(bin/kustomize build build/kustomize/crd/protected/cluster); echo "$$output" > ${CURDIR}/deployments/helm/cma-ssh/CRD-protected/cluster_v1alpha1_cnctcluster.yaml
+	output=$$(bin/kustomize build build/kustomize/crd/protected/machine); echo "$$output" > ${CURDIR}/deployments/helm/cma-ssh/CRD-protected/custer_v1alpha1_cnctmachine.yaml
+	output=$$(bin/kustomize build build/kustomize/crd/protected/machineset); echo "$$output" > ${CURDIR}/deployments/helm/cma-ssh/CRD-protected/cluster_v1alpha1_cnctmachineset.yaml
+	output=$$(bin/kustomize build build/kustomize/crd/unprotected/cluster); echo "$$output" > ${CURDIR}/deployments/helm/cma-ssh/CRD/cluster_v1alpha1_cnctcluster.yaml
+	output=$$(bin/kustomize build build/kustomize/crd/unprotected/machine); echo "$$output" > ${CURDIR}/deployments/helm/cma-ssh/CRD/cluster_v1alpha1_cnctmachine.yaml
+	output=$$(bin/kustomize build build/kustomize/crd/unprotected/machineset); echo "$$output" > ${CURDIR}/deployments/helm/cma-ssh/CRD/cluster_v1alpha1_cnctmachineset.yaml

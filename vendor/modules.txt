@@ -1,9 +1,18 @@
+# github.com/PuerkitoBio/purell v1.0.0
+github.com/PuerkitoBio/purell
+# github.com/PuerkitoBio/urlesc v0.0.0-20160726150825-5bd2802263f2
+github.com/PuerkitoBio/urlesc
 # github.com/appscode/jsonpatch v0.0.0-20190108182946-7c0e3b262f30
 github.com/appscode/jsonpatch
 # github.com/beorn7/perks v1.0.0
 github.com/beorn7/perks/quantile
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
+# github.com/emicklei/go-restful v0.0.0-20170410110728-ff4f55a20633
+github.com/emicklei/go-restful
+github.com/emicklei/go-restful/log
+# github.com/evanphx/json-patch v4.0.0+incompatible
+github.com/evanphx/json-patch
 # github.com/fsnotify/fsnotify v1.4.7
 github.com/fsnotify/fsnotify
 # github.com/ghodss/yaml v1.0.0
@@ -12,6 +21,16 @@ github.com/ghodss/yaml
 github.com/go-logr/logr
 # github.com/go-logr/zapr v0.1.1
 github.com/go-logr/zapr
+# github.com/go-openapi/jsonpointer v0.0.0-20160704185906-46af16f9f7b1
+github.com/go-openapi/jsonpointer
+# github.com/go-openapi/jsonreference v0.0.0-20160704190145-13c6e3589ad9
+github.com/go-openapi/jsonreference
+# github.com/go-openapi/spec v0.0.0-20160808142527-6aced65f8501
+github.com/go-openapi/spec
+# github.com/go-openapi/swag v0.0.0-20160704191624-1d0bd113de87
+github.com/go-openapi/swag
+# github.com/gobuffalo/envy v1.6.5
+github.com/gobuffalo/envy
 # github.com/gogo/protobuf v1.2.1
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/sortkeys
@@ -72,6 +91,8 @@ github.com/hpcloud/tail/winfile
 github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.0.0
 github.com/inconshreveable/mousetrap
+# github.com/joho/godotenv v1.3.0
+github.com/joho/godotenv
 # github.com/json-iterator/go v1.1.6
 github.com/json-iterator/go
 # github.com/juju/collections v0.0.0-20180717171555-9be91dc79b7c
@@ -88,6 +109,12 @@ github.com/juju/schema
 github.com/juju/version
 # github.com/magiconair/properties v1.8.0
 github.com/magiconair/properties
+# github.com/mailru/easyjson v0.0.0-20160728113105-d5b7844b561a
+github.com/mailru/easyjson/jlexer
+github.com/mailru/easyjson/jwriter
+github.com/mailru/easyjson/buffer
+# github.com/markbates/inflect v1.0.4
+github.com/markbates/inflect
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/mitchellh/mapstructure v1.1.2
@@ -229,6 +256,10 @@ golang.org/x/text/runes
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
+golang.org/x/text/secure/precis
+golang.org/x/text/cases
+golang.org/x/text/width
+golang.org/x/text/internal
 # golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 golang.org/x/time/rate
 # golang.org/x/tools v0.0.0-20190422184413-61c0d375276a
@@ -303,8 +334,9 @@ gopkg.in/tomb.v1
 gopkg.in/yaml.v2
 # k8s.io/api v0.0.0-20181213150558-05914d821849
 k8s.io/api/core/v1
-k8s.io/api/admissionregistration/v1alpha1
+k8s.io/api/rbac/v1
 k8s.io/api/admissionregistration/v1beta1
+k8s.io/api/admissionregistration/v1alpha1
 k8s.io/api/apps/v1
 k8s.io/api/apps/v1beta1
 k8s.io/api/apps/v1beta2
@@ -325,7 +357,6 @@ k8s.io/api/events/v1beta1
 k8s.io/api/extensions/v1beta1
 k8s.io/api/networking/v1
 k8s.io/api/policy/v1beta1
-k8s.io/api/rbac/v1
 k8s.io/api/rbac/v1alpha1
 k8s.io/api/rbac/v1beta1
 k8s.io/api/scheduling/v1alpha1
@@ -383,8 +414,11 @@ k8s.io/apimachinery/pkg/util/mergepatch
 k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/pkg/util/cache
 k8s.io/apimachinery/pkg/util/diff
+k8s.io/apimachinery/pkg/api/validation
+k8s.io/apimachinery/pkg/apis/meta/v1/validation
 k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/apis/meta/internalversion
+k8s.io/apimachinery/pkg/api/equality
 # k8s.io/client-go v0.0.0-20181213151034-8d9ed539ba31
 k8s.io/client-go/tools/clientcmd/api
 k8s.io/client-go/tools/clientcmd/api/latest
@@ -467,6 +501,7 @@ k8s.io/gengo/examples/set-gen/sets
 k8s.io/klog
 # k8s.io/kube-openapi v0.0.0-20190418160015-6b3d3b2d5666
 k8s.io/kube-openapi/pkg/util/proto
+k8s.io/kube-openapi/pkg/common
 # sigs.k8s.io/controller-runtime v0.1.10
 sigs.k8s.io/controller-runtime/pkg/client/config
 sigs.k8s.io/controller-runtime/pkg/manager
@@ -474,7 +509,6 @@ sigs.k8s.io/controller-runtime/pkg/runtime/signals
 sigs.k8s.io/controller-runtime/pkg/client
 sigs.k8s.io/controller-runtime/pkg/runtime/scheme
 sigs.k8s.io/controller-runtime/pkg/controller
-sigs.k8s.io/controller-runtime/pkg/controller/controllerutil
 sigs.k8s.io/controller-runtime/pkg/handler
 sigs.k8s.io/controller-runtime/pkg/reconcile
 sigs.k8s.io/controller-runtime/pkg/source
@@ -499,6 +533,55 @@ sigs.k8s.io/controller-runtime/pkg/webhook/internal/metrics
 sigs.k8s.io/controller-runtime/pkg/webhook/types
 sigs.k8s.io/controller-runtime/pkg/envtest/printer
 sigs.k8s.io/controller-runtime/pkg/internal/controller/metrics
+# sigs.k8s.io/controller-tools v0.1.10
+sigs.k8s.io/controller-tools/cmd/controller-gen
+sigs.k8s.io/controller-tools/pkg/crd/generator
+sigs.k8s.io/controller-tools/pkg/rbac
+sigs.k8s.io/controller-tools/pkg/webhook
+sigs.k8s.io/controller-tools/pkg/crd/util
+sigs.k8s.io/controller-tools/pkg/internal/codegen
+sigs.k8s.io/controller-tools/pkg/internal/codegen/parse
+sigs.k8s.io/controller-tools/pkg/util
+sigs.k8s.io/controller-tools/pkg/internal/general
+# sigs.k8s.io/kustomize v2.0.3+incompatible
+sigs.k8s.io/kustomize
+sigs.k8s.io/kustomize/k8sdeps
+sigs.k8s.io/kustomize/pkg/commands
+sigs.k8s.io/kustomize/k8sdeps/kunstruct
+sigs.k8s.io/kustomize/k8sdeps/transformer
+sigs.k8s.io/kustomize/k8sdeps/validator
+sigs.k8s.io/kustomize/pkg/factory
+sigs.k8s.io/kustomize/pkg/commands/build
+sigs.k8s.io/kustomize/pkg/commands/edit
+sigs.k8s.io/kustomize/pkg/commands/misc
+sigs.k8s.io/kustomize/pkg/fs
+sigs.k8s.io/kustomize/k8sdeps/configmapandsecret
+sigs.k8s.io/kustomize/pkg/gvk
+sigs.k8s.io/kustomize/pkg/ifc
+sigs.k8s.io/kustomize/pkg/types
+sigs.k8s.io/kustomize/k8sdeps/transformer/hash
+sigs.k8s.io/kustomize/k8sdeps/transformer/patch
+sigs.k8s.io/kustomize/pkg/resource
+sigs.k8s.io/kustomize/pkg/transformers
+sigs.k8s.io/kustomize/pkg/ifc/transformer
+sigs.k8s.io/kustomize/pkg/resmap
+sigs.k8s.io/kustomize/pkg/constants
+sigs.k8s.io/kustomize/pkg/loader
+sigs.k8s.io/kustomize/pkg/target
+sigs.k8s.io/kustomize/pkg/commands/edit/add
+sigs.k8s.io/kustomize/pkg/commands/edit/fix
+sigs.k8s.io/kustomize/pkg/commands/edit/set
+sigs.k8s.io/kustomize/pkg/transformers/config/defaultconfig
+sigs.k8s.io/kustomize/k8sdeps/kv
+sigs.k8s.io/kustomize/pkg/image
+sigs.k8s.io/kustomize/pkg/patch
+sigs.k8s.io/kustomize/pkg/internal/error
+sigs.k8s.io/kustomize/pkg/resid
+sigs.k8s.io/kustomize/pkg/expansion
+sigs.k8s.io/kustomize/pkg/transformers/config
+sigs.k8s.io/kustomize/pkg/git
+sigs.k8s.io/kustomize/pkg/patch/transformer
+sigs.k8s.io/kustomize/pkg/commands/kustfile
 # sigs.k8s.io/testing_frameworks v0.1.1
 sigs.k8s.io/testing_frameworks/integration
 sigs.k8s.io/testing_frameworks/integration/addr
