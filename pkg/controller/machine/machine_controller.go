@@ -324,9 +324,10 @@ func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine) (r
 	// a UUID. Cf. k8s.io/apimachinery/pkg/util/uuid
 	providerID := fmt.Sprintf("%s-%s", cluster.Name, machine.Name)
 	createResponse, err := r.MAASClient.Create(context.Background(), &maas.CreateRequest{
-		ProviderID: providerID,
-		Distro:     "ubuntu-18.04-cnct-k8s-master",
-		Userdata:   userdata})
+		ProviderID:   providerID,
+		Distro:       "ubuntu-18.04-cnct-k8s-master",
+		InstanceType: machine.Spec.InstanceType,
+		Userdata:     userdata})
 	if err != nil {
 		return reconcile.Result{}, err
 	}

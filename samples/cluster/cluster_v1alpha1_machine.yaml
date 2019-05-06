@@ -12,7 +12,7 @@ spec:
     - master
   labels:
     role: controlPlane
-  InstanceType: small
+  instanceType: master
 ---
 apiVersion: cluster.cnct.sds.samsung.com/v1alpha1
 kind: CnctMachine
@@ -27,4 +27,4 @@ spec:
   - worker
   labels:
     role: worker
-  InstanceType: small
+  instanceType: standard
