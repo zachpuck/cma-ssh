@@ -40,7 +40,7 @@ inputs:
     string:
       constraints: { minLength: 1 }
       description: kubernetes version of aks cluster used as cmc
-      default: 1.11.5
+      default: 1.12.6
   clusterAccountId:
     string:
       constraints: { minLength: 1 }
