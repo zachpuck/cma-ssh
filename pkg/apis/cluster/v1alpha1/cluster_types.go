@@ -26,31 +26,8 @@ const ClusterFinalizer = "cnctcluster.cluster.cnct.sds.samsung.com"
 
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
-	// Cluster network configuration
-	ClusterNetwork ClusterNetworkingConfig `json:"clusterNetwork"`
-
-	// name of the private key secret for machines
-	Secret string `json:"secret,omitempty"`
-
+	// Desired Kubernetes version
 	KubernetesVersion string `json:"kubernetesVersion"`
-}
-
-// ClusterNetworkingConfig specifies the different networking
-// parameters for a cluster.
-type ClusterNetworkingConfig struct {
-	// The network ranges from which service VIPs are allocated.
-	Services NetworkRanges `json:"services"`
-
-	// The network ranges from which POD networks are allocated.
-	Pods NetworkRanges `json:"pods"`
-
-	// Domain name for services.
-	ServiceDomain string `json:"serviceDomain"`
-}
-
-// NetworkRanges represents ranges of network addresses.
-type NetworkRanges struct {
-	CIDRBlock string `json:"cidrBlock"`
 }
 
 // ClusterStatus defines the observed state of Cluster

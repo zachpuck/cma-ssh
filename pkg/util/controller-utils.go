@@ -32,7 +32,8 @@ func GetClusterMachineList(c client.Client, clusterName string) ([]clusterv1alph
 
 	var clusterMachines []clusterv1alpha1.CnctMachine
 	for _, item := range machineList.Items {
-		if item.Spec.ClusterRef == clusterName {
+		clusterOwnerRef := GetClusterNameFromMachineOwnerRef(&item)
+		if clusterOwnerRef == clusterName {
 			clusterMachines = append(clusterMachines, item)
 		}
 	}
