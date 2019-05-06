@@ -30,6 +30,7 @@ require (
 	github.com/juju/testing v0.0.0-20190429233213-dfc56b8c09fc // indirect
 	github.com/juju/utils v0.0.0-20180820210520-bf9cc5bdd62d // indirect
 	github.com/juju/version v0.0.0-20180108022336-b64dbd566305 // indirect
+	github.com/markbates/inflect v1.0.4 // indirect
 	github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742 // indirect
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0
@@ -72,6 +73,8 @@ require (
 	k8s.io/klog v0.3.0
 	k8s.io/kube-openapi v0.0.0-20190418160015-6b3d3b2d5666 // indirect
 	sigs.k8s.io/controller-runtime v0.1.10
+	sigs.k8s.io/controller-tools v0.1.10
+	sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/testing_frameworks v0.1.1 // indirect
 	sigs.k8s.io/yaml v1.1.0 // indirect
 )

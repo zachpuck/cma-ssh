@@ -1,0 +1,93 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    helm.sh/resource-policy: keep
+  creationTimestamp: null
+  labels:
+    app.kubernetes.io/instance: '{{.Release.Name}}'
+    app.kubernetes.io/managed-by: '{{.Release.Service}}'
+    app.kubernetes.io/name: '{{include "cma-ssh.name" .}}'
+    app.kubernetes.io/version: '{{.Chart.AppVersion | replace "+" "_" | trunc 63}}'
+    controller-tools.k8s.io: "1.0"
+    helm.sh/chart: '{{include "cma-ssh.chart" .}}'
+  name: cnctmachinesets.cluster.cnct.sds.samsung.com
+spec:
+  group: cluster.cnct.sds.samsung.com
+  names:
+    kind: CnctMachineSet
+    plural: cnctmachinesets
+  scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          properties:
+            machineTemplate:
+              description: MachineTemplate defines the desired state of each instance
+                of Machine
+              properties:
+                metadata:
+                  type: object
+                spec:
+                  properties:
+                    clusterref:
+                      description: name of the Cluster object this node belongs to
+                      type: string
+                    instanceType:
+                      description: InstanceType references the type of machine to
+                        provision in maas based on cpu, gpu, memory tags
+                      type: string
+                    labels:
+                      type: object
+                    providerID:
+                      description: This field will be set by the actuators and consumed
+                        by higher level entities like autoscaler that will be interfacing
+                        with cluster-api as generic provider.
+                      type: string
+                    roles:
+                      items:
+                        type: string
+                      type: array
+                    taints:
+                      description: The full, authoritative list of taints to apply
+                        to the corresponding Node.
+                      items:
+                        type: object
+                      type: array
+                  type: object
+              type: object
+            replicas:
+              description: Replicas defines the number of type Machine
+              format: int64
+              type: integer
+          type: object
+        status:
+          properties:
+            lastUpdated:
+              description: When was this status last observed
+              format: date-time
+              type: string
+            phase:
+              description: MachineSet status
+              type: string
+          type: object
+  version: v1alpha1
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
