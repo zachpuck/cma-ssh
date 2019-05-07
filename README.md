@@ -63,6 +63,28 @@ helm install --name cma-ssh deployments/helm/cma-ssh/
 kubectl get pods --watch
 ```
 
+## Creating a kubernetes cluster with cma-ssh
+
+Using kubectl, apply a cluster manifest, and one or more machine manifests to create a kubernetes cluster.
+
+- [cluster spec](https://github.com/samsung-cnct/cma-ssh/blob/master/samples/cluster/cluster_v1alpha1_cluster.yaml) contains the kubernetes version.
+-  [machine spec](https://github.com/samsung-cnct/cma-ssh/blob/master/samples/cluster/cluster_v1alpha1_machine.yaml) contains a role, label, and instanceType.
+
+```bash
+kubectl apply -f samples/cluster/cluster_v1alpha1_cluster.yaml
+kubectl apply -f samples/cluster/cluster_v1alpha1_machine.yaml
+```
+
+## How instanceType is mapped to MaaS machine tags
+[MaaS tags](https://docs.maas.io/2.5/en/nodes-tags) can be used to: 
+- select hardware reserved for use by cma-ssh, 
+- select hardware for masters or workers, and 
+- select hardware for specific workloads (e.g. those requiring GPUs, etc.)
+
+User defined MaaS tags would be assigned to MaaS machines using the MaaS cli or MaaS UI before running cma-ssh. 
+The machine spec [instanceType](https://github.com/samsung-cnct/cma-ssh/blob/master/samples/cluster/cluster_v1alpha1_machine.yaml#L15) field is used to map a single instanceType string to a MaaS tag.  If no MaaS tags have been defined, the instanceType field can be passed in as an empty string so that any MaaS machine will be chosen.
+ 
+
 # Deprecated
 
 The instructions below are deprecated as we move towards a cloud-init approach

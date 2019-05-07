@@ -59,6 +59,12 @@ type CreateRequest struct {
 	// Distro is the name of the OS image and kernel to install/boot.
 	Distro string
 
+	// InstanceType is used to filter the machines to allocate by MAAS tags.
+	// These tags would have been specified on machines to correspond
+	// to different machine types desired.  If InstanceType is empty any machine can
+	// be allocated.
+	InstanceType string
+
 	// Userdata is passed to the machine on boot and contains cloud-init
 	// configuration.
 	Userdata string
@@ -86,10 +92,8 @@ type CreateResponse struct {
 func (c Client) Create(ctx context.Context, request *CreateRequest) (*CreateResponse, error) {
 	klog.Infof("Creating machine %s", request.ProviderID)
 
-	// TODO: Tag MAAS machine
-
 	// Allocate MAAS machine
-	allocateArgs := gomaasapi.AllocateMachineArgs{Tags: []string{}}
+	allocateArgs := gomaasapi.AllocateMachineArgs{Tags: []string{request.InstanceType}}
 	m, _, err := c.Controller.AllocateMachine(allocateArgs)
 	if err != nil {
 		klog.Errorf("Create failed to allocate machine %s: %v", request.ProviderID, err)
