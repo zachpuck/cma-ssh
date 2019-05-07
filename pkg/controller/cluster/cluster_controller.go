@@ -190,22 +190,6 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, r.Update(context.Background(), cluster)
 	}
 
-	machineList, err := util.GetClusterMachineList(r.Client, cluster.GetName())
-	if err != nil {
-		klog.Errorf("could not list Machines for cluster %q: %q", cluster.GetName(), err)
-		return reconcile.Result{}, err
-	}
-
-	clusterStatus, apiEndpoint := util.GetStatus(machineList)
-	if cluster.Status.Phase != clusterStatus || cluster.Status.APIEndpoint != apiEndpoint {
-		cluster.Status.Phase = clusterStatus
-		cluster.Status.APIEndpoint = apiEndpoint
-		err = r.updateStatus(cluster, corev1.EventTypeNormal,
-			common.ResourceStateChange, common.MessageResourceStateChange, cluster.GetName(), clusterStatus)
-		if err != nil {
-			klog.Errorf("could not update cluster %q status: %q", cluster.GetName(), err)
-		}
-	}
 	return reconcile.Result{}, err
 }
 
@@ -247,12 +231,7 @@ func deleteClusterSecrets(k8sClient client.Client, cluster *clusterv1alpha1.Cnct
 			Namespace: cluster.Namespace,
 		},
 	}
-
-	if secret != nil {
-		return k8sClient.Delete(context.Background(), secret)
-	}
-
-	return nil
+	return k8sClient.Delete(context.Background(), secret)
 }
 
 func (r *ReconcileCluster) updateStatus(clusterInstance *clusterv1alpha1.CnctCluster, eventType string,
