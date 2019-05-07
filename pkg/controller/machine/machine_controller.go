@@ -238,24 +238,28 @@ func (r *ReconcileMachine) handleUpgrade(machineInstance *clusterv1alpha1.CnctMa
 }
 
 func (r *ReconcileMachine) handleCreate(machine *clusterv1alpha1.CnctMachine) (reconcile.Result, error) {
-	// Get cluster based on machine owner reference.
-	var cluster clusterv1alpha1.CnctCluster
-	clusterName := machine.Namespace
-	err := r.Get(
+	// Get cluster from machine's namespace.
+	var clusters clusterv1alpha1.CnctClusterList
+	err := r.List(
 		context.Background(),
-		client.ObjectKey{Name: clusterName, Namespace: machine.Namespace},
-		&cluster,
+		&client.ListOptions{Namespace: machine.Namespace},
+		&clusters,
 	)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Either has not been created yet or has been deleted
-			klog.Errorf("could not find cluster %s: %q", clusterName, err)
+			klog.Errorf("could not find cluster: %q", err)
 			return reconcile.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 		}
 		// Error reading the object - requeue the request.
 		klog.Errorf("error reading object machine %s: %q", machine.GetName(), err)
 		return reconcile.Result{}, err
 	}
+	if len(clusters.Items) == 0 {
+		klog.Infof("no cluster in namespace, requeue request")
+		return reconcile.Result{RequeueAfter: 5 * time.Second, Requeue: true}, nil
+	}
+	cluster := clusters.Items[0]
 
 	// Add the finalizer
 	if !util.ContainsString(machine.Finalizers, clusterv1alpha1.MachineFinalizer) {
