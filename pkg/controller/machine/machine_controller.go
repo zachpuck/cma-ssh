@@ -127,10 +127,12 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 		switch e := errors.Cause(err).(type) {
 		case *apierrors.StatusError:
 			if apierrors.IsNotFound(e) {
-				return reconcile.Result{Requeue: true, RequeueAfter: 5 * time.Second}, err
+				klog.Info(err)
+				return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 			}
 		case errNotReady:
-			return reconcile.Result{Requeue: true, RequeueAfter: 5 * time.Second}, err
+			klog.Info(err)
+			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 		case errRelease:
 			r.MAASClient.Delete(context.Background(), &maas.DeleteRequest{"", e.systemID})
 			return reconcile.Result{}, err

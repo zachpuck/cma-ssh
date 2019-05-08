@@ -19,6 +19,7 @@ import (
 	"github.com/samsung-cnct/cma-ssh/pkg/maas"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeSchema "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
@@ -65,33 +66,36 @@ type creator struct {
 }
 
 func create(k8sClient clientEventer, maasClient maas.Client, machine *v1alpha1.CnctMachine) error {
-	c := &creator{k8sClient: k8sClient, maasClient: maasClient, machine: machine}
-	c.setMaster()
-	c.getCluster()
-	c.getSecret()
-	c.createClientsetFromSecret()
-	c.createToken()
-	c.checkApiserverAddress()
-	c.prepareMaasRequest()
-	c.doMaasCreate()
-	c.createKubeconfig()
-	c.updateCluster()
-	c.updateMachine()
-	return c.err
-}
-
-func (c *creator) setMaster() {
-	if c.err != nil {
-		return
-	}
-
 	klog.Info("checking if machine is master")
-	for _, v := range c.machine.Spec.Roles {
+	var isMaster bool
+	for _, v := range machine.Spec.Roles {
 		if v == common.MachineRoleMaster {
-			c.isMaster = true
-			return
+			isMaster = true
+			break
 		}
 	}
+	c := &creator{k8sClient: k8sClient, maasClient: maasClient, machine: machine}
+	c.isMaster = isMaster
+	if isMaster {
+		c.getCluster()
+		c.getSecret()
+		c.prepareMaasRequest()
+		c.doMaasCreate()
+		c.createKubeconfig()
+		c.updateCluster()
+		c.updateMachine()
+	} else {
+		c.getCluster()
+		c.getSecret()
+		c.createClientsetFromSecret()
+		c.checkIfTokenExists()
+		c.createToken()
+		c.checkApiserverAddress()
+		c.prepareMaasRequest()
+		c.doMaasCreate()
+		c.updateMachine()
+	}
+	return c.err
 }
 
 func (c *creator) getCluster() {
@@ -150,8 +154,44 @@ func (c *creator) createClientsetFromSecret() {
 	c.clientset, c.err = kubernetes.NewForConfig(restConfig)
 }
 
-func (c *creator) createToken() {
+func (c *creator) checkIfTokenExists() {
 	if c.err != nil || c.isMaster {
+		return
+	}
+	klog.Info("checking for existing tokens on managed cluster")
+	list, err := c.clientset.CoreV1().
+		Secrets(metav1.NamespaceSystem).
+		List(metav1.ListOptions{FieldSelector: "type=" + string(corev1.SecretTypeBootstrapToken)})
+	if err != nil {
+		e, ok := err.(*apierrors.StatusError)
+		if !ok {
+			c.err = errNotReady(err.Error())
+		} else {
+			c.err = e
+		}
+		return
+	}
+
+	// find the first non-expired token
+	for _, secret := range list.Items {
+		expires, ok := secret.Data["expiration"]
+		if ok && len(expires) > 0 {
+			t, err := time.Parse(time.RFC3339, string(expires))
+			if err != nil || t.Before(time.Now()) {
+				continue
+			}
+			klog.Info("found an existing token")
+			c.token = fmt.Sprintf("%s.%s", list.Items[0].Data["token-id"], list.Items[0].Data["token-secret"])
+			return
+		}
+		klog.Info("found an existing token")
+		c.token = fmt.Sprintf("%s.%s", list.Items[0].Data["token-id"], list.Items[0].Data["token-secret"])
+		return
+	}
+}
+
+func (c *creator) createToken() {
+	if c.err != nil || c.isMaster || c.token != "" {
 		return
 	}
 
