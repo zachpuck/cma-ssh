@@ -4,9 +4,9 @@ metadata:
   labels:
     controller-tools.k8s.io: "1.0"
   name: master
+  namespace: default
 spec:
   # Add fields here
-  clusterref: cluster
   roles:
     - etcd
     - master
@@ -20,9 +20,9 @@ metadata:
   labels:
     controller-tools.k8s.io: "1.0"
   name: worker
+  namespace: default
 spec:
   # Add fields here
-  clusterref: cluster
   roles:
   - worker
   labels:
