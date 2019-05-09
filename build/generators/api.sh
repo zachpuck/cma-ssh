@@ -14,6 +14,10 @@ mkdir -p ${PROJECT_DIRECTORY}/${DESTINATION_LIBRARY}
 echo "Ensuring Swagger Asset Direcotry ( ${SWAGGER_DESTINATION} ) Exists..."
 mkdir -p ${PROJECT_DIRECTORY}/${SWAGGER_DESTINATION}
 
+# copy annotations.proto if missing (due to go modules)
+cp -r ${GOPATH}/src/github.com/grpc-ecosystem/grpc-gateway/third_party \
+    ${PROJECT_DIRECTORY}/vendor/github.com/grpc-ecosystem/grpc-gateway
+
 echo
 echo "generating api stubs..."
 echo "protoc ${PROJECT_DIRECTORY}/api/api.proto -I ${PROJECT_DIRECTORY}/api/  --go_out=plugins=grpc:${PROJECT_DIRECTORY}/${DESTINATION_LIBRARY}/ -I${PROJECT_DIRECTORY}/vendor/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis -I${PROJECT_DIRECTORY}/vendor/github.com/grpc-ecosystem/grpc-gateway -I${PROJECT_DIRECTORY}/vendor"
@@ -33,3 +37,6 @@ echo
 echo "generating api docs..."
 echo "protoc ${PROJECT_DIRECTORY}/api/api.proto -I ${PROJECT_DIRECTORY}/api/ -I ${PROJECT_DIRECTORY}/vendor/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis -I ${PROJECT_DIRECTORY}/vendor/github.com/grpc-ecosystem/grpc-gateway ${PROJECT_DIRECTORY}/api/api.proto --doc_out ${PROJECT_DIRECTORY}/docs/api-generated --doc_opt=markdown,api.md"
 protoc ${PROJECT_DIRECTORY}/api/api.proto -I ${PROJECT_DIRECTORY}/api/ -I ${PROJECT_DIRECTORY}/vendor/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis -I ${PROJECT_DIRECTORY}/vendor/github.com/grpc-ecosystem/grpc-gateway ${PROJECT_DIRECTORY}/api/api.proto --doc_out ${PROJECT_DIRECTORY}/docs/api-generated --doc_opt=markdown,api.md
+
+# cleanup files created by root
+rm -rf ${PROJECT_DIRECTORY}/vendor/github.com/grpc-ecosystem/grpc-gateway/third_party

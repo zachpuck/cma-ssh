@@ -23,10 +23,6 @@ func PrepareNodes(in *pb.CreateClusterMsg) ([]byte, []byte, error) {
 	for _, node := range in.ControlPlaneNodes {
 		sshParams := ssh.MachineParams{
 			Username:   node.Username,
-			Host:       node.Host,
-			PublicHost: node.Publichost,
-			Port:       node.Port,
-			Password:   node.Password,
 		}
 		err := ssh.SetupPrivateKeyAccess(sshParams, private, public)
 		if err != nil {
@@ -37,10 +33,6 @@ func PrepareNodes(in *pb.CreateClusterMsg) ([]byte, []byte, error) {
 	for _, node := range in.WorkerNodes {
 		sshParams := ssh.MachineParams{
 			Username:   node.Username,
-			Host:       node.Host,
-			PublicHost: node.Publichost,
-			Port:       node.Port,
-			Password:   node.Password,
 		}
 
 		err := ssh.SetupPrivateKeyAccess(sshParams, private, public)

@@ -1,5 +1,5 @@
 # Protocol Documentation
-<a name="top"/>
+<a name="top"></a>
 
 ## Table of Contents
 
@@ -23,11 +23,13 @@
     - [GetVersionReply](#cmassh.GetVersionReply)
     - [GetVersionReply.VersionInformation](#cmassh.GetVersionReply.VersionInformation)
     - [KubernetesLabel](#cmassh.KubernetesLabel)
+    - [KubernetesTaint](#cmassh.KubernetesTaint)
     - [SshMachineSpec](#cmassh.SshMachineSpec)
     - [UpgradeClusterMsg](#cmassh.UpgradeClusterMsg)
     - [UpgradeClusterReply](#cmassh.UpgradeClusterReply)
   
     - [ClusterStatus](#cmassh.ClusterStatus)
+    - [KubernetesTaintEffect](#cmassh.KubernetesTaintEffect)
   
   
     - [Cluster](#cmassh.Cluster)
@@ -53,11 +55,13 @@
     - [GetVersionReply](#cmassh.GetVersionReply)
     - [GetVersionReply.VersionInformation](#cmassh.GetVersionReply.VersionInformation)
     - [KubernetesLabel](#cmassh.KubernetesLabel)
+    - [KubernetesTaint](#cmassh.KubernetesTaint)
     - [SshMachineSpec](#cmassh.SshMachineSpec)
     - [UpgradeClusterMsg](#cmassh.UpgradeClusterMsg)
     - [UpgradeClusterReply](#cmassh.UpgradeClusterReply)
   
     - [ClusterStatus](#cmassh.ClusterStatus)
+    - [KubernetesTaintEffect](#cmassh.KubernetesTaintEffect)
   
   
     - [Cluster](#cmassh.Cluster)
@@ -67,14 +71,14 @@
 
 
 
-<a name="api.proto"/>
+<a name="api.proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
 ## api.proto
 
 
 
-<a name="cmassh.AdjustClusterMsg"/>
+<a name="cmassh.AdjustClusterMsg"></a>
 
 ### AdjustClusterMsg
 
@@ -91,7 +95,7 @@
 
 
 
-<a name="cmassh.AdjustClusterMsg.SshRemoveMachineSpec"/>
+<a name="cmassh.AdjustClusterMsg.SshRemoveMachineSpec"></a>
 
 ### AdjustClusterMsg.SshRemoveMachineSpec
 
@@ -106,7 +110,7 @@
 
 
 
-<a name="cmassh.AdjustClusterReply"/>
+<a name="cmassh.AdjustClusterReply"></a>
 
 ### AdjustClusterReply
 
@@ -121,7 +125,7 @@
 
 
 
-<a name="cmassh.ClusterDetailItem"/>
+<a name="cmassh.ClusterDetailItem"></a>
 
 ### ClusterDetailItem
 
@@ -133,14 +137,16 @@
 | name | [string](#string) |  | Name of the cluster |
 | status_message | [string](#string) |  | Additional information about the status of the cluster |
 | kubeconfig | [string](#string) |  | What is the kubeconfig to connect to the cluster |
-| status | [ClusterStatus](#cmassh.ClusterStatus) |  | The status of the cluster |
+| status | [ClusterStatus](#cmassh.ClusterStatus) |  | The status of the cluster
+
+TODO: (zachpuck) Do we need to add machines SSH host? |
 
 
 
 
 
 
-<a name="cmassh.ClusterItem"/>
+<a name="cmassh.ClusterItem"></a>
 
 ### ClusterItem
 
@@ -158,7 +164,7 @@
 
 
 
-<a name="cmassh.CreateClusterMsg"/>
+<a name="cmassh.CreateClusterMsg"></a>
 
 ### CreateClusterMsg
 
@@ -180,7 +186,7 @@
 
 
 
-<a name="cmassh.CreateClusterReply"/>
+<a name="cmassh.CreateClusterReply"></a>
 
 ### CreateClusterReply
 
@@ -196,7 +202,7 @@
 
 
 
-<a name="cmassh.DeleteClusterMsg"/>
+<a name="cmassh.DeleteClusterMsg"></a>
 
 ### DeleteClusterMsg
 
@@ -211,7 +217,7 @@
 
 
 
-<a name="cmassh.DeleteClusterReply"/>
+<a name="cmassh.DeleteClusterReply"></a>
 
 ### DeleteClusterReply
 
@@ -227,7 +233,7 @@
 
 
 
-<a name="cmassh.GetClusterListMsg"/>
+<a name="cmassh.GetClusterListMsg"></a>
 
 ### GetClusterListMsg
 
@@ -237,7 +243,7 @@
 
 
 
-<a name="cmassh.GetClusterListReply"/>
+<a name="cmassh.GetClusterListReply"></a>
 
 ### GetClusterListReply
 
@@ -253,7 +259,7 @@
 
 
 
-<a name="cmassh.GetClusterMsg"/>
+<a name="cmassh.GetClusterMsg"></a>
 
 ### GetClusterMsg
 
@@ -268,7 +274,7 @@
 
 
 
-<a name="cmassh.GetClusterReply"/>
+<a name="cmassh.GetClusterReply"></a>
 
 ### GetClusterReply
 
@@ -284,7 +290,7 @@
 
 
 
-<a name="cmassh.GetUpgradeClusterInformationMsg"/>
+<a name="cmassh.GetUpgradeClusterInformationMsg"></a>
 
 ### GetUpgradeClusterInformationMsg
 
@@ -299,7 +305,7 @@
 
 
 
-<a name="cmassh.GetUpgradeClusterInformationReply"/>
+<a name="cmassh.GetUpgradeClusterInformationReply"></a>
 
 ### GetUpgradeClusterInformationReply
 
@@ -315,7 +321,7 @@
 
 
 
-<a name="cmassh.GetVersionMsg"/>
+<a name="cmassh.GetVersionMsg"></a>
 
 ### GetVersionMsg
 Get version of API Server
@@ -325,7 +331,7 @@ Get version of API Server
 
 
 
-<a name="cmassh.GetVersionReply"/>
+<a name="cmassh.GetVersionReply"></a>
 
 ### GetVersionReply
 Reply for version request
@@ -341,7 +347,7 @@ Reply for version request
 
 
 
-<a name="cmassh.GetVersionReply.VersionInformation"/>
+<a name="cmassh.GetVersionReply.VersionInformation"></a>
 
 ### GetVersionReply.VersionInformation
 
@@ -362,7 +368,7 @@ Reply for version request
 
 
 
-<a name="cmassh.KubernetesLabel"/>
+<a name="cmassh.KubernetesLabel"></a>
 
 ### KubernetesLabel
 
@@ -378,7 +384,24 @@ Reply for version request
 
 
 
-<a name="cmassh.SshMachineSpec"/>
+<a name="cmassh.KubernetesTaint"></a>
+
+### KubernetesTaint
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of a taint |
+| value | [string](#string) |  | The value of a taint |
+| effect | [KubernetesTaintEffect](#cmassh.KubernetesTaintEffect) |  | The effect of a taint |
+
+
+
+
+
+
+<a name="cmassh.SshMachineSpec"></a>
 
 ### SshMachineSpec
 The specification for a specific node
@@ -387,18 +410,18 @@ The specification for a specific node
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | username | [string](#string) |  | The username for SSH access |
-| host | [string](#string) |  | The host for SSH access |
-| port | [int32](#int32) |  | The port for SSH access |
-| password | [string](#string) |  | The password for SSH access. This is not implemented within the clusterapi because without known_host support a MITM can get the password. A MITM is still a problem for key based authentication; even if they do not get the key they can still impersonate the machine. TODO: implement known_hosts. |
 | labels | [KubernetesLabel](#cmassh.KubernetesLabel) | repeated | The labels for the machines |
-| publichost | [string](#string) |  | optional public host ip |
+| taints | [KubernetesTaint](#cmassh.KubernetesTaint) | repeated | The list of kubernetes taints |
+| instanceType | [string](#string) |  | Type of machine to provision (small, medium, gpu, ...)
+
+TODO: (zachpuck) Do we want instance type as enum? |
 
 
 
 
 
 
-<a name="cmassh.UpgradeClusterMsg"/>
+<a name="cmassh.UpgradeClusterMsg"></a>
 
 ### UpgradeClusterMsg
 
@@ -414,7 +437,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.UpgradeClusterReply"/>
+<a name="cmassh.UpgradeClusterReply"></a>
 
 ### UpgradeClusterReply
 
@@ -431,7 +454,7 @@ The specification for a specific node
  
 
 
-<a name="cmassh.ClusterStatus"/>
+<a name="cmassh.ClusterStatus"></a>
 
 ### ClusterStatus
 
@@ -447,39 +470,52 @@ The specification for a specific node
 | DEGRADED | 6 | The DEGRADED state indicates the cluster requires user action to restore full functionality |
 
 
- 
+
+<a name="cmassh.KubernetesTaintEffect"></a>
+
+### KubernetesTaintEffect
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| NoSchedule | 0 | Do not allow new pods to schedule onto the node unless they tolerate the taint. |
+| PreferNoSchedule | 1 | Attempt to not schedule new pods onto the node unless no other node without taint is available. |
+| NoExecute | 2 | Evict any already-running pods that do not tolerate the taint. |
+
 
  
 
+ 
 
-<a name="cmassh.Cluster"/>
+
+<a name="cmassh.Cluster"></a>
 
 ### Cluster
 
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| CreateCluster | [CreateClusterMsg](#cmassh.CreateClusterMsg) | [CreateClusterReply](#cmassh.CreateClusterMsg) | Will provision a cluster |
-| GetCluster | [GetClusterMsg](#cmassh.GetClusterMsg) | [GetClusterReply](#cmassh.GetClusterMsg) | Will retrieve the status of a cluster and its kubeconfig for connectivity |
-| DeleteCluster | [DeleteClusterMsg](#cmassh.DeleteClusterMsg) | [DeleteClusterReply](#cmassh.DeleteClusterMsg) | Will delete a cluster |
-| GetClusterList | [GetClusterListMsg](#cmassh.GetClusterListMsg) | [GetClusterListReply](#cmassh.GetClusterListMsg) | Will retrieve a list of clusters |
-| GetVersionInformation | [GetVersionMsg](#cmassh.GetVersionMsg) | [GetVersionReply](#cmassh.GetVersionMsg) | Will return version information about api server |
-| AdjustClusterNodes | [AdjustClusterMsg](#cmassh.AdjustClusterMsg) | [AdjustClusterReply](#cmassh.AdjustClusterMsg) | Will adjust a provision a cluster |
-| GetUpgradeClusterInformation | [GetUpgradeClusterInformationMsg](#cmassh.GetUpgradeClusterInformationMsg) | [GetUpgradeClusterInformationReply](#cmassh.GetUpgradeClusterInformationMsg) | Will return upgrade options for a given cluster |
-| UpgradeCluster | [UpgradeClusterMsg](#cmassh.UpgradeClusterMsg) | [UpgradeClusterReply](#cmassh.UpgradeClusterMsg) | Will attempt to upgrade a cluster |
+| CreateCluster | [CreateClusterMsg](#cmassh.CreateClusterMsg) | [CreateClusterReply](#cmassh.CreateClusterReply) | Will provision a cluster |
+| GetCluster | [GetClusterMsg](#cmassh.GetClusterMsg) | [GetClusterReply](#cmassh.GetClusterReply) | Will retrieve the status of a cluster and its kubeconfig for connectivity |
+| DeleteCluster | [DeleteClusterMsg](#cmassh.DeleteClusterMsg) | [DeleteClusterReply](#cmassh.DeleteClusterReply) | Will delete a cluster |
+| GetClusterList | [GetClusterListMsg](#cmassh.GetClusterListMsg) | [GetClusterListReply](#cmassh.GetClusterListReply) | Will retrieve a list of clusters |
+| GetVersionInformation | [GetVersionMsg](#cmassh.GetVersionMsg) | [GetVersionReply](#cmassh.GetVersionReply) | Will return version information about api server |
+| AdjustClusterNodes | [AdjustClusterMsg](#cmassh.AdjustClusterMsg) | [AdjustClusterReply](#cmassh.AdjustClusterReply) | Will adjust a provision a cluster |
+| GetUpgradeClusterInformation | [GetUpgradeClusterInformationMsg](#cmassh.GetUpgradeClusterInformationMsg) | [GetUpgradeClusterInformationReply](#cmassh.GetUpgradeClusterInformationReply) | Will return upgrade options for a given cluster |
+| UpgradeCluster | [UpgradeClusterMsg](#cmassh.UpgradeClusterMsg) | [UpgradeClusterReply](#cmassh.UpgradeClusterReply) | Will attempt to upgrade a cluster |
 
  
 
 
 
-<a name="api.proto"/>
+<a name="api.proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
 ## api.proto
 
 
 
-<a name="cmassh.AdjustClusterMsg"/>
+<a name="cmassh.AdjustClusterMsg"></a>
 
 ### AdjustClusterMsg
 
@@ -496,7 +532,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.AdjustClusterMsg.SshRemoveMachineSpec"/>
+<a name="cmassh.AdjustClusterMsg.SshRemoveMachineSpec"></a>
 
 ### AdjustClusterMsg.SshRemoveMachineSpec
 
@@ -511,7 +547,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.AdjustClusterReply"/>
+<a name="cmassh.AdjustClusterReply"></a>
 
 ### AdjustClusterReply
 
@@ -526,7 +562,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.ClusterDetailItem"/>
+<a name="cmassh.ClusterDetailItem"></a>
 
 ### ClusterDetailItem
 
@@ -538,14 +574,16 @@ The specification for a specific node
 | name | [string](#string) |  | Name of the cluster |
 | status_message | [string](#string) |  | Additional information about the status of the cluster |
 | kubeconfig | [string](#string) |  | What is the kubeconfig to connect to the cluster |
-| status | [ClusterStatus](#cmassh.ClusterStatus) |  | The status of the cluster |
+| status | [ClusterStatus](#cmassh.ClusterStatus) |  | The status of the cluster
+
+TODO: (zachpuck) Do we need to add machines SSH host? |
 
 
 
 
 
 
-<a name="cmassh.ClusterItem"/>
+<a name="cmassh.ClusterItem"></a>
 
 ### ClusterItem
 
@@ -563,7 +601,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.CreateClusterMsg"/>
+<a name="cmassh.CreateClusterMsg"></a>
 
 ### CreateClusterMsg
 
@@ -585,7 +623,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.CreateClusterReply"/>
+<a name="cmassh.CreateClusterReply"></a>
 
 ### CreateClusterReply
 
@@ -601,7 +639,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.DeleteClusterMsg"/>
+<a name="cmassh.DeleteClusterMsg"></a>
 
 ### DeleteClusterMsg
 
@@ -616,7 +654,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.DeleteClusterReply"/>
+<a name="cmassh.DeleteClusterReply"></a>
 
 ### DeleteClusterReply
 
@@ -632,7 +670,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.GetClusterListMsg"/>
+<a name="cmassh.GetClusterListMsg"></a>
 
 ### GetClusterListMsg
 
@@ -642,7 +680,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.GetClusterListReply"/>
+<a name="cmassh.GetClusterListReply"></a>
 
 ### GetClusterListReply
 
@@ -658,7 +696,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.GetClusterMsg"/>
+<a name="cmassh.GetClusterMsg"></a>
 
 ### GetClusterMsg
 
@@ -673,7 +711,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.GetClusterReply"/>
+<a name="cmassh.GetClusterReply"></a>
 
 ### GetClusterReply
 
@@ -689,7 +727,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.GetUpgradeClusterInformationMsg"/>
+<a name="cmassh.GetUpgradeClusterInformationMsg"></a>
 
 ### GetUpgradeClusterInformationMsg
 
@@ -704,7 +742,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.GetUpgradeClusterInformationReply"/>
+<a name="cmassh.GetUpgradeClusterInformationReply"></a>
 
 ### GetUpgradeClusterInformationReply
 
@@ -720,7 +758,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.GetVersionMsg"/>
+<a name="cmassh.GetVersionMsg"></a>
 
 ### GetVersionMsg
 Get version of API Server
@@ -730,7 +768,7 @@ Get version of API Server
 
 
 
-<a name="cmassh.GetVersionReply"/>
+<a name="cmassh.GetVersionReply"></a>
 
 ### GetVersionReply
 Reply for version request
@@ -746,7 +784,7 @@ Reply for version request
 
 
 
-<a name="cmassh.GetVersionReply.VersionInformation"/>
+<a name="cmassh.GetVersionReply.VersionInformation"></a>
 
 ### GetVersionReply.VersionInformation
 
@@ -767,7 +805,7 @@ Reply for version request
 
 
 
-<a name="cmassh.KubernetesLabel"/>
+<a name="cmassh.KubernetesLabel"></a>
 
 ### KubernetesLabel
 
@@ -783,7 +821,24 @@ Reply for version request
 
 
 
-<a name="cmassh.SshMachineSpec"/>
+<a name="cmassh.KubernetesTaint"></a>
+
+### KubernetesTaint
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of a taint |
+| value | [string](#string) |  | The value of a taint |
+| effect | [KubernetesTaintEffect](#cmassh.KubernetesTaintEffect) |  | The effect of a taint |
+
+
+
+
+
+
+<a name="cmassh.SshMachineSpec"></a>
 
 ### SshMachineSpec
 The specification for a specific node
@@ -792,18 +847,18 @@ The specification for a specific node
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | username | [string](#string) |  | The username for SSH access |
-| host | [string](#string) |  | The host for SSH access |
-| port | [int32](#int32) |  | The port for SSH access |
-| password | [string](#string) |  | The password for SSH access. This is not implemented within the clusterapi because without known_host support a MITM can get the password. A MITM is still a problem for key based authentication; even if they do not get the key they can still impersonate the machine. TODO: implement known_hosts. |
 | labels | [KubernetesLabel](#cmassh.KubernetesLabel) | repeated | The labels for the machines |
-| publichost | [string](#string) |  | optional public host ip |
+| taints | [KubernetesTaint](#cmassh.KubernetesTaint) | repeated | The list of kubernetes taints |
+| instanceType | [string](#string) |  | Type of machine to provision (small, medium, gpu, ...)
+
+TODO: (zachpuck) Do we want instance type as enum? |
 
 
 
 
 
 
-<a name="cmassh.UpgradeClusterMsg"/>
+<a name="cmassh.UpgradeClusterMsg"></a>
 
 ### UpgradeClusterMsg
 
@@ -819,7 +874,7 @@ The specification for a specific node
 
 
 
-<a name="cmassh.UpgradeClusterReply"/>
+<a name="cmassh.UpgradeClusterReply"></a>
 
 ### UpgradeClusterReply
 
@@ -836,7 +891,7 @@ The specification for a specific node
  
 
 
-<a name="cmassh.ClusterStatus"/>
+<a name="cmassh.ClusterStatus"></a>
 
 ### ClusterStatus
 
@@ -852,26 +907,39 @@ The specification for a specific node
 | DEGRADED | 6 | The DEGRADED state indicates the cluster requires user action to restore full functionality |
 
 
- 
+
+<a name="cmassh.KubernetesTaintEffect"></a>
+
+### KubernetesTaintEffect
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| NoSchedule | 0 | Do not allow new pods to schedule onto the node unless they tolerate the taint. |
+| PreferNoSchedule | 1 | Attempt to not schedule new pods onto the node unless no other node without taint is available. |
+| NoExecute | 2 | Evict any already-running pods that do not tolerate the taint. |
+
 
  
 
+ 
 
-<a name="cmassh.Cluster"/>
+
+<a name="cmassh.Cluster"></a>
 
 ### Cluster
 
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| CreateCluster | [CreateClusterMsg](#cmassh.CreateClusterMsg) | [CreateClusterReply](#cmassh.CreateClusterMsg) | Will provision a cluster |
-| GetCluster | [GetClusterMsg](#cmassh.GetClusterMsg) | [GetClusterReply](#cmassh.GetClusterMsg) | Will retrieve the status of a cluster and its kubeconfig for connectivity |
-| DeleteCluster | [DeleteClusterMsg](#cmassh.DeleteClusterMsg) | [DeleteClusterReply](#cmassh.DeleteClusterMsg) | Will delete a cluster |
-| GetClusterList | [GetClusterListMsg](#cmassh.GetClusterListMsg) | [GetClusterListReply](#cmassh.GetClusterListMsg) | Will retrieve a list of clusters |
-| GetVersionInformation | [GetVersionMsg](#cmassh.GetVersionMsg) | [GetVersionReply](#cmassh.GetVersionMsg) | Will return version information about api server |
-| AdjustClusterNodes | [AdjustClusterMsg](#cmassh.AdjustClusterMsg) | [AdjustClusterReply](#cmassh.AdjustClusterMsg) | Will adjust a provision a cluster |
-| GetUpgradeClusterInformation | [GetUpgradeClusterInformationMsg](#cmassh.GetUpgradeClusterInformationMsg) | [GetUpgradeClusterInformationReply](#cmassh.GetUpgradeClusterInformationMsg) | Will return upgrade options for a given cluster |
-| UpgradeCluster | [UpgradeClusterMsg](#cmassh.UpgradeClusterMsg) | [UpgradeClusterReply](#cmassh.UpgradeClusterMsg) | Will attempt to upgrade a cluster |
+| CreateCluster | [CreateClusterMsg](#cmassh.CreateClusterMsg) | [CreateClusterReply](#cmassh.CreateClusterReply) | Will provision a cluster |
+| GetCluster | [GetClusterMsg](#cmassh.GetClusterMsg) | [GetClusterReply](#cmassh.GetClusterReply) | Will retrieve the status of a cluster and its kubeconfig for connectivity |
+| DeleteCluster | [DeleteClusterMsg](#cmassh.DeleteClusterMsg) | [DeleteClusterReply](#cmassh.DeleteClusterReply) | Will delete a cluster |
+| GetClusterList | [GetClusterListMsg](#cmassh.GetClusterListMsg) | [GetClusterListReply](#cmassh.GetClusterListReply) | Will retrieve a list of clusters |
+| GetVersionInformation | [GetVersionMsg](#cmassh.GetVersionMsg) | [GetVersionReply](#cmassh.GetVersionReply) | Will return version information about api server |
+| AdjustClusterNodes | [AdjustClusterMsg](#cmassh.AdjustClusterMsg) | [AdjustClusterReply](#cmassh.AdjustClusterReply) | Will adjust a provision a cluster |
+| GetUpgradeClusterInformation | [GetUpgradeClusterInformationMsg](#cmassh.GetUpgradeClusterInformationMsg) | [GetUpgradeClusterInformationReply](#cmassh.GetUpgradeClusterInformationReply) | Will return upgrade options for a given cluster |
+| UpgradeCluster | [UpgradeClusterMsg](#cmassh.UpgradeClusterMsg) | [UpgradeClusterReply](#cmassh.UpgradeClusterReply) | Will attempt to upgrade a cluster |
 
  
 

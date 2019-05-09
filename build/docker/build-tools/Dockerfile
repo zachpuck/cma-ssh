@@ -26,3 +26,8 @@ ARG PROTOC_FILENAME=protoc.zip
 RUN curl -L ${PROTOC_URL} > /tmp/${PROTOC_FILENAME}
 RUN unzip -o /tmp/${PROTOC_FILENAME} -d /usr/local/
 RUN rm /tmp/${PROTOC_FILENAME}
+
+RUN go get -u github.com/golang/protobuf/protoc-gen-go && \
+	go get -u github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway && \
+	go get -u github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger && \
+	go get -u github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc

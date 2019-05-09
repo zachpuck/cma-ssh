@@ -4,9 +4,9 @@
     "title": "Cluster Manager API SSH provider",
     "version": "v0.1.0",
     "contact": {
-      "name": "Marat Garafutdinov",
+      "name": "Samsung CNCT",
       "url": "https://github.com/samsung-cnct/cma-ssh",
-      "email": "maratoid@gmail.com"
+      "email": "samsung.cloudnative@gmail.com"
     }
   },
   "schemes": [
@@ -26,7 +26,7 @@
         "operationId": "GetCluster",
         "responses": {
           "200": {
-            "description": "",
+            "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/cmasshGetClusterReply"
             }
@@ -50,7 +50,7 @@
         "operationId": "DeleteCluster",
         "responses": {
           "200": {
-            "description": "",
+            "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/cmasshDeleteClusterReply"
             }
@@ -74,7 +74,7 @@
         "operationId": "CreateCluster",
         "responses": {
           "200": {
-            "description": "",
+            "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/cmasshCreateClusterReply"
             }
@@ -99,7 +99,7 @@
         "operationId": "AdjustClusterNodes",
         "responses": {
           "200": {
-            "description": "",
+            "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/cmasshAdjustClusterReply"
             }
@@ -126,7 +126,7 @@
         "operationId": "GetClusterList",
         "responses": {
           "200": {
-            "description": "",
+            "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/cmasshGetClusterListReply"
             }
@@ -143,7 +143,7 @@
         "operationId": "GetUpgradeClusterInformation",
         "responses": {
           "200": {
-            "description": "",
+            "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/cmasshGetUpgradeClusterInformationReply"
             }
@@ -167,7 +167,7 @@
         "operationId": "UpgradeCluster",
         "responses": {
           "200": {
-            "description": "",
+            "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/cmasshUpgradeClusterReply"
             }
@@ -194,7 +194,7 @@
         "operationId": "GetVersionInformation",
         "responses": {
           "200": {
-            "description": "",
+            "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/cmasshGetVersionReply"
             }
@@ -489,25 +489,39 @@
         }
       }
     },
+    "cmasshKubernetesTaint": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "The name of a taint"
+        },
+        "value": {
+          "type": "string",
+          "title": "The value of a taint"
+        },
+        "effect": {
+          "$ref": "#/definitions/cmasshKubernetesTaintEffect",
+          "title": "The effect of a taint"
+        }
+      }
+    },
+    "cmasshKubernetesTaintEffect": {
+      "type": "string",
+      "enum": [
+        "NoSchedule",
+        "PreferNoSchedule",
+        "NoExecute"
+      ],
+      "default": "NoSchedule",
+      "description": " - NoSchedule: Do not allow new pods to schedule onto the node unless they tolerate the taint.\n - PreferNoSchedule: Attempt to not schedule new pods onto the node unless no other node without taint is available.\n - NoExecute: Evict any already-running pods that do not tolerate the taint."
+    },
     "cmasshSshMachineSpec": {
       "type": "object",
       "properties": {
         "username": {
           "type": "string",
           "title": "The username for SSH access"
-        },
-        "host": {
-          "type": "string",
-          "title": "The host for SSH access"
-        },
-        "port": {
-          "type": "integer",
-          "format": "int32",
-          "title": "The port for SSH access"
-        },
-        "password": {
-          "type": "string",
-          "description": "The password for SSH access. This is not implemented within the clusterapi\nbecause without known_host support a MITM can get the password. A MITM is\nstill a problem for key based authentication; even if they do not get the\nkey they can still impersonate the machine. TODO: implement known_hosts."
         },
         "labels": {
           "type": "array",
@@ -516,9 +530,16 @@
           },
           "title": "The labels for the machines"
         },
-        "publichost": {
+        "taints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/cmasshKubernetesTaint"
+          },
+          "title": "The list of kubernetes taints"
+        },
+        "instanceType": {
           "type": "string",
-          "title": "optional public host ip"
+          "title": "Type of machine to provision (small, medium, gpu, ...)"
         }
       },
       "title": "The specification for a specific node"

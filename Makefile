@@ -53,6 +53,11 @@ generate: bin/deepcopy-gen
 clean-test: build-dependencies-container
 	$(DOCKER_BUILD) 'make go1.12.4 && make'
 
+# protoc generates the proto buf api
+protoc:
+	$(DOCKER_BUILD) ./build/generators/api.sh
+	$(DOCKER_BUILD) ./build/generators/swagger-dist-adjustment.sh
+
 # Generate manifests e.g. CRD, RBAC etc.
 # generate parts of helm chart
 manifests: bin/controller-gen bin/kustomize
