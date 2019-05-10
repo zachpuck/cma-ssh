@@ -1,5 +1,5 @@
 # cma-ssh
-[![Build Status](https://jenkins.migrations.cnct.io/buildStatus/icon?job=cma-ssh/master)](https://jenkins.migrations.cnct.io/job/cma-ssh/job/master/)
+[![Build Status](https://jenkins.cnct.io/buildStatus/icon?job=cma-ssh/master)](https://jenkins.cnct.io/job/cma-ssh/job/master/)
 
 `cma-ssh` is an operator which manages the lifecycle of Kubernetes clusters
 (i.e. `CnctCluster` resources) and machines (`CnctMachine`). 
@@ -63,27 +63,88 @@ helm install --name cma-ssh deployments/helm/cma-ssh/
 kubectl get pods --watch
 ```
 
-## Creating a kubernetes cluster with cma-ssh
+## Creating kubernetes clusters with cma-ssh using kubectl
 
-Using kubectl, apply a cluster manifest, and one or more machine manifests to create a kubernetes cluster.
+Either kubectl or the Swagger UI REST interface can be used to create Kubernetes clusters with cma-ssh.  This section will focus on using kubectl.
 
-- [cluster spec](https://github.com/samsung-cnct/cma-ssh/blob/master/samples/cluster/cluster_v1alpha1_cluster.yaml) contains the kubernetes version.
--  [machine spec](https://github.com/samsung-cnct/cma-ssh/blob/master/samples/cluster/cluster_v1alpha1_machine.yaml) contains a role, label, and instanceType.
+A cluster definition consists of two kinds of Kubernetes Custom Resource Definitions (CRDs):
+- [cnctcluster CRD](https://github.com/samsung-cnct/cma-ssh/blob/master/crd/cluster_v1alpha1_cnctcluster.yaml), and 
+- [cnctmachine CRD](https://github.com/samsung-cnct/cma-ssh/blob/master/crd/cluster_v1alpha1_cnctmachine.yaml)
+
+A single cluster definition consists of:
+- one [cnctcluster resource](https://github.com/samsung-cnct/cma-ssh/blob/master/samples/cluster/cluster_v1alpha1_cluster.yaml), and 
+- one or more [cnctmachine resources](https://github.com/samsung-cnct/cma-ssh/blob/master/samples/cluster/cluster_v1alpha1_machine.yaml) to define master and worker nodes.
+
+### Namespace per cluster
+
+The resources for a single cluster definition must be in the same namespace.
+You cannot define two clusters in the same namespace, each cluster requires its own namespace.
+One naming option is to use unique cluster names and define a namespace that matches the cluster name.
+
+### Example using samples for a cluster named cluster1
+
+Create a namespace for the cluster definition resources:
 
 ```bash
-kubectl apply -f samples/cluster/cluster_v1alpha1_cluster.yaml
-kubectl apply -f samples/cluster/cluster_v1alpha1_machine.yaml
+kubectl create namespace cluster1
+```
+
+Copy the resource samples to your own cluster dir and modify them:
+
+```bash
+mkdir ~/cluster1
+cp samples/cluster/cluster_v1alpha1_cluster.yaml ~/cluster1/cluster.yaml
+cp samples/cluster/cluster_v1alpha1_machine.yaml ~/cluster1/machines.yaml
+
+vi ~/cluster1/cluster.yaml
+#Modify the name, namespace, and optionally kubernetes version
+
+vi ~/cluster1/machines.yaml
+# Modify the name, namespace and instanceType (to match MaaS tags desired)
+```
+Using kubectl, apply a cluster manifest, and one or more machine manifests to create a kubernetes cluster:
+
+```bash
+kubectl apply -f ~/cluster1/cluster.yaml
+kubectl apply -f ~/cluster1/machines.yaml
 ```
 
 ## How instanceType is mapped to MaaS machine tags
+
 [MaaS tags](https://docs.maas.io/2.5/en/nodes-tags) can be used to: 
 - select hardware reserved for use by cma-ssh, 
 - select hardware for masters or workers, and 
 - select hardware for specific workloads (e.g. those requiring GPUs, etc.)
 
+### Define MaaS tags on MaaS machines before using cma-ssh
+
 User defined MaaS tags would be assigned to MaaS machines using the MaaS cli or MaaS UI before running cma-ssh. 
 The machine spec [instanceType](https://github.com/samsung-cnct/cma-ssh/blob/master/samples/cluster/cluster_v1alpha1_machine.yaml#L15) field is used to map a single instanceType string to a MaaS tag.  If no MaaS tags have been defined, the instanceType field can be passed in as an empty string so that any MaaS machine will be chosen.
  
+## Retrieving the kubeconfig for the cluster
+
+A secret named `cluster-private-key` is defined in the namespace of the cluster.
+
+To retrieve the kubeconfig:
+```bash
+kubectl get secret cluster-private-key -ojson -n <namespace> | jq -r '.data.kubeconfig' | base64 -D > kubeconfig-<clustername>
+```
+To use the kubeconfig:
+```bash
+kubectl get nodes --kubeconfig kubeconfig-<clustername>
+````
+
+## Deleting the cluster or individual machines
+
+To delete the cluster:
+```bash
+kubectl delete cnctcluster <cluster name> -n <namespace>
+```
+
+To delete a single machine in the cluster:
+```bash
+kubectl delete cnctmachine <machine name> -n <namespace>
+```
 
 # Deprecated
 
