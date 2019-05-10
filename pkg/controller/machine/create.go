@@ -271,7 +271,7 @@ func (c *creator) prepareMaasRequest() {
 	providerID := fmt.Sprintf("%s-%s", c.cluster.Name, c.machine.Name)
 	c.createRequest = maas.CreateRequest{
 		ProviderID:   providerID,
-		Distro:       "ubuntu-18.04-cnct-k8s-master",
+		Distro:       "ubuntu-16.04-vanilla",
 		Userdata:     userdata,
 		InstanceType: c.machine.Spec.InstanceType,
 	}
