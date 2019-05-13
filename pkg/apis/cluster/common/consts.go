@@ -120,5 +120,5 @@ const (
 )
 
 const (
-	ApiEnpointPort = "6443"
+	ApiEndpointPort = "6443"
 )

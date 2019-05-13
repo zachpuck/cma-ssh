@@ -5,44 +5,12 @@ import (
 
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	"github.com/samsung-cnct/cma-ssh/pkg/generated/api"
-	pb "github.com/samsung-cnct/cma-ssh/pkg/generated/api"
-	"github.com/samsung-cnct/cma-ssh/pkg/ssh"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
 
 	corev1 "k8s.io/api/core/v1"
 	clientlib "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
-
-func PrepareNodes(in *pb.CreateClusterMsg) ([]byte, []byte, error) {
-	private, public, err := ssh.GenerateSSHKeyPair()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	for _, node := range in.ControlPlaneNodes {
-		sshParams := ssh.MachineParams{
-			Username:   node.Username,
-		}
-		err := ssh.SetupPrivateKeyAccess(sshParams, private, public)
-		if err != nil {
-			return private, public, err
-		}
-	}
-
-	for _, node := range in.WorkerNodes {
-		sshParams := ssh.MachineParams{
-			Username:   node.Username,
-		}
-
-		err := ssh.SetupPrivateKeyAccess(sshParams, private, public)
-		if err != nil {
-			return private, public, err
-		}
-	}
-
-	return public, private, nil
-}
 
 func TranslateClusterStatus(crStatus common.ClusterStatusPhase) cmassh.ClusterStatus {
 

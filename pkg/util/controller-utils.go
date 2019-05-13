@@ -52,7 +52,7 @@ func GetStatus(machines []clusterv1alpha1.CnctMachine) (common.ClusterStatusPhas
 	apiEndpoint := ""
 	for _, machine := range machines {
 		if machine.Status.Phase == common.ReadyMachinePhase && ContainsRole(machine.Spec.Roles, common.MachineRoleMaster) {
-			apiEndpoint = machine.Status.SshConfig.Host + ":" + common.ApiEnpointPort
+			apiEndpoint = machine.Status.SshConfig.Host + ":" + common.ApiEndpointPort
 		}
 	}
 
@@ -156,16 +156,4 @@ func RemoveString(slice []string, s string) (result []string) {
 		result = append(result, item)
 	}
 	return
-}
-
-func GetMaster(machines []clusterv1alpha1.CnctMachine) (*clusterv1alpha1.CnctMachine, error) {
-	for _, item := range machines {
-		for _, role := range item.Spec.Roles {
-			if role == common.MachineRoleMaster {
-				return &item, nil
-			}
-		}
-	}
-
-	return nil, fmt.Errorf("could not find master node")
 }
