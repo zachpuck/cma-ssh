@@ -233,7 +233,7 @@ message SshMachineSpec {
     // The list of kubernetes taints
     repeated KubernetesTaint taints = 7;
     // Type of machine to provision (small, medium, gpu, ...)
-    string instanceType = 8; // TODO: (zachpuck) Do we want instance type as enum?
+    string instanceType = 8;
 }
 
 // Get version of API Server

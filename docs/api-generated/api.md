@@ -412,9 +412,7 @@ The specification for a specific node
 | username | [string](#string) |  | The username for SSH access |
 | labels | [KubernetesLabel](#cmassh.KubernetesLabel) | repeated | The labels for the machines |
 | taints | [KubernetesTaint](#cmassh.KubernetesTaint) | repeated | The list of kubernetes taints |
-| instanceType | [string](#string) |  | Type of machine to provision (small, medium, gpu, ...)
-
-TODO: (zachpuck) Do we want instance type as enum? |
+| instanceType | [string](#string) |  | Type of machine to provision (small, medium, gpu, ...) |
 
 
 
@@ -849,9 +847,7 @@ The specification for a specific node
 | username | [string](#string) |  | The username for SSH access |
 | labels | [KubernetesLabel](#cmassh.KubernetesLabel) | repeated | The labels for the machines |
 | taints | [KubernetesTaint](#cmassh.KubernetesTaint) | repeated | The list of kubernetes taints |
-| instanceType | [string](#string) |  | Type of machine to provision (small, medium, gpu, ...)
-
-TODO: (zachpuck) Do we want instance type as enum? |
+| instanceType | [string](#string) |  | Type of machine to provision (small, medium, gpu, ...) |
 
 
 
