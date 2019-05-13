@@ -57,6 +57,7 @@ clean-test: build-dependencies-container
 protoc:
 	$(DOCKER_BUILD) ./build/generators/api.sh
 	$(DOCKER_BUILD) ./build/generators/swagger-dist-adjustment.sh
+	$(MAKE) generate
 
 # Generate manifests e.g. CRD, RBAC etc.
 # generate parts of helm chart
