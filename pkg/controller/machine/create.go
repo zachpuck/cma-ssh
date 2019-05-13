@@ -423,6 +423,12 @@ func (c *creator) updateMachine() {
 	// update status to "creating"
 	freshMachine.Status.Phase = common.ReadyMachinePhase
 	freshMachine.Status.KubernetesVersion = c.cluster.Spec.KubernetesVersion
+
+	// Check if machine object has existing annotations
+	if freshMachine.ObjectMeta.Annotations == nil {
+		freshMachine.ObjectMeta.Annotations = map[string]string{}
+	}
+	// TODO: (zachpuck) Move these Annotations to Status
 	freshMachine.ObjectMeta.Annotations["maas-ip"] = c.createResponse.IPAddresses[0]
 	freshMachine.ObjectMeta.Annotations["maas-system-id"] = c.createResponse.SystemID
 
