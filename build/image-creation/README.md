@@ -1,4 +1,6 @@
-# Building images with packer
+# MaaS Image Management
+
+# Building Images
 
 We are building images for MaaS; a general service which can provision operating
 systems to bare-metal as a service. Thus, we will need many images generally.
@@ -14,18 +16,20 @@ to create anything new then please skip down to [Run packer](#run-packer).
 
 ## Steps to build
 
-### Download Packer.
+### Using Packer
+
+#### Download Packer.
 
 You can download packer from [here](https://packer.io/downloads.html).
 
-### Choose a builder.
+#### Choose a builder.
 
 I prefer to do the image build on my computer so I use the Vagrant builder.
 You can also use AWS EC2, Azure, Google Cloud etc to build images.
 
-### Create a json template file for the build.
+#### Create a json template file for the build.
 
-```js
+```json
 {
   "builders": [
     // one or many builders here
@@ -54,12 +58,13 @@ You can also use AWS EC2, Azure, Google Cloud etc to build images.
 
 ## Provisioning Scripts Directory Layout
 
-This directory is created to create the versioned distribution dictated by the
-directory under which the packer assets reside. For instance, the path
-`<repo_root>/build/ubuntu/18.04` will create the image used for the stated
-distro and version.
+The following directory, `<repo_root>/build/ubuntu/18.04` is where the scripts
+reside and are used to create the versioned distribution dictated by the
+directory under which those assets reside. For instance, the path mentioned,
+`<repo_root>/build/ubuntu/18.04` will create the image used to create an Ubuntu
+18.04 image.
 
-### Download a base image to use.
+### Download a base image to use
 
 It was deemed a reasonably good idea to use the online MaaS image repo as a
 starting point for a vanilla OS image. The [Ubuntu Server Cloud Image](https://cloud-images.ubuntu.com/bionic/current/)
@@ -80,7 +85,7 @@ For example, [docker](image-creation/ubuntu/scripts/docker-install.sh) and [kube
 
 ### Add provisioners to copy files to builder.
 
-```js
+```json
 [
   // ...
     {
@@ -145,7 +150,36 @@ machine's processor exentions for virtual processing.
 
 ### Image file should be output to your local directory.
 
-# Importing into MaaS
+## Using Scripts
+
+Don't want to use Packer?
+
+Ordinarily, using scripts instead of packer should be discouraged unless you
+either cannot use packer, you're debugging these scripts, or some other reasonable
+reason for creating an image. That said, the artifact created using scripts is a
+proper maas image tarball semantically acceptable to the maas service for use in
+case the packer creation method ever fails.
+
+### How to use the scripts
+
+  All images are build under build/image-creation/<distribution>/<release>
+
+#### Download a base image to use.
+
+  If Necessary! See [above](#base_image_download)
+
+#### Steps to Use:
+
+  1. Note that the script must be run as root.
+  1. `chdir` to the path above for the distribution and release you
+      want to build. So, if you want to build an Ubuntu 18.04 image then
+     `cd build/image-creation/ubuntu/18.04`
+  1. invoke the script from your current location!
+```sudo ../scripts/non-packer-setup.sh```
+  1. Wait for the image to complete being created. It will be placed in the
+     ```iso``` directory of the current path you're in.
+
+# Import Image to MaaS
 
 ## Pre-requisites
 
@@ -157,8 +191,13 @@ machine's processor exentions for virtual processing.
   If you're unable to install maas-cli on your platform, you can use maas-cli
   on the maas master `192.168.2.24`.
 
-### Import New Image from MaaS Master *
-Important:*this is the only method available if you can't use local maas-cli
+### Import Image to MaaS
+
+Important:*this is the only method available **if you can't use local maas-cli**.
+If you have maas-cli installed on your (lap|desk)top then you can import directly
+from there and `scp`ing the image is not necessary.
+
+#### If you don't have maas-cli installed
 
   The image will need to get moved to the MaaS master server for import. Gaining
   access to the MaaS master is beyond the scope of this document. One can view
