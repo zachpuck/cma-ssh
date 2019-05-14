@@ -29,6 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const InstanceTypeNodeLabelKey = "beta.kubernetes.io/instance-type="
+
 type errNotReady string
 
 func (e errNotReady) Error() string {
@@ -249,6 +251,18 @@ func (c *creator) checkApiserverAddress() {
 	}
 }
 
+func (c *creator) getNodeLabels() string {
+	var sb strings.Builder
+	labels := c.machine.GetLabels()
+	for k, v := range labels {
+		label := fmt.Sprintf("%s=%s,", k, v)
+		sb.WriteString(label)
+	}
+	sb.WriteString(InstanceTypeNodeLabelKey)
+	sb.WriteString(c.machine.Spec.InstanceType)
+	return sb.String()
+}
+
 func (c *creator) prepareMaasRequest() {
 	if c.err != nil {
 		return
@@ -262,9 +276,10 @@ func (c *creator) prepareMaasRequest() {
 	}
 	var userdata string
 	if c.isMaster {
-		userdata, c.err = masterUserdata(bundle)
+		userdata, c.err = masterUserdata(bundle, c.getNodeLabels())
 	} else {
-		userdata, c.err = workerUserdata(bundle, c.token, c.cluster.Status.APIEndpoint)
+		userdata, c.err = workerUserdata(bundle, c.token, c.cluster.Status.APIEndpoint,
+			c.getNodeLabels())
 	}
 	// TODO: ProviderID should be unique. One way to ensure this is to generate
 	// a UUID. Cf. k8s.io/apimachinery/pkg/util/uuid
@@ -284,11 +299,25 @@ write_files:
    owner: root:root
    path: /etc/kubernetes/pki/certs.tar
    permissions: '0600'
+ - owner: root:root
+   path: /var/tmp/masterconfig.yaml
+   permissions: '0644'
+   content: |
+     apiVersion: kubeadm.k8s.io/v1beta1
+     kind: InitConfiguration
+     nodeRegistration:
+       kubeletExtraArgs:
+         node-labels: {{ .NodeLabels }}
+     ---
+     apiVersion: kubeadm.k8s.io/v1beta1
+     kind: ClusterConfiguration
+     networking:
+       podSubnet: "10.244.0.0/16"
 
 runcmd:
  - [ sh, -c, "swapoff -a" ]
  - [ sh, -c, "tar xf /etc/kubernetes/pki/certs.tar -C /etc/kubernetes/pki" ]
- - [ sh, -c, "kubeadm init --pod-network-cidr 10.244.0.0/16" ]
+ - [ sh, -c, "kubeadm init --config /var/tmp/masterconfig.yaml" ]
  - [ sh, -c, "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml" ]
 
 output : { all : '| tee -a /var/log/cloud-init-output.log' }
@@ -296,16 +325,18 @@ output : { all : '| tee -a /var/log/cloud-init-output.log' }
 
 var masterUserdataTmpl = template.Must(template.New("master").Parse(masterUserdataTmplText))
 
-func masterUserdata(bundle *cert.CABundle) (string, error) {
+func masterUserdata(bundle *cert.CABundle, nodeLabels string) (string, error) {
 	caTar, err := bundle.ToTar()
 	if err != nil {
 		return "", err
 	}
 	var userdata strings.Builder
 	data := struct {
-		Tar string
+		Tar        string
+		NodeLabels string
 	}{
-		Tar: caTar,
+		Tar:        caTar,
+		NodeLabels: nodeLabels,
 	}
 	if err := masterUserdataTmpl.Execute(&userdata, data); err != nil {
 		return "", err
@@ -314,16 +345,35 @@ func masterUserdata(bundle *cert.CABundle) (string, error) {
 }
 
 const workerUserdataTmplText = `#cloud-config
+write_files:
+ - owner: root:root
+   path: /var/tmp/workerconfig.yaml
+   permissions: '0644'
+   content: |
+     apiVersion: kubeadm.k8s.io/v1beta1
+     kind: JoinConfiguration
+     caCertPath: /etc/kubernetes/pki/ca.crt
+     discovery:
+       bootstrapToken:
+         apiServerEndpoint: {{ .APIEndpoint }}
+         token: {{ .Token }}
+         caCertHashes:
+         - {{ .CertHash }}
+       tlsBootstrapToken: {{ .Token }}
+     nodeRegistration:
+       kubeletExtraArgs:
+         node-labels: {{ .NodeLabels }}
+
 runcmd:
  - [ sh, -c, "swapoff -a" ]
- - [ sh, -c, "kubeadm join --discovery-token={{ .Token }} --discovery-token-ca-cert-hash {{ .CertHash }} {{ .APIEndpoint }}" ]
+ - [ sh, -c, "kubeadm join --config /var/tmp/workerconfig.yaml" ]
 
 output : { all : '| tee -a /var/log/cloud-init-output.log' }
 `
 
 var workerUserdataTmpl = template.Must(template.New("worker").Parse(workerUserdataTmplText))
 
-func workerUserdata(bundle *cert.CABundle, token, apiserverAddress string) (string, error) {
+func workerUserdata(bundle *cert.CABundle, token, apiserverAddress string, nodeLabels string) (string, error) {
 	certBlock, _ := pem.Decode(bundle.K8s)
 	certificate, err := x509.ParseCertificate(certBlock.Bytes)
 	if err != nil {
@@ -332,7 +382,17 @@ func workerUserdata(bundle *cert.CABundle, token, apiserverAddress string) (stri
 	hash := sha256.Sum256(certificate.RawSubjectPublicKeyInfo)
 	caHash := fmt.Sprintf("sha256:%x", hash)
 	var buf strings.Builder
-	data := struct{ Token, CertHash, APIEndpoint string }{token, caHash, apiserverAddress}
+	data := struct {
+		Token       string
+		CertHash    string
+		APIEndpoint string
+		NodeLabels  string
+	}{
+		Token:       token,
+		CertHash:    caHash,
+		APIEndpoint: apiserverAddress,
+		NodeLabels:  nodeLabels,
+	}
 	if err := workerUserdataTmpl.Execute(&buf, data); err != nil {
 		return "", err
 	}
