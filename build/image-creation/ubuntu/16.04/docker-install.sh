@@ -1,14 +1,3 @@
-mkdir -p /etc/apt/sources.list.d
-add-apt-repository -y ppa:graphics-drivers/ppa
-
-# Add the package repositories
-curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | \
-  sudo apt-key add -
-distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
-  sudo tee /etc/apt/sources.list.d/nvidia-docker.list
-sudo apt-get update
-
 # Install nvidia-docker2 and reload the Docker daemon configuration
 apt-get install -y \
   apt-transport-https \
@@ -29,10 +18,8 @@ add-apt-repository \
   $(lsb_release -cs) \
   stable"
 apt-get update
-apt-get install -y nvidia-docker2 \
-                   docker-ce docker-ce-cli \
-                   containerd.io libcuda1-384 \
-                   nvidia-384
+apt-get install -y docker-ce docker-ce-cli \
+                   containerd.io
 sudo pkill -SIGHUP dockerd
 apt --purge autoremove -y
 apt autoclean -y
