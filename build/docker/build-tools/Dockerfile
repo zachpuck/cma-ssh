@@ -31,3 +31,6 @@ RUN go get -u github.com/golang/protobuf/protoc-gen-go && \
 	go get -u github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway && \
 	go get -u github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger && \
 	go get -u github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc
+
+ARG GO_VERSION=go1.12.4
+RUN go get -u golang.org/dl/${GO_VERSION} && ${GO_VERSION} download

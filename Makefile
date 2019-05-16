@@ -11,7 +11,7 @@ DOCKER_BUILD ?= $(DOCKER) run --rm -v $(DIR):$(BUILDMNT) -w $(BUILDMNT) $(IMAGE)
 HOST_GOOS ?= $(shell go env GOOS)
 HOST_GOARCH ?= $(shell go env GOARCH)
 GO = go1.12.4
-GO_SYSTEM_FLAGS ?= GOOS=$(HOST_GOOS) GOARCH=$(HOST_GOARCH) GO111MODULE=on
+GO_SYSTEM_FLAGS ?= GOOS=$(HOST_GOOS) GOARCH=$(HOST_GOARCH) GO111MODULE=on GOPROXY=https://proxy.golang.org
 GOFILES = $(shell find ./ -type f -name '*.go')
 
 all: cma-ssh
@@ -25,7 +25,7 @@ $(GO):
 	GO111MODULE=off $(GO) download
 
 cma-ssh: $(GOFILES)
-	CGO_ENABLED=0 $(GO_SYSTEM_FLAGS) $(GO) build -o $(TARGET) cmd/cma-ssh/main.go
+	CGO_ENABLED=0 $(GO_SYSTEM_FLAGS) $(GO) build -o $(TARGET) ./cmd/cma-ssh
 
 bin:
 	mkdir bin
@@ -42,7 +42,7 @@ bin/kustomize: bin
 .PHONY: build-dependencies-container
 
 build-dependencies-container:
-	docker build -t $(IMAGE) -f build/docker/build-tools/Dockerfile build/docker/build-tools
+	docker build -t $(IMAGE) -f build/docker/build-tools/Dockerfile --build-arg GO_VERSION=$(GO) build/docker/build-tools
 
 test: build-dependencies-container
 	$(DOCKER_BUILD) 'go test -v ./...'
@@ -51,7 +51,7 @@ generate: bin/deepcopy-gen
 	PATH=${CURDIR}/bin:$(PATH) $(GO) generate ./...
 
 clean-test: build-dependencies-container
-	$(DOCKER_BUILD) 'make go1.12.4 && make'
+	$(DOCKER_BUILD) '$(GO_SYSTEM_FLAGS) $(GO) build -o $(TARGET) ./cmd/cma-ssh'
 
 # protoc generates the proto buf api
 protoc:
