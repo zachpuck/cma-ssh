@@ -31,14 +31,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
+
+var log = logf.Log.WithName("CnctMachine-controller")
 
 // AddWithActuator creates a new Machine Controller and adds it to the Manager
 // with default RBAC. The Manager will set fields on the Controller and Start
@@ -87,34 +89,39 @@ type ReconcileMachine struct {
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	log.Info("reconciling machine", "request", request)
+
+	log.Info("get machine")
 	var machine clusterv1alpha1.CnctMachine
 	if err := r.Get(context.Background(), request.NamespacedName, &machine); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Object not found, return.  Created objects are
 			// automatically garbage collected.
-			// log.Error(err, "could not find machine", "machine", request)
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		klog.Errorf("could not read machine %s: %q", request.Name, err)
+		log.Error(err, "could not get machine")
 		return reconcile.Result{}, err
 	}
 
+	log.Info("get parent cluster of machine")
 	// If this machine does not have an OwnerReference that matches the
 	// cluster then we add it now. If the cluster has not been created yet
 	// we will try again.
 	var cluster clusterv1alpha1.CnctCluster
 	var secret corev1.Secret
 	{
+		log.Info("listing clusters in machine namespace")
 		var clusterList clusterv1alpha1.CnctClusterList
 		if err := r.List(context.Background(), &client.ListOptions{Namespace: machine.Namespace}, &clusterList); err != nil {
 			return reconcile.Result{}, err
 		}
 		if len(clusterList.Items) != 1 {
-			klog.Infof("expected # of clusters to be 1 got %v", len(clusterList.Items))
+			log.Info("expected the number of clusters to be 1", "CnctClusterList", clusterList)
 			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 		cluster = clusterList.Items[0]
+		log.Info("checking if machine has cluster owner reference")
 		needsOwnerRef := true
 		for _, ref := range machine.OwnerReferences {
 			if ref.UID == cluster.UID {
@@ -123,6 +130,7 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 			}
 		}
 		if needsOwnerRef {
+			log.Info("adding cluster owner reference to machine")
 			isController := false
 			blockOwnerDeletion := true
 			gvk := clusterv1alpha1.SchemeGroupVersion.WithKind("CnctCluster")
@@ -139,6 +147,7 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 				return reconcile.Result{}, err
 			}
 		}
+		log.Info("get the cluster secret")
 		err := r.Client.Get(
 			context.Background(),
 			client.ObjectKey{
@@ -150,6 +159,7 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "could not get cluster secret")
 		}
+		log.Info("checking if the machine has the secret owner reference")
 		needsOwnerRef = true
 		for _, ref := range machine.OwnerReferences {
 			if ref.UID == secret.UID {
@@ -158,6 +168,7 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 			}
 		}
 		if needsOwnerRef {
+			log.Info("adding secret owner reference to machine")
 			isController := false
 			blockOwnerDeletion := true
 			gvk := secret.GroupVersionKind()
@@ -176,12 +187,16 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 	}
 
+	log.Info("check if machine is being deleted")
 	if !machine.DeletionTimestamp.IsZero() && machine.Status.Phase != common.DeletingMachinePhase {
+		log.Info("machine is being deleted update phase to deleteing")
 		machine.Status.Phase = common.DeletingMachinePhase
 		if err := r.Update(context.Background(), &machine); err != nil {
 			return reconcile.Result{}, err
 		}
 	}
+
+	log.Info("handle machine phases")
 	var err error
 	switch machine.Status.Phase {
 	case common.ProvisioningMachinePhase:
@@ -196,21 +211,23 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 		switch e := errors.Cause(err).(type) {
 		case *apierrors.StatusError:
 			if apierrors.IsNotFound(e) {
-				klog.Info(err)
+				log.Info("during reconcile an object was not found", "machine", machine)
 				return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 			} else {
 				return reconcile.Result{}, err
 			}
 		case errNotReady:
-			klog.Info(err)
+			log.Error(err, "during reconcile an object was not ready", "machine", machine)
 			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 		case errRelease:
+			log.Error(err, "during reconcile we needed to release a machine", "machine", machine)
 			r.MAASClient.Delete(context.Background(), &maas.DeleteRequest{"", e.systemID})
 			return reconcile.Result{}, err
 		default:
 			return reconcile.Result{}, err
 		}
 	}
+	log.Info("machine reconicle completed successfully")
 	return reconcile.Result{}, nil
 }
 
@@ -233,18 +250,18 @@ func (r *ReconcileMachine) handleUpgrade(
 	}
 	machineList, err := util.GetClusterMachineList(r.Client, cluster.GetName())
 	if err != nil {
-		klog.Errorf("could not list Machines for cluster %s: %q", machine.GetName(), err)
+		log.Error(err, "could not list Machines for cluster", "cluster", cluster)
 		return reconcile.Result{}, err
 	}
 	// if not ok to upgrade with error, return and do not requeue
 	ok, err := util.IsReadyForUpgrade(machineList)
 	if err != nil {
-		klog.Errorf("cannot upgrade machine %s: %q", machine.GetName(), err)
+		log.Error(err, "cannot upgrade machine", "machine", machine)
 		return reconcile.Result{}, nil
 	}
 	// if not ok to upgrade, try later
 	if !ok {
-		klog.Infof("Upgrade: Waiting for cluster %s to finish reconciling", clusterName)
+		log.Info("Upgrade: Waiting for cluster to finish reconciling", "cluster", cluster)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -254,7 +271,7 @@ func (r *ReconcileMachine) handleUpgrade(
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machine.GetName(), common.UpgradingMachinePhase)
 	if err != nil {
-		klog.Errorf("could not update status of machine %s: %q", machine.GetName(), err)
+		log.Error(err, "could not update status of machine", "machine", machine)
 		return reconcile.Result{}, err
 	}
 
@@ -262,7 +279,7 @@ func (r *ReconcileMachine) handleUpgrade(
 }
 
 func (r *ReconcileMachine) handleWaitingForReady(machine *clusterv1alpha1.CnctMachine) error {
-	klog.Infof("figure out how to check if a machine is ready")
+	log.Info("figure out how to check if a machine is ready")
 	return nil
 }
 

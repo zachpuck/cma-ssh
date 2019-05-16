@@ -25,13 +25,17 @@ func (r *ReconcileMachine) handleDelete(
 	machine *clusterv1alpha1.CnctMachine,
 	cluster *clusterv1alpha1.CnctCluster,
 ) error {
+	log.Info("handling machine delete")
+
 	// If the machine does not have a system id yet then it has not been
 	// acquired or deployed in maas so we can just delete it.
 	if machine.Status.SystemId == "" {
+		log.Info("there is no maas node asssociated with this machine")
 		if err := deleteMachine(r, machine); err != nil {
 			return errors.Wrap(err, "could not delete machine object")
 		}
 	}
+	log.Info("creating clientset for remote cluster")
 	var secret corev1.Secret
 	err := r.Get(
 		context.Background(),
@@ -44,7 +48,6 @@ func (r *ReconcileMachine) handleDelete(
 	if err != nil {
 		return errors.Wrap(err, "could not get cluster secret")
 	}
-	klog.Info("creating clientset from cert bundle")
 	configData, ok := secret.Data["kubeconfig"]
 	if !ok || len(configData) == 0 {
 		return errNotReady("no kubeconfig in secret")
@@ -73,6 +76,7 @@ func (r *ReconcileMachine) handleDelete(
 	} else if err != nil {
 		return errors.Wrapf(err, "could not get node %s", machine.Name)
 	}
+	log.Info("cordoning remote node")
 	cordonHelper := drain.NewCordonHelper(node)
 	if cordonHelper.UpdateIfRequired(true) {
 		err, patchErr := cordonHelper.PatchOrReplace(clientset)
@@ -102,6 +106,7 @@ func (r *ReconcileMachine) handleDelete(
 		return err
 	}
 	if len(policyGroupVersion) > 0 {
+		log.Info("evicting pods on node")
 		returnCh := make(chan error, 1)
 		for _, pod := range list.Pods() {
 			go func(pod corev1.Pod, returnCh chan error) {
@@ -131,10 +136,9 @@ func (r *ReconcileMachine) handleDelete(
 			}(pod, returnCh)
 		}
 	} else {
+		log.Info("deleting pods on node")
 		pods := list.Pods()
 		for _, pod := range pods {
-			// TODO: do the same as above for delete
-			//  https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain/drain.go#L307:27
 			err := drainer.DeletePod(pod)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return errors.Wrap(err, "could not delete pods")
@@ -163,6 +167,7 @@ func (r *ReconcileMachine) handleDelete(
 		}
 	}
 
+	log.Info("removing remote node from cluster")
 	err = clientset.CoreV1().Nodes().Delete(machine.Name, &metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrap(err, "could not delete node")
@@ -176,16 +181,13 @@ func (r *ReconcileMachine) handleDelete(
 }
 
 func deleteMachine(r *ReconcileMachine, machine *clusterv1alpha1.CnctMachine) error {
-	systemID := machine.ObjectMeta.Annotations["maas-system-id"]
-	if systemID == "" {
-		goto removeFinalizers
+	systemID := machine.Status.SystemId
+	if systemID != "" {
+		if err := r.MAASClient.Delete(context.Background(), &maas.DeleteRequest{SystemID: systemID}); err != nil {
+			return errors.Wrapf(err, "could not delete machine %s with system id %q", machine.Name, *machine.Spec.ProviderID)
+		}
 	}
 
-	if err := r.MAASClient.Delete(context.Background(), &maas.DeleteRequest{SystemID: systemID}); err != nil {
-		return errors.Wrapf(err, "could not delete machine %s with system id %q", machine.Name, *machine.Spec.ProviderID)
-	}
-
-removeFinalizers:
 	machine.Finalizers = util.RemoveString(machine.Finalizers, clusterv1alpha1.MachineFinalizer)
 	if err := r.Client.Update(context.Background(), machine); err != nil {
 		return errors.Wrap(err, "could not remove finalizer")

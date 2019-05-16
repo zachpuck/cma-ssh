@@ -19,7 +19,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
@@ -68,7 +67,7 @@ type creator struct {
 }
 
 func create(k8sClient clientEventer, maasClient maas.Client, machine *clusterv1alpha1.CnctMachine) error {
-	klog.Info("checking if machine is master")
+	log.Info("checking if machine is master")
 	var isMaster bool
 	for _, v := range machine.Spec.Roles {
 		if v == common.MachineRoleMaster {
@@ -105,7 +104,7 @@ func (c *creator) getCluster() {
 		return
 	}
 
-	klog.Info("getting cluster from namespace")
+	log.Info("getting cluster from namespace")
 	// Get cluster from machine's namespace.
 	var clusters clusterv1alpha1.CnctClusterList
 	c.err = c.k8sClient.List(
@@ -117,7 +116,7 @@ func (c *creator) getCluster() {
 		return
 	}
 	if len(clusters.Items) == 0 {
-		klog.Infof("no cluster in namespace, requeue request")
+		log.Info("no cluster in namespace, requeue request")
 		c.err = errNotReady("no cluster in namespace")
 		return
 	}
@@ -128,7 +127,7 @@ func (c *creator) getSecret() {
 	if c.err != nil {
 		return
 	}
-	klog.Info("getting the secret cert bundle")
+	log.Info("getting the secret cert bundle")
 	c.err = c.k8sClient.Get(context.Background(), client.ObjectKey{Name: "cluster-private-key", Namespace: c.machine.Namespace}, &c.secret)
 }
 
@@ -137,7 +136,7 @@ func (c *creator) createClientsetFromSecret() {
 		return
 	}
 
-	klog.Info("creating clientset from cert bundle")
+	log.Info("creating clientset from cert bundle")
 	configData, ok := c.secret.Data["kubeconfig"]
 	if !ok || len(configData) == 0 {
 		c.err = errNotReady("no kubeconfig in secret")
@@ -160,7 +159,7 @@ func (c *creator) checkIfTokenExists() {
 	if c.err != nil || c.isMaster {
 		return
 	}
-	klog.Info("checking for existing tokens on managed cluster")
+	log.Info("checking for existing tokens on managed cluster")
 	list, err := c.clientset.CoreV1().
 		Secrets(metav1.NamespaceSystem).
 		List(metav1.ListOptions{FieldSelector: "type=" + string(corev1.SecretTypeBootstrapToken)})
@@ -182,11 +181,11 @@ func (c *creator) checkIfTokenExists() {
 			if err != nil || t.Before(time.Now()) {
 				continue
 			}
-			klog.Info("found an existing token")
+			log.Info("found an existing token")
 			c.token = fmt.Sprintf("%s.%s", list.Items[0].Data["token-id"], list.Items[0].Data["token-secret"])
 			return
 		}
-		klog.Info("found an existing token")
+		log.Info("found an existing token")
 		c.token = fmt.Sprintf("%s.%s", list.Items[0].Data["token-id"], list.Items[0].Data["token-secret"])
 		return
 	}
@@ -197,7 +196,7 @@ func (c *creator) createToken() {
 		return
 	}
 
-	klog.Info("creating join token")
+	log.Info("creating join token")
 	tokBuf := make([]byte, 3)
 	_, c.err = io.ReadFull(rand.Reader, tokBuf)
 	if c.err != nil {
@@ -243,7 +242,7 @@ func (c *creator) checkApiserverAddress() {
 		return
 	}
 
-	klog.Info("checking if apiendpoint is set on cluster")
+	log.Info("checking if apiendpoint is set on cluster")
 	apiserverAddress := c.cluster.Status.APIEndpoint
 	if apiserverAddress == "" {
 		c.err = errNotReady(fmt.Sprintf("%s cluster APIEndpoint is not set", c.cluster.Name))
@@ -268,7 +267,7 @@ func (c *creator) prepareMaasRequest() {
 		return
 	}
 
-	klog.Infoln("preparing maas request")
+	log.Info("preparing maas request")
 	var bundle *cert.CABundle
 	bundle, c.err = cert.CABundleFromMap(c.secret.Data)
 	if c.err != nil {
@@ -407,7 +406,7 @@ func (c *creator) doMaasCreate() {
 		return
 	}
 
-	klog.Info("calling create on maas")
+	log.Info("calling create on maas")
 	createResponse, err := c.maasClient.Create(context.Background(), &c.createRequest)
 	if err != nil {
 		c.err = err
@@ -415,7 +414,7 @@ func (c *creator) doMaasCreate() {
 	}
 
 	if len(createResponse.IPAddresses) == 0 {
-		klog.Infof("Error machine (%s) ip is nil, releasing", createResponse.ProviderID)
+		log.Info("machine ip is nil, releasing", "maas create response", createResponse)
 		c.err = c.maasClient.Delete(
 			context.Background(),
 			&maas.DeleteRequest{
@@ -433,21 +432,21 @@ func (c *creator) createKubeconfig() {
 		return
 	}
 
-	klog.Info("creating kubeconfig")
+	log.Info("creating kubeconfig")
 	bundle, err := cert.CABundleFromMap(c.secret.Data)
 	if err != nil {
 		c.err = err
 		return
 	}
 
-	klog.Info("create kubeconfig")
+	log.Info("create kubeconfig")
 	kubeconfig, err := bundle.Kubeconfig(c.cluster.Name, "https://"+c.createResponse.IPAddresses[0]+":6443")
 	if err != nil {
 		c.err = err
 		return
 	}
 
-	klog.Info("add kubeconfig to cluster-private-key secret")
+	log.Info("add kubeconfig to cluster-private-key secret")
 	c.secret.Data["kubeconfig"] = kubeconfig
 	c.err = c.k8sClient.Update(context.Background(), &c.secret)
 }
@@ -457,27 +456,13 @@ func (c *creator) updateMachine() {
 		return
 	}
 
-	//klog.Info("updating machine")
-	//freshMachine := clusterv1alpha1.CnctMachine{}
-	//c.err = c.k8sClient.Get(
-	//	context.Background(),
-	//	client.ObjectKey{
-	//		Namespace: c.machine.GetNamespace(),
-	//		Name:      c.machine.GetName(),
-	//	},
-	//	&freshMachine,
-	//)
-	//if c.err != nil {
-	//	return
-	//}
-
 	// Add the finalizer
 	if !util.ContainsString(c.machine.Finalizers, clusterv1alpha1.MachineFinalizer) {
-		klog.Infoln("adding finalizer to machine")
+		log.Info("adding finalizer to machine")
 		c.machine.Finalizers = append(c.machine.Finalizers, clusterv1alpha1.MachineFinalizer)
 	}
 
-	klog.Info("update machine status to ready")
+	log.Info("update machine status to ready")
 	// update status to "creating"
 	c.machine.Status.Phase = common.ReadyMachinePhase
 	c.machine.Status.KubernetesVersion = c.cluster.Spec.KubernetesVersion
@@ -510,8 +495,8 @@ func (c *creator) updateCluster() {
 		return
 	}
 
-	klog.Info("updating cluster")
-	klog.Info("updating cluster api endpoint")
+	log.Info("updating cluster")
+	log.Info("updating cluster api endpoint")
 	var fresh clusterv1alpha1.CnctCluster
 	err := c.k8sClient.Get(
 		context.Background(),

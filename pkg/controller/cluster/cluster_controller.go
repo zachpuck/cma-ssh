@@ -31,15 +31,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
+
+var log = logf.Log.WithName("CnctCluster-controller")
 
 // Add creates a new Cluster Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -96,14 +98,14 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		klog.Errorf("error reading object cluster %s: %q", request.Name, err)
+		log.Error(err, "error reading object cluster", "request", request)
 		return reconcile.Result{}, err
 	}
 
 	if !cluster.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is being deleted
 		if util.ContainsString(cluster.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer) {
-			klog.Info("deleting cluster...")
+			log.Info("deleting cluster...")
 			// update status to "deleting"
 			if cluster.Status.Phase != common.StoppingClusterPhase {
 				cluster.Status.Phase = common.StoppingClusterPhase
@@ -111,7 +113,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 					common.ResourceStateChange, common.MessageResourceStateChange,
 					cluster.GetName(), common.StoppingClusterPhase)
 				if err != nil {
-					klog.Errorf("could not update status of cluster %q: %q", cluster.GetName(), err)
+					log.Error(err, "could not update status of cluster", "cluster", cluster)
 					return reconcile.Result{}, err
 				}
 			}
@@ -128,7 +130,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 		if err := createClusterSecrets(r.Client, cluster, r.scheme); err != nil {
 			return reconcile.Result{Requeue: true}, err
 		}
-		klog.Info("cluster secrets created")
+		log.Info("cluster secrets created")
 		cluster.Status.Phase = common.RunningClusterPhase
 		cluster.ObjectMeta.Finalizers = append(cluster.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
 		err = r.updateStatus(
@@ -140,7 +142,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			common.RunningClusterPhase,
 		)
 		if err != nil {
-			klog.Errorf("could not update cluster %q status: %q", cluster.GetName(), err)
+			log.Error(err, "could not update cluster status", "cluster", cluster)
 			return reconcile.Result{Requeue: true}, err
 		}
 	case common.StoppingClusterPhase:
@@ -168,7 +170,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			}
 		}
 		if len(pendingMachines) != 0 {
-			klog.Infof("cluster deletion pending on %v machines", len(pendingMachines))
+			log.Info("cluster deletion pending on machine deletion", "pending machines", len(pendingMachines))
 			return reconcile.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 		cluster.ObjectMeta.Finalizers =
@@ -182,7 +184,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 func createClusterSecrets(k8sClient client.Client, cluster *clusterv1alpha1.CnctCluster, scheme *runtime.Scheme) error {
 	bundle, err := cert.NewCABundle()
 	if err != nil {
-		klog.Error(err)
+		log.Error(err, "could not create a new ca cert bundle")
 		return err
 	}
 
