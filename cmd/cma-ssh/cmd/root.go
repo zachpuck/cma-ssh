@@ -27,8 +27,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/klog"
+	"k8s.io/klog/klogr"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 
 	"github.com/samsung-cnct/cma-ssh/pkg/apis"
@@ -78,6 +80,7 @@ func Execute() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	log.SetLogger(klogr.New())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

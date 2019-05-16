@@ -53,7 +53,7 @@ require (
 	go.uber.org/atomic v1.3.2 // indirect
 	go.uber.org/multierr v1.1.0 // indirect
 	go.uber.org/zap v1.9.1 // indirect
-	golang.org/x/crypto v0.0.0-20190422183909-d864b10871cd
+	golang.org/x/crypto v0.0.0-20190422183909-d864b10871cd // indirect
 	golang.org/x/net v0.0.0-20190420063019-afa5a82059c6
 	golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a // indirect
 	golang.org/x/sys v0.0.0-20190422165155-953cdadca894 // indirect
@@ -72,6 +72,7 @@ require (
 	k8s.io/code-generator v0.0.0-20190419212335-ff26e7842f9d
 	k8s.io/klog v0.3.0
 	k8s.io/kube-openapi v0.0.0-20190418160015-6b3d3b2d5666 // indirect
+	k8s.io/kubernetes v1.14.1
 	sigs.k8s.io/controller-runtime v0.1.10
 	sigs.k8s.io/controller-tools v0.1.10
 	sigs.k8s.io/kustomize v2.0.3+incompatible

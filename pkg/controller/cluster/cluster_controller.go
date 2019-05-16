@@ -24,14 +24,17 @@ import (
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"github.com/samsung-cnct/cma-ssh/pkg/cert"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
+
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -63,17 +66,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to Cluster
 	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.CnctCluster{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
-	err = c.Watch(&source.Kind{Type: &clusterv1alpha1.CnctMachine{}},
-		&handler.EnqueueRequestsFromMapFunc{ToRequests: util.MachineToClusterMapper{Client: mgr.GetClient()}})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 var _ reconcile.Reconciler = &ReconcileCluster{}
@@ -97,9 +90,9 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 	cluster := &clusterv1alpha1.CnctCluster{}
 	err := r.Get(context.Background(), request.NamespacedName, cluster)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// Object not found, return. Created objects are automatically garbage collected.
-			//log.Error(err, "could not find cluster", "cluster", request)
+			// log.Error(err, "could not find cluster", "cluster", request)
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -123,32 +116,6 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 				}
 			}
 
-			// there is a finalizer so we check if there are any machines left
-			machineList, err := util.GetClusterMachineList(r.Client, cluster.GetName())
-			if err != nil {
-				klog.Errorf("could not list Machines for object cluster %q: %q", cluster.GetName(), err)
-				return reconcile.Result{}, err
-			}
-
-			// delete the machines
-			if len(machineList) > 0 {
-				for _, machine := range machineList {
-					if machine.Status.Phase == common.DeletingMachinePhase {
-						continue
-					}
-
-					err = r.Delete(context.Background(), &machine)
-					if err != nil {
-						if !errors.IsNotFound(err) {
-							klog.Errorf("could not delete machine %q for cluster %q: %q",
-								machine.GetName(), cluster.GetName(), err)
-						}
-					}
-				}
-
-				return reconcile.Result{}, err
-			}
-
 			// if no Machines left to be deleted
 			// set phase to deleted so secrets can be deleted and finalizer
 			// can be removed
@@ -158,7 +125,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	switch cluster.Status.Phase {
 	case "":
-		if err := createClusterSecrets(r.Client, cluster); err != nil {
+		if err := createClusterSecrets(r.Client, cluster, r.scheme); err != nil {
 			return reconcile.Result{Requeue: true}, err
 		}
 		klog.Info("cluster secrets created")
@@ -177,23 +144,42 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			return reconcile.Result{Requeue: true}, err
 		}
 	case common.StoppingClusterPhase:
-		if err := deleteClusterSecrets(r.Client, cluster); err != nil {
-			klog.Errorf("Failed to delete cluster secrets: %s\n", err)
-			return reconcile.Result{Requeue: true}, err
+		var machines clusterv1alpha1.CnctMachineList
+		err := r.Client.List(context.Background(), &client.ListOptions{Namespace: cluster.Namespace}, &machines)
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "could not list machines")
 		}
-		klog.Info("cluster secrets deleted")
+		var pendingMachines []clusterv1alpha1.CnctMachine
+		for _, machine := range machines.Items {
+			err := r.Client.Delete(context.Background(), &machine)
+			if apierrors.IsNotFound(err) {
+				continue
+			} else if err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "could not delete machine")
+			}
+			var m clusterv1alpha1.CnctMachine
+			err = r.Client.Get(context.Background(), client.ObjectKey{Name: machine.Name, Namespace: machine.Namespace}, &m)
+			if apierrors.IsNotFound(err) {
+				continue
+			} else if err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "could not get machine after deletion")
+			} else {
+				pendingMachines = append(pendingMachines, m)
+			}
+		}
+		if len(pendingMachines) != 0 {
+			klog.Infof("cluster deletion pending on %v machines", len(pendingMachines))
+			return reconcile.Result{RequeueAfter: 1 * time.Second}, nil
+		}
 		cluster.ObjectMeta.Finalizers =
 			util.RemoveString(cluster.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
-
-		klog.Info("cluster is deleted")
-		cluster.Status.Phase = ""
 		return reconcile.Result{}, r.Update(context.Background(), cluster)
 	}
 
 	return reconcile.Result{}, err
 }
 
-func createClusterSecrets(k8sClient client.Client, cluster *clusterv1alpha1.CnctCluster) error {
+func createClusterSecrets(k8sClient client.Client, cluster *clusterv1alpha1.CnctCluster, scheme *runtime.Scheme) error {
 	bundle, err := cert.NewCABundle()
 	if err != nil {
 		klog.Error(err)
@@ -202,36 +188,18 @@ func createClusterSecrets(k8sClient client.Client, cluster *clusterv1alpha1.Cnct
 
 	dataMap := map[string][]byte{}
 	bundle.MergeWithMap(dataMap)
-	kind := source.Kind{Type: &clusterv1alpha1.CnctCluster{}}
-	secret := &corev1.Secret{
+	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster-private-key",
 			Namespace: cluster.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: clusterv1alpha1.SchemeGroupVersion.String(),
-					Kind:       kind.String(),
-					Name:       cluster.Name,
-					UID:        cluster.GetUID(),
-				},
-			},
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: dataMap,
 	}
-
-	return k8sClient.Create(context.Background(), secret)
-}
-
-// how does one GET a secret from k8s?
-func deleteClusterSecrets(k8sClient client.Client, cluster *clusterv1alpha1.CnctCluster) error {
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cluster-private-key",
-			Namespace: cluster.Namespace,
-		},
+	if err := controllerutil.SetControllerReference(cluster, &secret, scheme); err != nil {
+		return errors.Wrap(err, "could not set owner ref on cluster secret")
 	}
-	return k8sClient.Delete(context.Background(), secret)
+	return k8sClient.Create(context.Background(), &secret)
 }
 
 func (r *ReconcileCluster) updateStatus(clusterInstance *clusterv1alpha1.CnctCluster, eventType string,

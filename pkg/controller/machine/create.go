@@ -13,20 +13,20 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
-	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
-	"github.com/samsung-cnct/cma-ssh/pkg/cert"
-	"github.com/samsung-cnct/cma-ssh/pkg/maas"
-	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtimeSchema "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
+	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
+	"github.com/samsung-cnct/cma-ssh/pkg/cert"
+	"github.com/samsung-cnct/cma-ssh/pkg/maas"
+	"github.com/samsung-cnct/cma-ssh/pkg/util"
 )
 
 const InstanceTypeNodeLabelKey = "beta.kubernetes.io/instance-type="
@@ -54,12 +54,12 @@ type clientEventer interface {
 type creator struct {
 	k8sClient  clientEventer
 	maasClient maas.Client
-	machine    *v1alpha1.CnctMachine
+	machine    *clusterv1alpha1.CnctMachine
 	err        error
 
 	// derived types
 	isMaster       bool
-	cluster        v1alpha1.CnctCluster
+	cluster        clusterv1alpha1.CnctCluster
 	clientset      *kubernetes.Clientset
 	secret         corev1.Secret
 	token          string
@@ -67,7 +67,7 @@ type creator struct {
 	createResponse maas.CreateResponse
 }
 
-func create(k8sClient clientEventer, maasClient maas.Client, machine *v1alpha1.CnctMachine) error {
+func create(k8sClient clientEventer, maasClient maas.Client, machine *clusterv1alpha1.CnctMachine) error {
 	klog.Info("checking if machine is master")
 	var isMaster bool
 	for _, v := range machine.Spec.Roles {
@@ -107,7 +107,7 @@ func (c *creator) getCluster() {
 
 	klog.Info("getting cluster from namespace")
 	// Get cluster from machine's namespace.
-	var clusters v1alpha1.CnctClusterList
+	var clusters clusterv1alpha1.CnctClusterList
 	c.err = c.k8sClient.List(
 		context.Background(),
 		&client.ListOptions{Namespace: c.machine.Namespace},
@@ -276,10 +276,9 @@ func (c *creator) prepareMaasRequest() {
 	}
 	var userdata string
 	if c.isMaster {
-		userdata, c.err = masterUserdata(bundle, c.getNodeLabels())
+		userdata, c.err = masterUserdata(c, bundle)
 	} else {
-		userdata, c.err = workerUserdata(bundle, c.token, c.cluster.Status.APIEndpoint,
-			c.getNodeLabels())
+		userdata, c.err = workerUserdata(c, bundle)
 	}
 	// TODO: ProviderID should be unique. One way to ensure this is to generate
 	// a UUID. Cf. k8s.io/apimachinery/pkg/util/uuid
@@ -317,7 +316,7 @@ write_files:
 runcmd:
  - [ sh, -c, "swapoff -a" ]
  - [ sh, -c, "tar xf /etc/kubernetes/pki/certs.tar -C /etc/kubernetes/pki" ]
- - [ sh, -c, "kubeadm init --config /var/tmp/masterconfig.yaml" ]
+ - [ sh, -c, "kubeadm init --node-name {{ .Name }}  --config /var/tmp/masterconfig.yaml" ]
  - [ sh, -c, "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml" ]
 
 output : { all : '| tee -a /var/log/cloud-init-output.log' }
@@ -325,18 +324,20 @@ output : { all : '| tee -a /var/log/cloud-init-output.log' }
 
 var masterUserdataTmpl = template.Must(template.New("master").Parse(masterUserdataTmplText))
 
-func masterUserdata(bundle *cert.CABundle, nodeLabels string) (string, error) {
+func masterUserdata(c *creator, bundle *cert.CABundle) (string, error) {
 	caTar, err := bundle.ToTar()
 	if err != nil {
 		return "", err
 	}
 	var userdata strings.Builder
 	data := struct {
+		Name       string
 		Tar        string
 		NodeLabels string
 	}{
+		Name:       c.machine.Name,
 		Tar:        caTar,
-		NodeLabels: nodeLabels,
+		NodeLabels: c.getNodeLabels(),
 	}
 	if err := masterUserdataTmpl.Execute(&userdata, data); err != nil {
 		return "", err
@@ -366,14 +367,14 @@ write_files:
 
 runcmd:
  - [ sh, -c, "swapoff -a" ]
- - [ sh, -c, "kubeadm join --config /var/tmp/workerconfig.yaml" ]
+ - [ sh, -c, "kubeadm join --node-name {{ .Name }} --config /var/tmp/workerconfig.yaml" ]
 
 output : { all : '| tee -a /var/log/cloud-init-output.log' }
 `
 
 var workerUserdataTmpl = template.Must(template.New("worker").Parse(workerUserdataTmplText))
 
-func workerUserdata(bundle *cert.CABundle, token, apiserverAddress string, nodeLabels string) (string, error) {
+func workerUserdata(c *creator, bundle *cert.CABundle) (string, error) {
 	certBlock, _ := pem.Decode(bundle.K8s)
 	certificate, err := x509.ParseCertificate(certBlock.Bytes)
 	if err != nil {
@@ -383,15 +384,17 @@ func workerUserdata(bundle *cert.CABundle, token, apiserverAddress string, nodeL
 	caHash := fmt.Sprintf("sha256:%x", hash)
 	var buf strings.Builder
 	data := struct {
+		Name        string
 		Token       string
 		CertHash    string
 		APIEndpoint string
 		NodeLabels  string
 	}{
-		Token:       token,
+		Name:        c.machine.Name,
+		Token:       c.token,
 		CertHash:    caHash,
-		APIEndpoint: apiserverAddress,
-		NodeLabels:  nodeLabels,
+		APIEndpoint: c.cluster.Status.APIEndpoint,
+		NodeLabels:  c.getNodeLabels(),
 	}
 	if err := workerUserdataTmpl.Execute(&buf, data); err != nil {
 		return "", err
@@ -413,7 +416,13 @@ func (c *creator) doMaasCreate() {
 
 	if len(createResponse.IPAddresses) == 0 {
 		klog.Infof("Error machine (%s) ip is nil, releasing", createResponse.ProviderID)
-		c.err = c.maasClient.Delete(context.Background(), &maas.DeleteRequest{ProviderID: createResponse.ProviderID, SystemID: createResponse.SystemID})
+		c.err = c.maasClient.Delete(
+			context.Background(),
+			&maas.DeleteRequest{
+				ProviderID: createResponse.ProviderID,
+				SystemID:   createResponse.SystemID,
+			},
+		)
 		return
 	}
 	c.createResponse = *createResponse
@@ -448,57 +457,48 @@ func (c *creator) updateMachine() {
 		return
 	}
 
-	klog.Info("updating machine")
-	freshMachine := v1alpha1.CnctMachine{}
-	c.err = c.k8sClient.Get(
-		context.Background(),
-		client.ObjectKey{
-			Namespace: c.machine.GetNamespace(),
-			Name:      c.machine.GetName(),
-		},
-		&freshMachine,
-	)
-	if c.err != nil {
-		return
-	}
+	//klog.Info("updating machine")
+	//freshMachine := clusterv1alpha1.CnctMachine{}
+	//c.err = c.k8sClient.Get(
+	//	context.Background(),
+	//	client.ObjectKey{
+	//		Namespace: c.machine.GetNamespace(),
+	//		Name:      c.machine.GetName(),
+	//	},
+	//	&freshMachine,
+	//)
+	//if c.err != nil {
+	//	return
+	//}
 
 	// Add the finalizer
-	if !util.ContainsString(freshMachine.Finalizers, v1alpha1.MachineFinalizer) {
+	if !util.ContainsString(c.machine.Finalizers, clusterv1alpha1.MachineFinalizer) {
 		klog.Infoln("adding finalizer to machine")
-		freshMachine.Finalizers = append(freshMachine.Finalizers, v1alpha1.MachineFinalizer)
+		c.machine.Finalizers = append(c.machine.Finalizers, clusterv1alpha1.MachineFinalizer)
 	}
-
-	// Set owner ref
-	machineOwnerRef := *metav1.NewControllerRef(&c.cluster,
-		runtimeSchema.GroupVersionKind{
-			Group:   v1alpha1.SchemeGroupVersion.Group,
-			Version: v1alpha1.SchemeGroupVersion.Version,
-			Kind:    "CnctCluster",
-		},
-	)
-
-	freshMachine.OwnerReferences = append(freshMachine.OwnerReferences, machineOwnerRef)
 
 	klog.Info("update machine status to ready")
 	// update status to "creating"
-	freshMachine.Status.Phase = common.ReadyMachinePhase
-	freshMachine.Status.KubernetesVersion = c.cluster.Spec.KubernetesVersion
-
+	c.machine.Status.Phase = common.ReadyMachinePhase
+	c.machine.Status.KubernetesVersion = c.cluster.Spec.KubernetesVersion
+	c.machine.Status.SystemId = c.createResponse.SystemID
+	c.machine.Status.SshConfig.Host = c.createResponse.IPAddresses[0]
 	// Check if machine object has existing annotations
-	if freshMachine.ObjectMeta.Annotations == nil {
-		freshMachine.ObjectMeta.Annotations = map[string]string{}
+	if c.machine.ObjectMeta.Annotations == nil {
+		c.machine.ObjectMeta.Annotations = map[string]string{}
 	}
 	// TODO: (zachpuck) Move these Annotations to Status
-	freshMachine.ObjectMeta.Annotations["maas-ip"] = c.createResponse.IPAddresses[0]
-	freshMachine.ObjectMeta.Annotations["maas-system-id"] = c.createResponse.SystemID
+	c.machine.ObjectMeta.Annotations["maas-ip"] = c.createResponse.IPAddresses[0]
+	c.machine.ObjectMeta.Annotations["maas-system-id"] = c.createResponse.SystemID
 
-	c.err = c.k8sClient.Update(context.Background(), &freshMachine)
-	if c.err != nil {
+	err := c.k8sClient.Update(context.Background(), c.machine)
+	if err != nil {
+		c.err = errRelease{systemID: c.createResponse.SystemID, err: err}
 		return
 	}
 
 	c.k8sClient.Event(
-		&freshMachine,
+		c.machine,
 		corev1.EventTypeNormal,
 		"ResourceStateChange",
 		"set Finalizer and OwnerReferences",
@@ -512,7 +512,7 @@ func (c *creator) updateCluster() {
 
 	klog.Info("updating cluster")
 	klog.Info("updating cluster api endpoint")
-	var fresh v1alpha1.CnctCluster
+	var fresh clusterv1alpha1.CnctCluster
 	err := c.k8sClient.Get(
 		context.Background(),
 		client.ObjectKey{
