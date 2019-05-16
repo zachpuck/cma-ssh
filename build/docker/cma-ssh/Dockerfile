@@ -8,7 +8,8 @@ ENV GOOS=linux
 ENV GOARCH=amd64
 ENV CGO_ENABLED=0
 ENV GO111MODULE=on
-RUN go build -o cma-ssh -mod=vendor cmd/cma-ssh/main.go
+ENV GOPROXY=https://proxy.golang.org
+RUN go build -o cma-ssh cmd/cma-ssh/main.go
 
 # Copy the controller-manager into a thin image
 FROM alpine:3.8
