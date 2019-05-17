@@ -4,7 +4,7 @@ apt-get install -y \
   ca-certificates \
   curl \
   gnupg-agent \
-  software-properties-common \
+  software-properties-common
 
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
 
