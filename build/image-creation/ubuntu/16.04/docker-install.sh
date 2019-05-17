@@ -1,4 +1,7 @@
-# Install nvidia-docker2 and reload the Docker daemon configuration
+
+DEBIAN_FRONTEND=noninteractive
+export DEBIAN_FRONTEND
+
 apt-get install -y \
   apt-transport-https \
   ca-certificates \
@@ -6,13 +9,8 @@ apt-get install -y \
   gnupg-agent \
   software-properties-common
 
-# https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#pre-installation-actions
-# https://github.com/NVIDIA/nvidia-docker/wiki/Frequently-Asked-Questions#how-do-i-install-20-if-im-not-using-the-latest-docker-version
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
 
-# The nvidia cards on the SDSA lab GPU hosts are
-# 04:00.0 3D controller: NVIDIA Corporation GK210GL [Tesla K80] (rev a1)
-# which are CUDA
 add-apt-repository \
   "deb https://download.docker.com/linux/ubuntu \
   $(lsb_release -cs) \
