@@ -137,7 +137,7 @@ func (c *creator) createClientsetFromSecret() {
 	}
 
 	log.Info("creating clientset from cert bundle")
-	configData, ok := c.secret.Data["kubeconfig"]
+	configData, ok := c.secret.Data[corev1.ServiceAccountKubeconfigKey]
 	if !ok || len(configData) == 0 {
 		c.err = errNotReady("no kubeconfig in secret")
 		return
@@ -447,7 +447,7 @@ func (c *creator) createKubeconfig() {
 	}
 
 	log.Info("add kubeconfig to cluster-private-key secret")
-	c.secret.Data["kubeconfig"] = kubeconfig
+	c.secret.Data[corev1.ServiceAccountKubeconfigKey] = kubeconfig
 	c.err = c.k8sClient.Update(context.Background(), &c.secret)
 }
 

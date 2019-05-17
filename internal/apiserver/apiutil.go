@@ -36,17 +36,17 @@ func GetKubeConfig(clusterName string, manager manager.Manager) ([]byte, error) 
 	// get client
 	client := manager.GetClient()
 
-	// get kubeconfig secret
-	kubeConfigSecret := &corev1.Secret{}
+	// get kubeconfig from cluster secret
+	clusterSecret := &corev1.Secret{}
 	err := client.Get(context.Background(), clientlib.ObjectKey{
 		Namespace: clusterName,
-		Name:      clusterName + "-kubeconfig",
-	}, kubeConfigSecret)
+		Name:      "cluster-private-key",
+	}, clusterSecret)
 	if err != nil {
 		return nil, err
 	}
 
-	return kubeConfigSecret.Data[corev1.ServiceAccountKubeconfigKey], nil
+	return clusterSecret.Data[corev1.ServiceAccountKubeconfigKey], nil
 }
 
 func GetMachineName(clusterName string, hostIp string, manager manager.Manager) (string, error) {

@@ -48,7 +48,7 @@ func (r *ReconcileMachine) handleDelete(
 	if err != nil {
 		return errors.Wrap(err, "could not get cluster secret")
 	}
-	configData, ok := secret.Data["kubeconfig"]
+	configData, ok := secret.Data[corev1.ServiceAccountKubeconfigKey]
 	if !ok || len(configData) == 0 {
 		return errNotReady("no kubeconfig in secret")
 	}
