@@ -22,9 +22,10 @@ umount_sysdev()
 
 get_image()
 {
-  local ver _ distro_name
+  local ver _ distro_name build_type match
 
   distro_name=""
+  match=0
 
   if ! [[ "$sqfs_image" =~ ^(ubuntu|centos)-[0-9]+ ]]; then
     echo >&2 "Must run from distribution/version directory. You're in: $PWD"
@@ -34,19 +35,21 @@ get_image()
 
   for sq in "${sqfs[@]}"; do
     IFS=':' read -r v distro_name <<< "$sq"
+    IFS='-' read -r ver build_type <<< "$ver"
+
     if [[ $v == "$ver" ]]; then
+      match=1
       break
     fi
   done
 
-  [[ "$distro_name" == "" ]] && \
-    {
-      echo >&2 "cannot determine distribution name."
-      exit 1
-    }
+  if [[ "$match" == 0 ]] || [[ "$distro_name" == "" ]]; then
+    echo >&2 "cannot determine distribution name."
+    exit 1
+  fi
 
   image_name="$distro_name"-server-cloudimg-amd64.squashfs
-  system_name="$distro_name-$ver".tar.gz
+  system_name="$distro_name-$ver-$build_type".tar.gz
 
   mkdir -p iso
   wget -O iso/"$distro_name"-server-cloudimg-amd64.squashfs \
