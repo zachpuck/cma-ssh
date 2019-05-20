@@ -10,7 +10,7 @@ spec:
   roles:
     - etcd
     - master
-  instanceType: master
+  instanceType: standard
 ---
 apiVersion: cluster.cnct.sds.samsung.com/v1alpha1
 kind: CnctMachine

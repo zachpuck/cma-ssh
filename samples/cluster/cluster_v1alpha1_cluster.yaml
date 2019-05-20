@@ -7,4 +7,4 @@ metadata:
   namespace: default
 spec:
   # Add fields here
-  kubernetesVersion: 1.12.6
+  kubernetesVersion: 1.13.5

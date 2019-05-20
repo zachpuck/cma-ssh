@@ -52,7 +52,7 @@ type clientEventer interface {
 
 type creator struct {
 	k8sClient  clientEventer
-	maasClient maas.Client
+	maasClient *maas.Client
 	machine    *clusterv1alpha1.CnctMachine
 	err        error
 
@@ -66,7 +66,7 @@ type creator struct {
 	createResponse maas.CreateResponse
 }
 
-func create(k8sClient clientEventer, maasClient maas.Client, machine *clusterv1alpha1.CnctMachine) error {
+func create(k8sClient clientEventer, maasClient *maas.Client, machine *clusterv1alpha1.CnctMachine) error {
 	log.Info("checking if machine is master")
 	var isMaster bool
 	for _, v := range machine.Spec.Roles {
@@ -282,9 +282,14 @@ func (c *creator) prepareMaasRequest() {
 	// TODO: ProviderID should be unique. One way to ensure this is to generate
 	// a UUID. Cf. k8s.io/apimachinery/pkg/util/uuid
 	providerID := fmt.Sprintf("%s-%s", c.cluster.Name, c.machine.Name)
+	distro := getImage(c.maasClient, "ubuntu-xenial", c.cluster.Spec.KubernetesVersion, c.machine.Spec.InstanceType)
+	if distro == "" {
+		c.err = errors.New("image does not exist")
+		return
+	}
 	c.createRequest = maas.CreateRequest{
 		ProviderID:   providerID,
-		Distro:       "ubuntu-16.04-vanilla",
+		Distro:       distro,
 		Userdata:     userdata,
 		InstanceType: c.machine.Spec.InstanceType,
 	}

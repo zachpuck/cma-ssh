@@ -17,23 +17,12 @@ limitations under the License.
 package machine
 
 import (
-	"log"
-	"os"
-	"path/filepath"
-	"sync"
-	"testing"
-
-	"github.com/onsi/gomega"
-	"github.com/samsung-cnct/cma-ssh/pkg/apis"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 var cfg *rest.Config
 
+/*
 func TestMain(m *testing.M) {
 	t := &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "crd")},
@@ -73,3 +62,4 @@ func StartTestManager(mgr manager.Manager, g *gomega.GomegaWithT) (chan struct{}
 	}()
 	return stop, wg
 }
+*/

@@ -205,7 +205,7 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 		err = r.handleDelete(&machine, &cluster)
 	case common.ErrorMachinePhase, common.ReadyMachinePhase, common.UpgradingMachinePhase:
 	default:
-		err = create(r, r.MAASClient, &machine)
+		err = create(r, &r.MAASClient, &machine)
 	}
 	if err != nil {
 		switch e := errors.Cause(err).(type) {
