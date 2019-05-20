@@ -135,7 +135,7 @@ To retrieve the kubeconfig:
 ```bash
 # If you're using Linux `base64` then use `-d` not `-D`
 kubectl get secret cluster-private-key -ojson -n <namespace> | \
-  jq -r '.data.kubeconfig' | \
+  jq -r '.data["kubernetes.kubeconfig"]' | \
   base64 -D > kubeconfig-<clustername>
 ```
 To use the kubeconfig:
