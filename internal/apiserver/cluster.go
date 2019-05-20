@@ -68,6 +68,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 			},
 			Spec: v1alpha.MachineSpec{
 				Roles: []common.MachineRoles{common.MachineRoleMaster, common.MachineRoleEtcd},
+				InstanceType: machineConfig.InstanceType,
 			},
 		}
 
@@ -94,6 +95,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 			},
 			Spec: v1alpha.MachineSpec{
 				Roles: []common.MachineRoles{common.MachineRoleWorker},
+				InstanceType: machineConfig.InstanceType,
 			},
 		}
 
