@@ -1,5 +1,5 @@
 # cma-ssh
-[![Build Status](https://jenkins.cnct.io/buildStatus/icon?job=cma-ssh/master)](cnct_jenkins)
+[![Build Status](https://jenkins.cnct.io/buildStatus/icon?job=cma-ssh/master)](https://jenkins.cnct.io/job/cma-ssh/job/master/)
 
 # What is this?
 
@@ -304,4 +304,3 @@ the azure portal or cli
 
 [generate-an-api-key]: https://docs.maas.io/2.1/en/manage-account#api-key
 [packer_tool]: https://packer.io/downloads.html
-[cnct_jenkins]: https://jenkins.cnct.io/job/cma-ssh/job/master/
