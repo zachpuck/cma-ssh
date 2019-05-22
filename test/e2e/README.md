@@ -6,8 +6,7 @@ and access to other providers.  There are scripts here to test both api endpoint
 
 # Developer Context
 
-When making changes to cma-ssh, the developer and possibly reviewer should run the `full-test-cma-ssh.sh` script which will
-e2e test the cma-ssh api.
+When making changes to cma-ssh, the developer and possibly reviewer should run the `full-test-cma-ssh.sh` script which will e2e test the cma-ssh api.
 
 # How to run `full-test-cma-ssh.sh`
 

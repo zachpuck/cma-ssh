@@ -85,13 +85,12 @@ test_delete(){
   # wait up to 20 minutes for cluster delete complete
   for tries in $(seq 1 120); do
     deleted=$("${__dir}/cma-get")
-
-    if echo $deleted | grep -o "404 Not Found"; then
+    if echo $deleted | grep -o "STOPPING"; then
+      echo "Cluster DELETE is NOT COMPLETE"
+    else
       echo "Cluster DELETE is COMPLETE"
       echo "elapsed seconds=$(( 10 * $tries ))"
       return 0
-    else
-      echo "Cluster DELETE is NOT COMPLETE"
     fi
     sleep 10
   done
