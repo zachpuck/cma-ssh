@@ -204,7 +204,7 @@ func createClusterSecrets(k8sClient client.Client, cluster *clusterv1alpha1.Cnct
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "cluster-private-key",
 			Namespace:  cluster.Namespace,
-			Finalizers: []string{clusterv1alpha1.ClusterFinalizer},
+			Finalizers: []string{"foregroundDeletion"},
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: dataMap,
