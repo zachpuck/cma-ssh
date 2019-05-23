@@ -32,6 +32,42 @@ full-test-cma-ssh PASSED
 
 ```
 
+# Testing from the cma api
+
+The script `full-test.sh` is an end to end test of the cma api.
+Normally `full-test.sh` would be used on an already installed CMS.
+
+# How to run `full-test.sh`
+
+Follow instructions to install [cluster-manager-api](https://github.com/samsung-cnct/cluster-manager-api)
+and set helpers.ssh.enabled=true.
+Note: cert-manager and nginx-ingress should be installed per instructions before installing
+cluster-manager-api.
+
+```bash
+# install cma
+cd $GOPATH/src/github.com/samsung-cnct/cluster-manager-api
+helm install deployments/helm/cluster-manager-api --name cma --set helpers.ssh.enabled=true
+
+# install cma-ssh
+cd $GOPATH/src/github.com/samsung-cnct/cma-ssh
+vi deployments/helm/cma-ssh/values.yaml  - to add maas key
+helm install --name cma-ssh deployments/helm/cma-ssh/
+
+# make sure cluster-manager-api service is accessible (NodePort, or ingress)
+kubectl get svc
+
+# run full-test.sh
+cd $GOPATH/src/github.com/samsung-cnct/cma-ssh/test/e2e
+vi testEnvs.sh - modify CLUSTER_API to point to cma service
+source ./testEnvs.sh
+./full-test.sh
+
+# Look at test output and final status
+full-test-cma PASSED
+
+````
+
 # CI Pipeline Context
 
 TBD.  CI needs access to the MaaS environment in order to test end to end provisioning.
