@@ -57,17 +57,16 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 		for _, label := range machineConfig.Labels {
 			machineLabels[label.Name] = label.Value
 		}
+		machineLabels["controller-tools.k8s.io"] = "1.0"
 
 		machineObject := &v1alpha.CnctMachine{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "control-plane-",
 				Namespace:    in.Name,
-				Labels: map[string]string{
-					"controller-tools.k8s.io": "1.0",
-				},
+				Labels:       machineLabels,
 			},
 			Spec: v1alpha.MachineSpec{
-				Roles: []common.MachineRoles{common.MachineRoleMaster, common.MachineRoleEtcd},
+				Roles:        []common.MachineRoles{common.MachineRoleMaster, common.MachineRoleEtcd},
 				InstanceType: machineConfig.InstanceType,
 			},
 		}
@@ -85,16 +84,16 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 		for _, label := range machineConfig.Labels {
 			machineLabels[label.Name] = label.Value
 		}
+		machineLabels["controller-tools.k8s.io"] = "1.0"
+
 		machineObject := &v1alpha.CnctMachine{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "worker-",
 				Namespace:    in.Name,
-				Labels: map[string]string{
-					"controller-tools.k8s.io": "1.0",
-				},
+				Labels:       machineLabels,
 			},
 			Spec: v1alpha.MachineSpec{
-				Roles: []common.MachineRoles{common.MachineRoleWorker},
+				Roles:        []common.MachineRoles{common.MachineRoleWorker},
 				InstanceType: machineConfig.InstanceType,
 			},
 		}
