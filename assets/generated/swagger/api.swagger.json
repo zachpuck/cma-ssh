@@ -207,12 +207,12 @@
     }
   },
   "definitions": {
-    "AdjustClusterMsgSshRemoveMachineSpec": {
+    "AdjustClusterMsgRemoveMachineSpec": {
       "type": "object",
       "properties": {
-        "host": {
+        "ip": {
           "type": "string",
-          "title": "The host for SSH access"
+          "title": "The ip of machine"
         }
       }
     },
@@ -259,14 +259,14 @@
         "add_nodes": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/cmasshSshMachineSpec"
+            "$ref": "#/definitions/cmasshMachineSpec"
           },
           "title": "Machines which we want to add to the cluster"
         },
         "remove_nodes": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/AdjustClusterMsgSshRemoveMachineSpec"
+            "$ref": "#/definitions/AdjustClusterMsgRemoveMachineSpec"
           },
           "title": "Machines which we want to remove from the cluster"
         }
@@ -285,10 +285,6 @@
     "cmasshClusterDetailItem": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string",
-          "title": "ID of the cluster"
-        },
         "name": {
           "type": "string",
           "title": "Name of the cluster"
@@ -310,10 +306,6 @@
     "cmasshClusterItem": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string",
-          "title": "ID of the cluster"
-        },
         "name": {
           "type": "string",
           "title": "Name of the cluster"
@@ -342,6 +334,27 @@
       "default": "STATUS_UNSPECIFIED",
       "title": "- STATUS_UNSPECIFIED: Not set\n - PROVISIONING: The PROVISIONING state indicates the cluster is being created.\n - RUNNING: The RUNNING state indicates the cluster has been created and is fully usable.\n - RECONCILING: The RECONCILING state indicates that some work is actively being done on the cluster, such as upgrading the master or node software.\n - STOPPING: The STOPPING state indicates the cluster is being deleted\n - ERROR: The ERROR state indicates the cluster may be unusable\n - DEGRADED: The DEGRADED state indicates the cluster requires user action to restore full functionality"
     },
+    "cmasshControlPlaneMachineSpec": {
+      "type": "object",
+      "properties": {
+        "labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/cmasshKubernetesLabel"
+          },
+          "title": "The labels for the control plane machines"
+        },
+        "instanceType": {
+          "type": "string",
+          "title": "Type of machines to provision (standard or gpu)"
+        },
+        "count": {
+          "type": "string",
+          "title": "The number of machines"
+        }
+      },
+      "title": "The specification for a set of control plane machines"
+    },
     "cmasshCreateClusterMsg": {
       "type": "object",
       "properties": {
@@ -353,36 +366,16 @@
           "type": "string",
           "description": "The version of Kubernetes for worker nodes. Control plane versions are determined by the MachineSpec."
         },
-        "high_availability": {
-          "type": "boolean",
-          "format": "boolean",
-          "title": "Whether or not the cluster is HA"
-        },
-        "network_fabric": {
-          "type": "string",
-          "title": "The fabric to be used"
-        },
         "control_plane_nodes": {
+          "$ref": "#/definitions/cmasshControlPlaneMachineSpec",
+          "title": "Machines which comprise the cluster control plane"
+        },
+        "worker_node_pools": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/cmasshSshMachineSpec"
+            "$ref": "#/definitions/cmasshMachineSpec"
           },
           "title": "Machines which comprise the cluster"
-        },
-        "worker_nodes": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/cmasshSshMachineSpec"
-          },
-          "title": "Machines which comprise the cluster"
-        },
-        "api_endpoint": {
-          "type": "string",
-          "title": "This should be a value like ip:port that will be a virtual IP/port\nPassed back to external customers to be able to communicate to the cluster"
-        },
-        "private_key": {
-          "type": "string",
-          "title": "Private key used to ssh into machines"
         }
       }
     },
@@ -489,60 +482,30 @@
         }
       }
     },
-    "cmasshKubernetesTaint": {
+    "cmasshMachineSpec": {
       "type": "object",
       "properties": {
         "name": {
           "type": "string",
-          "title": "The name of a taint"
-        },
-        "value": {
-          "type": "string",
-          "title": "The value of a taint"
-        },
-        "effect": {
-          "$ref": "#/definitions/cmasshKubernetesTaintEffect",
-          "title": "The effect of a taint"
-        }
-      }
-    },
-    "cmasshKubernetesTaintEffect": {
-      "type": "string",
-      "enum": [
-        "NoSchedule",
-        "PreferNoSchedule",
-        "NoExecute"
-      ],
-      "default": "NoSchedule",
-      "description": " - NoSchedule: Do not allow new pods to schedule onto the node unless they tolerate the taint.\n - PreferNoSchedule: Attempt to not schedule new pods onto the node unless no other node without taint is available.\n - NoExecute: Evict any already-running pods that do not tolerate the taint."
-    },
-    "cmasshSshMachineSpec": {
-      "type": "object",
-      "properties": {
-        "username": {
-          "type": "string",
-          "title": "The username for SSH access"
+          "title": "The name of the machine set"
         },
         "labels": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/cmasshKubernetesLabel"
           },
-          "title": "The labels for the machines"
-        },
-        "taints": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/cmasshKubernetesTaint"
-          },
-          "title": "The list of kubernetes taints"
+          "title": "The labels for the machine set"
         },
         "instanceType": {
           "type": "string",
-          "title": "Type of machine to provision (small, medium, gpu, ...)"
+          "title": "Type of machines to provision (standard or gpu)"
+        },
+        "count": {
+          "type": "string",
+          "title": "The number of machines"
         }
       },
-      "title": "The specification for a specific node"
+      "title": "The specification for a set of machines"
     },
     "cmasshUpgradeClusterMsg": {
       "type": "object",

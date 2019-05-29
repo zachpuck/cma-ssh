@@ -52,7 +52,9 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 	}
 
 	// create control plane machines
-	for _, machineConfig := range in.ControlPlaneNodes {
+	// TODO (zachpuck): handle count/name - awaiting machineset implementation and load balancer for api server
+	{
+		machineConfig := in.ControlPlaneNodes
 		machineLabels := map[string]string{}
 		for _, label := range machineConfig.Labels {
 			machineLabels[label.Name] = label.Value
@@ -79,7 +81,8 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 	}
 
 	// create worker plane machines
-	for _, machineConfig := range in.WorkerNodes {
+	// TODO (zachpuck): handle count/name - awaiting machineset implementation
+	for _, machineConfig := range in.WorkerNodePools {
 		machineLabels := map[string]string{}
 		for _, label := range machineConfig.Labels {
 			machineLabels[label.Name] = label.Value
@@ -108,7 +111,6 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 	return &pb.CreateClusterReply{
 		Ok: true,
 		Cluster: &pb.ClusterItem{
-			Id:     "stub",
 			Name:   in.Name,
 			Status: pb.ClusterStatus_PROVISIONING,
 		},
@@ -145,7 +147,6 @@ func (s *Server) GetCluster(ctx context.Context, in *pb.GetClusterMsg) (*pb.GetC
 	return &pb.GetClusterReply{
 		Ok: true,
 		Cluster: &pb.ClusterDetailItem{
-			Id:         "stub",
 			Name:       in.Name,
 			Status:     TranslateClusterStatus(clusterInstance.Status.Phase),
 			Kubeconfig: string(kubeconfigBytes),
@@ -227,7 +228,6 @@ func (s *Server) GetClusterList(ctx context.Context, in *pb.GetClusterListMsg) (
 		clusterStatus := TranslateClusterStatus(cluster.Status.Phase)
 
 		clusters = append(clusters, &pb.ClusterItem{
-			Id:     "stub",
 			Name:   cluster.GetName(),
 			Status: clusterStatus,
 		})
@@ -286,14 +286,14 @@ func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg
 	}
 
 	for _, removedNode := range in.RemoveNodes {
-		machineName, err := GetMachineName(clusterInstance.GetName(), removedNode.Host, s.Manager)
+		machineName, err := GetMachineName(clusterInstance.GetName(), removedNode.Ip, s.Manager)
 		if err != nil {
-			klog.Errorf("Failed to get machine name for node %s: %q", removedNode.Host, err)
+			klog.Errorf("Failed to get machine name for node %s: %q", removedNode.Ip, err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 
 		if machineName == "" {
-			klog.Errorf("Got empty machine name for node %s", removedNode.Host)
+			klog.Errorf("Got empty machine name for node %s", removedNode.Ip)
 			return nil, status.Error(codes.Internal, "machine is empty")
 		}
 

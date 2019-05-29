@@ -5,10 +5,11 @@
 
 - [api.proto](#api.proto)
     - [AdjustClusterMsg](#cmassh.AdjustClusterMsg)
-    - [AdjustClusterMsg.SshRemoveMachineSpec](#cmassh.AdjustClusterMsg.SshRemoveMachineSpec)
+    - [AdjustClusterMsg.RemoveMachineSpec](#cmassh.AdjustClusterMsg.RemoveMachineSpec)
     - [AdjustClusterReply](#cmassh.AdjustClusterReply)
     - [ClusterDetailItem](#cmassh.ClusterDetailItem)
     - [ClusterItem](#cmassh.ClusterItem)
+    - [ControlPlaneMachineSpec](#cmassh.ControlPlaneMachineSpec)
     - [CreateClusterMsg](#cmassh.CreateClusterMsg)
     - [CreateClusterReply](#cmassh.CreateClusterReply)
     - [DeleteClusterMsg](#cmassh.DeleteClusterMsg)
@@ -23,13 +24,11 @@
     - [GetVersionReply](#cmassh.GetVersionReply)
     - [GetVersionReply.VersionInformation](#cmassh.GetVersionReply.VersionInformation)
     - [KubernetesLabel](#cmassh.KubernetesLabel)
-    - [KubernetesTaint](#cmassh.KubernetesTaint)
-    - [SshMachineSpec](#cmassh.SshMachineSpec)
+    - [MachineSpec](#cmassh.MachineSpec)
     - [UpgradeClusterMsg](#cmassh.UpgradeClusterMsg)
     - [UpgradeClusterReply](#cmassh.UpgradeClusterReply)
   
     - [ClusterStatus](#cmassh.ClusterStatus)
-    - [KubernetesTaintEffect](#cmassh.KubernetesTaintEffect)
   
   
     - [Cluster](#cmassh.Cluster)
@@ -37,10 +36,11 @@
 
 - [api.proto](#api.proto)
     - [AdjustClusterMsg](#cmassh.AdjustClusterMsg)
-    - [AdjustClusterMsg.SshRemoveMachineSpec](#cmassh.AdjustClusterMsg.SshRemoveMachineSpec)
+    - [AdjustClusterMsg.RemoveMachineSpec](#cmassh.AdjustClusterMsg.RemoveMachineSpec)
     - [AdjustClusterReply](#cmassh.AdjustClusterReply)
     - [ClusterDetailItem](#cmassh.ClusterDetailItem)
     - [ClusterItem](#cmassh.ClusterItem)
+    - [ControlPlaneMachineSpec](#cmassh.ControlPlaneMachineSpec)
     - [CreateClusterMsg](#cmassh.CreateClusterMsg)
     - [CreateClusterReply](#cmassh.CreateClusterReply)
     - [DeleteClusterMsg](#cmassh.DeleteClusterMsg)
@@ -55,13 +55,11 @@
     - [GetVersionReply](#cmassh.GetVersionReply)
     - [GetVersionReply.VersionInformation](#cmassh.GetVersionReply.VersionInformation)
     - [KubernetesLabel](#cmassh.KubernetesLabel)
-    - [KubernetesTaint](#cmassh.KubernetesTaint)
-    - [SshMachineSpec](#cmassh.SshMachineSpec)
+    - [MachineSpec](#cmassh.MachineSpec)
     - [UpgradeClusterMsg](#cmassh.UpgradeClusterMsg)
     - [UpgradeClusterReply](#cmassh.UpgradeClusterReply)
   
     - [ClusterStatus](#cmassh.ClusterStatus)
-    - [KubernetesTaintEffect](#cmassh.KubernetesTaintEffect)
   
   
     - [Cluster](#cmassh.Cluster)
@@ -87,23 +85,23 @@
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | What is the cluster that we are considering for upgrade |
-| add_nodes | [SshMachineSpec](#cmassh.SshMachineSpec) | repeated | Machines which we want to add to the cluster |
-| remove_nodes | [AdjustClusterMsg.SshRemoveMachineSpec](#cmassh.AdjustClusterMsg.SshRemoveMachineSpec) | repeated | Machines which we want to remove from the cluster |
+| add_nodes | [MachineSpec](#cmassh.MachineSpec) | repeated | Machines which we want to add to the cluster |
+| remove_nodes | [AdjustClusterMsg.RemoveMachineSpec](#cmassh.AdjustClusterMsg.RemoveMachineSpec) | repeated | Machines which we want to remove from the cluster |
 
 
 
 
 
 
-<a name="cmassh.AdjustClusterMsg.SshRemoveMachineSpec"></a>
+<a name="cmassh.AdjustClusterMsg.RemoveMachineSpec"></a>
 
-### AdjustClusterMsg.SshRemoveMachineSpec
+### AdjustClusterMsg.RemoveMachineSpec
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| host | [string](#string) |  | The host for SSH access |
+| ip | [string](#string) |  | The ip of machine |
 
 
 
@@ -133,13 +131,10 @@
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| id | [string](#string) |  | ID of the cluster |
 | name | [string](#string) |  | Name of the cluster |
 | status_message | [string](#string) |  | Additional information about the status of the cluster |
 | kubeconfig | [string](#string) |  | What is the kubeconfig to connect to the cluster |
-| status | [ClusterStatus](#cmassh.ClusterStatus) |  | The status of the cluster
-
-TODO: (zachpuck) Do we need to add machines SSH host? |
+| status | [ClusterStatus](#cmassh.ClusterStatus) |  | The status of the cluster |
 
 
 
@@ -154,10 +149,26 @@ TODO: (zachpuck) Do we need to add machines SSH host? |
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| id | [string](#string) |  | ID of the cluster |
 | name | [string](#string) |  | Name of the cluster |
 | status_message | [string](#string) |  | Additional information about the status of the cluster |
 | status | [ClusterStatus](#cmassh.ClusterStatus) |  | The status of the cluster |
+
+
+
+
+
+
+<a name="cmassh.ControlPlaneMachineSpec"></a>
+
+### ControlPlaneMachineSpec
+The specification for a set of control plane machines
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| labels | [KubernetesLabel](#cmassh.KubernetesLabel) | repeated | The labels for the control plane machines |
+| instanceType | [string](#string) |  | Type of machines to provision (standard or gpu) |
+| count | [string](#string) |  | The number of machines |
 
 
 
@@ -174,12 +185,8 @@ TODO: (zachpuck) Do we need to add machines SSH host? |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | Name of the cluster to be provisioned |
 | k8s_version | [string](#string) |  | The version of Kubernetes for worker nodes. Control plane versions are determined by the MachineSpec. |
-| high_availability | [bool](#bool) |  | Whether or not the cluster is HA |
-| network_fabric | [string](#string) |  | The fabric to be used |
-| control_plane_nodes | [SshMachineSpec](#cmassh.SshMachineSpec) | repeated | Machines which comprise the cluster |
-| worker_nodes | [SshMachineSpec](#cmassh.SshMachineSpec) | repeated | Machines which comprise the cluster |
-| api_endpoint | [string](#string) |  | This should be a value like ip:port that will be a virtual IP/port Passed back to external customers to be able to communicate to the cluster |
-| private_key | [string](#string) |  | Private key used to ssh into machines |
+| control_plane_nodes | [ControlPlaneMachineSpec](#cmassh.ControlPlaneMachineSpec) |  | Machines which comprise the cluster control plane |
+| worker_node_pools | [MachineSpec](#cmassh.MachineSpec) | repeated | Machines which comprise the cluster |
 
 
 
@@ -384,35 +391,18 @@ Reply for version request
 
 
 
-<a name="cmassh.KubernetesTaint"></a>
+<a name="cmassh.MachineSpec"></a>
 
-### KubernetesTaint
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The name of a taint |
-| value | [string](#string) |  | The value of a taint |
-| effect | [KubernetesTaintEffect](#cmassh.KubernetesTaintEffect) |  | The effect of a taint |
-
-
-
-
-
-
-<a name="cmassh.SshMachineSpec"></a>
-
-### SshMachineSpec
-The specification for a specific node
+### MachineSpec
+The specification for a set of machines
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| username | [string](#string) |  | The username for SSH access |
-| labels | [KubernetesLabel](#cmassh.KubernetesLabel) | repeated | The labels for the machines |
-| taints | [KubernetesTaint](#cmassh.KubernetesTaint) | repeated | The list of kubernetes taints |
-| instanceType | [string](#string) |  | Type of machine to provision (small, medium, gpu, ...) |
+| name | [string](#string) |  | The name of the machine set |
+| labels | [KubernetesLabel](#cmassh.KubernetesLabel) | repeated | The labels for the machine set |
+| instanceType | [string](#string) |  | Type of machines to provision (standard or gpu) |
+| count | [string](#string) |  | The number of machines |
 
 
 
@@ -466,19 +456,6 @@ The specification for a specific node
 | STOPPING | 4 | The STOPPING state indicates the cluster is being deleted |
 | ERROR | 5 | The ERROR state indicates the cluster may be unusable |
 | DEGRADED | 6 | The DEGRADED state indicates the cluster requires user action to restore full functionality |
-
-
-
-<a name="cmassh.KubernetesTaintEffect"></a>
-
-### KubernetesTaintEffect
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| NoSchedule | 0 | Do not allow new pods to schedule onto the node unless they tolerate the taint. |
-| PreferNoSchedule | 1 | Attempt to not schedule new pods onto the node unless no other node without taint is available. |
-| NoExecute | 2 | Evict any already-running pods that do not tolerate the taint. |
 
 
  
@@ -522,23 +499,23 @@ The specification for a specific node
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | What is the cluster that we are considering for upgrade |
-| add_nodes | [SshMachineSpec](#cmassh.SshMachineSpec) | repeated | Machines which we want to add to the cluster |
-| remove_nodes | [AdjustClusterMsg.SshRemoveMachineSpec](#cmassh.AdjustClusterMsg.SshRemoveMachineSpec) | repeated | Machines which we want to remove from the cluster |
+| add_nodes | [MachineSpec](#cmassh.MachineSpec) | repeated | Machines which we want to add to the cluster |
+| remove_nodes | [AdjustClusterMsg.RemoveMachineSpec](#cmassh.AdjustClusterMsg.RemoveMachineSpec) | repeated | Machines which we want to remove from the cluster |
 
 
 
 
 
 
-<a name="cmassh.AdjustClusterMsg.SshRemoveMachineSpec"></a>
+<a name="cmassh.AdjustClusterMsg.RemoveMachineSpec"></a>
 
-### AdjustClusterMsg.SshRemoveMachineSpec
+### AdjustClusterMsg.RemoveMachineSpec
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| host | [string](#string) |  | The host for SSH access |
+| ip | [string](#string) |  | The ip of machine |
 
 
 
@@ -568,13 +545,10 @@ The specification for a specific node
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| id | [string](#string) |  | ID of the cluster |
 | name | [string](#string) |  | Name of the cluster |
 | status_message | [string](#string) |  | Additional information about the status of the cluster |
 | kubeconfig | [string](#string) |  | What is the kubeconfig to connect to the cluster |
-| status | [ClusterStatus](#cmassh.ClusterStatus) |  | The status of the cluster
-
-TODO: (zachpuck) Do we need to add machines SSH host? |
+| status | [ClusterStatus](#cmassh.ClusterStatus) |  | The status of the cluster |
 
 
 
@@ -589,10 +563,26 @@ TODO: (zachpuck) Do we need to add machines SSH host? |
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| id | [string](#string) |  | ID of the cluster |
 | name | [string](#string) |  | Name of the cluster |
 | status_message | [string](#string) |  | Additional information about the status of the cluster |
 | status | [ClusterStatus](#cmassh.ClusterStatus) |  | The status of the cluster |
+
+
+
+
+
+
+<a name="cmassh.ControlPlaneMachineSpec"></a>
+
+### ControlPlaneMachineSpec
+The specification for a set of control plane machines
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| labels | [KubernetesLabel](#cmassh.KubernetesLabel) | repeated | The labels for the control plane machines |
+| instanceType | [string](#string) |  | Type of machines to provision (standard or gpu) |
+| count | [string](#string) |  | The number of machines |
 
 
 
@@ -609,12 +599,8 @@ TODO: (zachpuck) Do we need to add machines SSH host? |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | Name of the cluster to be provisioned |
 | k8s_version | [string](#string) |  | The version of Kubernetes for worker nodes. Control plane versions are determined by the MachineSpec. |
-| high_availability | [bool](#bool) |  | Whether or not the cluster is HA |
-| network_fabric | [string](#string) |  | The fabric to be used |
-| control_plane_nodes | [SshMachineSpec](#cmassh.SshMachineSpec) | repeated | Machines which comprise the cluster |
-| worker_nodes | [SshMachineSpec](#cmassh.SshMachineSpec) | repeated | Machines which comprise the cluster |
-| api_endpoint | [string](#string) |  | This should be a value like ip:port that will be a virtual IP/port Passed back to external customers to be able to communicate to the cluster |
-| private_key | [string](#string) |  | Private key used to ssh into machines |
+| control_plane_nodes | [ControlPlaneMachineSpec](#cmassh.ControlPlaneMachineSpec) |  | Machines which comprise the cluster control plane |
+| worker_node_pools | [MachineSpec](#cmassh.MachineSpec) | repeated | Machines which comprise the cluster |
 
 
 
@@ -819,35 +805,18 @@ Reply for version request
 
 
 
-<a name="cmassh.KubernetesTaint"></a>
+<a name="cmassh.MachineSpec"></a>
 
-### KubernetesTaint
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The name of a taint |
-| value | [string](#string) |  | The value of a taint |
-| effect | [KubernetesTaintEffect](#cmassh.KubernetesTaintEffect) |  | The effect of a taint |
-
-
-
-
-
-
-<a name="cmassh.SshMachineSpec"></a>
-
-### SshMachineSpec
-The specification for a specific node
+### MachineSpec
+The specification for a set of machines
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| username | [string](#string) |  | The username for SSH access |
-| labels | [KubernetesLabel](#cmassh.KubernetesLabel) | repeated | The labels for the machines |
-| taints | [KubernetesTaint](#cmassh.KubernetesTaint) | repeated | The list of kubernetes taints |
-| instanceType | [string](#string) |  | Type of machine to provision (small, medium, gpu, ...) |
+| name | [string](#string) |  | The name of the machine set |
+| labels | [KubernetesLabel](#cmassh.KubernetesLabel) | repeated | The labels for the machine set |
+| instanceType | [string](#string) |  | Type of machines to provision (standard or gpu) |
+| count | [string](#string) |  | The number of machines |
 
 
 
@@ -901,19 +870,6 @@ The specification for a specific node
 | STOPPING | 4 | The STOPPING state indicates the cluster is being deleted |
 | ERROR | 5 | The ERROR state indicates the cluster may be unusable |
 | DEGRADED | 6 | The DEGRADED state indicates the cluster requires user action to restore full functionality |
-
-
-
-<a name="cmassh.KubernetesTaintEffect"></a>
-
-### KubernetesTaintEffect
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| NoSchedule | 0 | Do not allow new pods to schedule onto the node unless they tolerate the taint. |
-| PreferNoSchedule | 1 | Attempt to not schedule new pods onto the node unless no other node without taint is available. |
-| NoExecute | 2 | Evict any already-running pods that do not tolerate the taint. |
 
 
  
