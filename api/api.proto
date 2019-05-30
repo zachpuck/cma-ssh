@@ -113,33 +113,15 @@ enum ClusterStatus {
     DEGRADED = 6;
 }
 
-enum KubernetesTaintEffect {
-    // Do not allow new pods to schedule onto the node unless they tolerate the taint.
-    NoSchedule = 0;
-    // Attempt to not schedule new pods onto the node unless no other node without taint is available.
-    PreferNoSchedule = 1;
-    // Evict any already-running pods that do not tolerate the taint.
-    NoExecute = 2;
-}
-
 message CreateClusterMsg {
     // Name of the cluster to be provisioned
     string name = 1;
     // The version of Kubernetes for worker nodes. Control plane versions are determined by the MachineSpec.
     string k8s_version = 2;
-    // Whether or not the cluster is HA
-    bool high_availability = 3;
-    // The fabric to be used
-    string network_fabric = 4;
+    // Machines which comprise the cluster control plane
+    ControlPlaneMachineSpec control_plane_nodes = 3;
     // Machines which comprise the cluster
-    repeated SshMachineSpec control_plane_nodes = 5;
-    // Machines which comprise the cluster
-    repeated SshMachineSpec worker_nodes = 6;
-    // This should be a value like ip:port that will be a virtual IP/port
-    // Passed back to external customers to be able to communicate to the cluster
-    string api_endpoint = 7;
-    // Private key used to ssh into machines
-    string private_key = 8;
+    repeated MachineSpec worker_node_pools = 4;
 }
 
 message CreateClusterReply {
@@ -184,28 +166,23 @@ message GetClusterListReply {
 }
 
 message ClusterItem {
-    // ID of the cluster
-    string id = 1;
     // Name of the cluster
-    string name = 2;
+    string name = 1;
     // Additional information about the status of the cluster
-    string status_message = 3;
+    string status_message = 2;
     // The status of the cluster
-    ClusterStatus status = 4;
+    ClusterStatus status = 3;
 }
 
 message ClusterDetailItem {
-    // ID of the cluster
-    string id = 1;
     // Name of the cluster
-    string name = 2;
+    string name = 1;
     // Additional information about the status of the cluster
-    string status_message = 3;
+    string status_message = 2;
     // What is the kubeconfig to connect to the cluster
-    string kubeconfig = 4;
+    string kubeconfig = 3;
     // The status of the cluster
-    ClusterStatus status = 5;
-    // TODO: (zachpuck) Do we need to add machines SSH host?
+    ClusterStatus status = 4;
 }
 
 message KubernetesLabel {
@@ -215,25 +192,26 @@ message KubernetesLabel {
     string value = 2;
 }
 
-message KubernetesTaint {
-    // The name of a taint
-    string name = 1;
-    // The value of a taint
-    string value = 2;
-    // The effect of a taint
-    KubernetesTaintEffect effect = 3;
+// The specification for a set of control plane machines
+message ControlPlaneMachineSpec {
+    // The labels for the control plane machines
+    repeated KubernetesLabel labels = 1;
+    // Type of machines to provision (standard or gpu)
+    string instanceType = 2;
+    // The number of machines
+    string count = 3;
 }
 
-// The specification for a specific node
-message SshMachineSpec {
-    // The username for SSH access
-    string username = 1;
-    // The labels for the machines
-    repeated KubernetesLabel labels = 5;
-    // The list of kubernetes taints
-    repeated KubernetesTaint taints = 7;
-    // Type of machine to provision (small, medium, gpu, ...)
-    string instanceType = 8;
+// The specification for a set of machines
+message MachineSpec {
+    // The name of the machine set
+    string name = 1;
+    // The labels for the machine set
+    repeated KubernetesLabel labels = 2;
+    // Type of machines to provision (standard or gpu)
+    string instanceType = 3;
+    // The number of machines
+    string count = 4;
 }
 
 // Get version of API Server
@@ -294,13 +272,13 @@ message AdjustClusterMsg {
     // What is the cluster that we are considering for upgrade
     string name = 1;
     // Machines which we want to add to the cluster
-    repeated SshMachineSpec add_nodes = 2;
+    repeated MachineSpec add_nodes = 2;
     // Machines which we want to remove from the cluster
-    repeated SshRemoveMachineSpec remove_nodes = 3;
+    repeated RemoveMachineSpec remove_nodes = 3;
 
-    message SshRemoveMachineSpec {
-        // The host for SSH access
-        string host = 1;
+    message RemoveMachineSpec {
+        // The ip of machine
+        string ip = 1;
     }
 }
 
