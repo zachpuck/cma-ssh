@@ -31,7 +31,7 @@ get_image()
     echo >&2 "Must run from distribution/version directory. You're in: $PWD"
     exit 1
   fi
-  IFS='-' read -r _ ver <<< "$sqfs_image"
+  IFS='-' read -r distro ver <<< "$sqfs_image"
 
   for sq in "${sqfs[@]}"; do
     IFS=':' read -r v distro_name <<< "$sq"
@@ -49,7 +49,7 @@ get_image()
   fi
 
   image_name="$distro_name"-server-cloudimg-amd64.squashfs
-  system_name="$distro_name-$ver-$build_type".tar.gz
+  system_name="$distro-$ver-${build_type:-standard}".tar.gz
 
   mkdir -p iso
   wget -O iso/"$distro_name"-server-cloudimg-amd64.squashfs \

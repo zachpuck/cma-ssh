@@ -10,7 +10,7 @@ curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.li
 sudo apt-get update
 
 # Install nvidia-docker2 and reload the Docker daemon configuration
-apt-get install -y \
+apt-get install -y --no-install-recommends --no-install-suggests \
   apt-transport-https \
   ca-certificates \
   curl \
@@ -29,7 +29,8 @@ add-apt-repository \
   $(lsb_release -cs) \
   stable"
 apt-get update
-apt-get install -y nvidia-docker2 \
+apt-get install -y --no-install-recommends --no-install-suggests \
+                   nvidia-docker2 \
                    docker-ce docker-ce-cli \
                    containerd.io libcuda1-384 \
                    nvidia-384

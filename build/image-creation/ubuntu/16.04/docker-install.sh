@@ -2,7 +2,7 @@
 DEBIAN_FRONTEND=noninteractive
 export DEBIAN_FRONTEND
 
-apt-get install -y \
+apt-get install -y --no-install-recommends --no-install-suggests \
   apt-transport-https \
   ca-certificates \
   curl \
@@ -16,7 +16,8 @@ add-apt-repository \
   $(lsb_release -cs) \
   stable"
 apt-get update
-apt-get install -y docker-ce docker-ce-cli \
+apt-get install -y --no-install-recommends --no-install-suggests \
+                   docker-ce docker-ce-cli \
                    containerd.io
 sudo pkill -SIGHUP dockerd
 apt --purge autoremove -y
