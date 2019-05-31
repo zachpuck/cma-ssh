@@ -29,6 +29,8 @@ func Test_parse(t *testing.T) {
 		{name: "empty i", raw: "standard,,os=ubuntu,k8s=1.13.5", wantImg: standardImage("standard,,os=ubuntu,k8s=1.13.5"), wantOk: true},
 		{name: "unused i", raw: "os=ubuntu,andrew=cool,k8s=1.13.5,standard", wantImg: standardImage("os=ubuntu,andrew=cool,k8s=1.13.5,standard"), wantOk: true},
 		{name: "repeated key", raw: "os=fedora,os=ubuntu,k8s=1.12.5,k8s=1.13.5,gpu,standard", wantImg: standardImage("os=fedora,os=ubuntu,k8s=1.12.5,k8s=1.13.5,gpu,standard"), wantOk: true},
+		{name: "using type", raw: "os=ubuntu,k8s=1.13.5,type=standard", wantImg: standardImage("os=ubuntu,k8s=1.13.5,type=standard"), wantOk: true},
+		{name: "overlapping type", raw: "os=ubuntu,k8s=1.13.5,gpu,type=standard", wantImg: standardImage("os=ubuntu,k8s=1.13.5,gpu,type=standard"), wantOk: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

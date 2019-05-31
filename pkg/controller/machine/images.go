@@ -19,6 +19,8 @@ func (i *image) set(key, value string) {
 		i.os = value
 	case "k8s":
 		i.k8sVersion = value
+	case "type":
+		i.instanceType = value
 	case "standard":
 		i.instanceType = key
 	case "gpu":
