@@ -23,6 +23,7 @@ import (
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"github.com/samsung-cnct/cma-ssh/pkg/cert"
+	"github.com/samsung-cnct/cma-ssh/pkg/prometheus"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -181,6 +182,16 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 		if len(serviceList.Items) > 0 {
 			cluster.Status.Phase = common.RunningClusterPhase
+			// Install Prometheus
+			if cluster.ObjectMeta.Annotations["hasPrometheus"] != "true" {
+				prometheusErr := prometheus.InstallPrometheus(clientset)
+				if prometheusErr != nil {
+					log.Error(prometheusErr, "could not install prometheus job on", "cluster", cluster.Name)
+				}
+
+				cluster.ObjectMeta.Annotations = map[string]string{"hasPrometheus": "true"}
+			}
+
 			if err := r.Update(context.Background(), cluster); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "could not update cluster status")
 			}
