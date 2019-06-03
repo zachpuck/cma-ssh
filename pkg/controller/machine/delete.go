@@ -53,7 +53,7 @@ func (r *ReconcileMachine) handleDelete(
 	}
 	configData, ok := secret.Data[corev1.ServiceAccountKubeconfigKey]
 	if !ok || len(configData) == 0 {
-		return errNotReady("no kubeconfig in secret")
+		return notReadyError("no kubeconfig in secret")
 	}
 	config, err := clientcmd.NewClientConfigFromBytes(configData)
 	if err != nil {

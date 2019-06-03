@@ -30,18 +30,32 @@ import (
 
 const InstanceTypeNodeLabelKey = "beta.kubernetes.io/instance-type="
 
-type errNotReady string
+// notReadyError signals the controller that something is not available yet but
+// may be available in the future.
+type notReadyError string
 
-func (e errNotReady) Error() string {
+func (e notReadyError) Error() string {
 	return string(e)
 }
 
-type errRelease struct {
+// unrecoverableError signals the controller that the current machine state can
+// never be fixed without user intervention.
+type unrecoverableError struct {
+	reason string
+}
+
+func (e unrecoverableError) Error() string {
+	return e.reason
+}
+
+// releaseError signals that the controller must release a machine that has been
+// allocated.
+type releaseError struct {
 	systemID string
 	err      error
 }
 
-func (e errRelease) Error() string {
+func (e releaseError) Error() string {
 	return e.err.Error()
 }
 
@@ -117,7 +131,7 @@ func (c *creator) getCluster() {
 	}
 	if len(clusters.Items) == 0 {
 		log.Info("no cluster in namespace, requeue request")
-		c.err = errNotReady("no cluster in namespace")
+		c.err = notReadyError("no cluster in namespace")
 		return
 	}
 	c.cluster = clusters.Items[0]
@@ -139,7 +153,7 @@ func (c *creator) createClientsetFromSecret() {
 	log.Info("creating clientset from cert bundle")
 	configData, ok := c.secret.Data[corev1.ServiceAccountKubeconfigKey]
 	if !ok || len(configData) == 0 {
-		c.err = errNotReady("no kubeconfig in secret")
+		c.err = notReadyError("no kubeconfig in secret")
 		return
 	}
 	config, err := clientcmd.NewClientConfigFromBytes(configData)
@@ -166,7 +180,7 @@ func (c *creator) checkIfTokenExists() {
 	if err != nil {
 		e, ok := err.(*apierrors.StatusError)
 		if !ok {
-			c.err = errNotReady(err.Error())
+			c.err = notReadyError(err.Error())
 		} else {
 			c.err = e
 		}
@@ -245,7 +259,7 @@ func (c *creator) checkApiserverAddress() {
 	log.Info("checking if apiendpoint is set on cluster")
 	apiserverAddress := c.cluster.Status.APIEndpoint
 	if apiserverAddress == "" {
-		c.err = errNotReady(fmt.Sprintf("%s cluster APIEndpoint is not set", c.cluster.Name))
+		c.err = notReadyError(fmt.Sprintf("%s cluster APIEndpoint is not set", c.cluster.Name))
 		return
 	}
 }
@@ -284,7 +298,7 @@ func (c *creator) prepareMaasRequest() {
 	providerID := fmt.Sprintf("%s-%s", c.cluster.Name, c.machine.Name)
 	distro := getImage(c.maasClient, "ubuntu-xenial", c.cluster.Spec.KubernetesVersion, c.machine.Spec.InstanceType)
 	if distro == "" {
-		c.err = errors.New("image does not exist")
+		c.err = unrecoverableError{reason: fmt.Sprintf("there is no matching image in MaaS: osVersion=%s, k8sVersion=%s, instanceType=%s", "ubuntu-xenial", c.cluster.Spec.KubernetesVersion, c.machine.Spec.InstanceType)}
 		return
 	}
 	c.createRequest = maas.CreateRequest{
@@ -483,7 +497,7 @@ func (c *creator) updateMachine() {
 
 	err := c.k8sClient.Update(context.Background(), c.machine)
 	if err != nil {
-		c.err = errRelease{systemID: c.createResponse.SystemID, err: err}
+		c.err = releaseError{systemID: c.createResponse.SystemID, err: err}
 		return
 	}
 
@@ -512,14 +526,14 @@ func (c *creator) updateCluster() {
 		&fresh,
 	)
 	if err != nil {
-		c.err = errRelease{err: err, systemID: c.createResponse.SystemID}
+		c.err = releaseError{err: err, systemID: c.createResponse.SystemID}
 	}
 
 	fresh.Status.APIEndpoint = c.createResponse.IPAddresses[0] + ":6443"
 	fresh.Status.LastUpdated = &metav1.Time{Time: time.Now()}
 	err = c.k8sClient.Update(context.Background(), &fresh)
 	if err != nil {
-		c.err = errRelease{err: err, systemID: c.createResponse.SystemID}
+		c.err = releaseError{err: err, systemID: c.createResponse.SystemID}
 		return
 	}
 

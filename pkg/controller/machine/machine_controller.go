@@ -216,18 +216,25 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 			} else {
 				return reconcile.Result{}, err
 			}
-		case errNotReady:
+		case notReadyError:
 			log.Error(err, "during reconcile an object was not ready", "machine", machine)
 			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
-		case errRelease:
+		case releaseError:
 			log.Error(err, "during reconcile we needed to release a machine", "machine", machine)
 			r.MAASClient.Delete(context.Background(), &maas.DeleteRequest{"", e.systemID})
 			return reconcile.Result{}, err
+		case unrecoverableError:
+			log.Error(err, "machine object has an unrecoverable error", machine)
+			machine.Status.Phase = common.ErrorMachinePhase
+			updateErr := r.Client.Update(context.Background(), &machine)
+			if updateErr != nil {
+				return reconcile.Result{}, err
+			}
 		default:
 			return reconcile.Result{}, err
 		}
 	}
-	log.Info("machine reconicle completed successfully")
+	log.Info("machine reconcile completed", "machine", machine)
 	return reconcile.Result{}, nil
 }
 
