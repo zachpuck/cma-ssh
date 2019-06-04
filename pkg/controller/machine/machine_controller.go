@@ -224,7 +224,7 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 			r.MAASClient.Delete(context.Background(), &maas.DeleteRequest{"", e.systemID})
 			return reconcile.Result{}, err
 		case unrecoverableError:
-			log.Error(err, "machine object has an unrecoverable error", machine)
+			log.Error(err, "machine object has an unrecoverable error", "machine", machine)
 			machine.Status.Phase = common.ErrorMachinePhase
 			updateErr := r.Client.Update(context.Background(), &machine)
 			if updateErr != nil {
