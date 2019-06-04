@@ -49,7 +49,7 @@ cat <<EOF > /etc/docker/daemon.json
       "path": "/usr/bin/nvidia-container-runtime",
       "runtimeArgs": []
     }
-  }
+  },
   "exec-opts": ["native.cgroupdriver=systemd"],
   "log-driver": "json-file",
   "log-opts": {
