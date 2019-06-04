@@ -24,6 +24,8 @@ import (
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"github.com/samsung-cnct/cma-ssh/pkg/maas"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -200,7 +202,7 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 	var err error
 	switch machine.Status.Phase {
 	case common.ProvisioningMachinePhase:
-		err = r.handleWaitingForReady(&machine)
+		err = r.handleWaitingForReady(&machine, &secret)
 	case common.DeletingMachinePhase:
 		err = r.handleDelete(&machine, &cluster)
 	case common.ErrorMachinePhase, common.ReadyMachinePhase, common.UpgradingMachinePhase:
@@ -285,9 +287,41 @@ func (r *ReconcileMachine) handleUpgrade(
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileMachine) handleWaitingForReady(machine *clusterv1alpha1.CnctMachine) error {
-	log.Info("figure out how to check if a machine is ready")
-	return nil
+func (r *ReconcileMachine) handleWaitingForReady(
+	machine *clusterv1alpha1.CnctMachine,
+	secret *corev1.Secret,
+) error {
+	configData, ok := secret.Data[corev1.ServiceAccountKubeconfigKey]
+	if !ok || len(configData) == 0 {
+		return notReadyError("no kubeconfig in secret")
+	}
+	config, err := clientcmd.NewClientConfigFromBytes(configData)
+	if err != nil {
+		return errors.Wrap(err, "could not create new client config from secret")
+	}
+	restConfig, err := config.ClientConfig()
+	if err != nil {
+		return errors.Wrap(err, "could not create rest client config")
+	}
+	clientset, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return errors.Wrap(err, "could not create a clientset")
+	}
+	node, err := clientset.CoreV1().
+		Nodes().
+		Get(machine.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return errors.Wrap(err, "could not find node on apiserver")
+	} else if err != nil {
+		return errors.Wrap(err, "could not get node")
+	}
+	for _, v := range node.Status.Conditions {
+		if v.Reason == "KubeletReady" && v.Status == "True" {
+			machine.Status.Phase = common.ReadyMachinePhase
+			return r.Update(context.Background(), machine)
+		}
+	}
+	return notReadyError("did not see kubelet ready status")
 }
 
 func (r *ReconcileMachine) updateStatus(

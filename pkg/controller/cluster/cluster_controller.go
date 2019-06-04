@@ -24,6 +24,8 @@ import (
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"github.com/samsung-cnct/cma-ssh/pkg/cert"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -131,7 +133,7 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			return reconcile.Result{Requeue: true}, err
 		}
 		log.Info("cluster secrets created")
-		cluster.Status.Phase = common.RunningClusterPhase
+		cluster.Status.Phase = common.ReconcilingClusterPhase
 		cluster.ObjectMeta.Finalizers = append(cluster.ObjectMeta.Finalizers, clusterv1alpha1.ClusterFinalizer)
 		err = r.updateStatus(
 			cluster,
@@ -139,12 +141,52 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			common.ResourceStateChange,
 			common.MessageResourceStateChange,
 			cluster.GetName(),
-			common.RunningClusterPhase,
+			common.ReconcilingClusterPhase,
 		)
 		if err != nil {
 			log.Error(err, "could not update cluster status", "cluster", cluster)
 			return reconcile.Result{Requeue: true}, err
 		}
+	case common.ReconcilingClusterPhase:
+		var secret corev1.Secret
+		err := r.Get(context.Background(), client.ObjectKey{Name: "cluster-private-key", Namespace: cluster.Namespace}, &secret)
+		configData, ok := secret.Data[corev1.ServiceAccountKubeconfigKey]
+		if !ok || len(configData) == 0 {
+			return reconcile.Result{}, errors.New("no kubeconfig in secret")
+		}
+		config, err := clientcmd.NewClientConfigFromBytes(configData)
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "could not create new client config from secret")
+		}
+		restConfig, err := config.ClientConfig()
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "could not create rest client config")
+		}
+		clientset, err := kubernetes.NewForConfig(restConfig)
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "could not create a clientset")
+		}
+		// Copied from kubectl cluster-info
+		serviceList, err := clientset.CoreV1().
+			Services(metav1.NamespaceSystem).
+			List(
+				metav1.ListOptions{
+					LabelSelector: "kubernetes.io/cluster-service=true",
+				},
+			)
+		if apierrors.IsNotFound(err) {
+			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
+		} else if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "could not get service list")
+		}
+		if len(serviceList.Items) > 0 {
+			cluster.Status.Phase = common.RunningClusterPhase
+			if err := r.Update(context.Background(), cluster); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "could not update cluster status")
+			}
+			return reconcile.Result{}, nil
+		}
+		return reconcile.Result{}, errors.New("cluster services are not running")
 	case common.StoppingClusterPhase:
 		var machines clusterv1alpha1.CnctMachineList
 		err := r.Client.List(context.Background(), &client.ListOptions{Namespace: cluster.Namespace}, &machines)
