@@ -333,7 +333,7 @@ write_files:
 
 runcmd:
  - [ sh, -c, "swapoff -a" ]
- - [ sh, -c, "sed -i.bak '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab"]
+ - [ sh, -c, "sed -ri.bak '/ swap / s/^(.*)$/#\1/g' /etc/fstab"]
  - [ sh, -c, "tar xf /etc/kubernetes/pki/certs.tar -C /etc/kubernetes/pki" ]
  - [ sh, -c, "kubeadm init --node-name {{ .Name }}  --config /var/tmp/masterconfig.yaml" ]
  - [ sh, -c, "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml" ]
@@ -386,7 +386,7 @@ write_files:
 
 runcmd:
  - [ sh, -c, "swapoff -a" ]
- - [ sh, -c, "sed -i.bak '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab"]
+ - [ sh, -c, "sed -ri.bak '/ swap / s/^(.*)$/#\1/g' /etc/fstab"]
  - [ sh, -c, "kubeadm join --node-name {{ .Name }} --config /var/tmp/workerconfig.yaml" ]
 
 output : { all : '| tee -a /var/log/cloud-init-output.log' }
