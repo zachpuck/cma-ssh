@@ -81,11 +81,6 @@ mount -t proc proc "$build_root"/proc/
 mount -t sysfs sys "$build_root"/sys/
 mount -o bind /dev "$build_root"/dev
 
-# maas's preseed curtin_userdata cloud-init uses useradd
-# to add users so set the default shell to /bin/bash instead
-# the default of borne.
-sed -i.bak 's#SHELL=/bin/sh#SHELL=/bin/bash#' /etc/default/useradd
-
 cp /etc/hosts "$build_root"/etc/hosts
 # resolv.conf is a symlink to systemd runtime
 mv "$build_root"/etc/resolv.conf "$build_root"/etc/resolv.conf.bak || true
@@ -93,6 +88,10 @@ echo 'nameserver 8.8.8.8' > "$build_root"/etc/resolv.conf
 
 chroot "$build_root"/ /tmp/docker-install.sh
 chroot "$build_root"/ /tmp/kubernetes-install.sh
+# maas's preseed curtin_userdata cloud-init uses useradd
+# to add users so set the default shell to /bin/bash instead
+# the default of borne.
+chroot "$build_root"/ /bin/sed -i.bak 's#SHELL=/bin/sh#SHELL=/bin/bash#' /etc/default/useradd
 
 umount_sysdev
 
