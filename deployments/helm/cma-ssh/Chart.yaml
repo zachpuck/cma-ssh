@@ -1,8 +1,8 @@
 apiVersion: v1
-appVersion: 0.1.82
+appVersion: 0.1.83
 description: A Helm chart for CMA SSH provisioner
 name: cma-ssh
-version: 0.1.82
+version: 0.1.83
 keywords:
 - cma
 - ssh
