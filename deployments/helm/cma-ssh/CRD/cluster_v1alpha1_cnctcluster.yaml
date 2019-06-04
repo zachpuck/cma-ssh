@@ -11,6 +11,14 @@ metadata:
     helm.sh/chart: '{{include "cma-ssh.chart" .}}'
   name: cnctclusters.cluster.cnct.sds.samsung.com
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.phase
+    description: machine status
+    name: Status
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: cluster.cnct.sds.samsung.com
   names:
     kind: CnctCluster

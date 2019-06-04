@@ -50,6 +50,8 @@ type MachineSetStatus struct {
 
 // CnctMachineSet is the Schema for the cnctmachinesets API
 // +k8s:openapi-gen=true
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="machine set status"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type CnctMachineSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
