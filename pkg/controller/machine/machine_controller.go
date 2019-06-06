@@ -223,7 +223,10 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 		case releaseError:
 			log.Error(err, "during reconcile we needed to release a machine", "machine", machine)
-			r.MAASClient.Delete(context.Background(), &maas.DeleteRequest{"", e.systemID})
+			errRelease := r.MAASClient.Delete(context.Background(), &maas.DeleteRequest{SystemID: e.systemID})
+			if errRelease != nil {
+				log.Error(errRelease, "YOU MUST RELEASE THIS MACHINE MANUALLY", "machine", machine.Status.SystemId)
+			}
 			return reconcile.Result{}, err
 		case unrecoverableError:
 			log.Error(err, "machine object has an unrecoverable error", "machine", machine)
