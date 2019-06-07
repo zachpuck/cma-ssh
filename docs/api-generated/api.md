@@ -168,7 +168,7 @@ The specification for a set of control plane machines
 | ----- | ---- | ----- | ----------- |
 | labels | [KubernetesLabel](#cmassh.KubernetesLabel) | repeated | The labels for the control plane machines |
 | instanceType | [string](#string) |  | Type of machines to provision (standard or gpu) |
-| count | [string](#string) |  | The number of machines |
+| count | [int32](#int32) |  | The number of machines |
 
 
 
@@ -402,7 +402,7 @@ The specification for a set of machines
 | name | [string](#string) |  | The name of the machine set |
 | labels | [KubernetesLabel](#cmassh.KubernetesLabel) | repeated | The labels for the machine set |
 | instanceType | [string](#string) |  | Type of machines to provision (standard or gpu) |
-| count | [string](#string) |  | The number of machines |
+| count | [int32](#int32) |  | The number of machines |
 
 
 
@@ -582,7 +582,7 @@ The specification for a set of control plane machines
 | ----- | ---- | ----- | ----------- |
 | labels | [KubernetesLabel](#cmassh.KubernetesLabel) | repeated | The labels for the control plane machines |
 | instanceType | [string](#string) |  | Type of machines to provision (standard or gpu) |
-| count | [string](#string) |  | The number of machines |
+| count | [int32](#int32) |  | The number of machines |
 
 
 
@@ -816,7 +816,7 @@ The specification for a set of machines
 | name | [string](#string) |  | The name of the machine set |
 | labels | [KubernetesLabel](#cmassh.KubernetesLabel) | repeated | The labels for the machine set |
 | instanceType | [string](#string) |  | Type of machines to provision (standard or gpu) |
-| count | [string](#string) |  | The number of machines |
+| count | [int32](#int32) |  | The number of machines |
 
 
 

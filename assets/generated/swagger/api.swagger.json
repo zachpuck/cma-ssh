@@ -349,7 +349,8 @@
           "title": "Type of machines to provision (standard or gpu)"
         },
         "count": {
-          "type": "string",
+          "type": "integer",
+          "format": "int32",
           "title": "The number of machines"
         }
       },
@@ -501,7 +502,8 @@
           "title": "Type of machines to provision (standard or gpu)"
         },
         "count": {
-          "type": "string",
+          "type": "integer",
+          "format": "int32",
           "title": "The number of machines"
         }
       },

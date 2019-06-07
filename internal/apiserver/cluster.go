@@ -52,7 +52,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 	}
 
 	// create control plane machines
-	// TODO (zachpuck): handle count/name - awaiting machineset implementation and load balancer for api server
+	// TODO (zachpuck): handle count (currently only creates 1 machine)
 	{
 		machineConfig := in.ControlPlaneNodes
 		machineLabels := map[string]string{}
@@ -81,29 +81,42 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 	}
 
 	// create worker plane machines
-	// TODO (zachpuck): handle count/name - awaiting machineset implementation
-	for _, machineConfig := range in.WorkerNodePools {
+	for _, machineSetConfig := range in.WorkerNodePools {
 		machineLabels := map[string]string{}
-		for _, label := range machineConfig.Labels {
+		for _, label := range machineSetConfig.Labels {
 			machineLabels[label.Name] = label.Value
 		}
 		machineLabels["controller-tools.k8s.io"] = "1.0"
+		machineLabels["node-pool"] = machineSetConfig.Name
 
-		machineObject := &v1alpha.CnctMachine{
+		machineSetObject := &v1alpha.CnctMachineSet{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "worker-",
-				Namespace:    in.Name,
-				Labels:       machineLabels,
+				Name:      machineSetConfig.Name,
+				Namespace: in.Name,
+				Labels:    machineLabels,
 			},
-			Spec: v1alpha.MachineSpec{
-				Roles:        []common.MachineRoles{common.MachineRoleWorker},
-				InstanceType: machineConfig.InstanceType,
+			Spec: v1alpha.MachineSetSpec{
+				Replicas: int(machineSetConfig.Count),
+				Selector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"node-pool": machineSetConfig.Name,
+					},
+				},
+				MachineTemplate: v1alpha.MachineTemplate{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: machineLabels,
+					},
+					Spec: v1alpha.MachineSpec{
+						Roles:        []common.MachineRoles{common.MachineRoleWorker},
+						InstanceType: machineSetConfig.InstanceType,
+					},
+				},
 			},
 		}
 
-		err = client.Create(ctx, machineObject)
+		err = client.Create(ctx, machineSetObject)
 		if err != nil {
-			klog.Errorf("Failed to create worker machine object %s: %q", machineObject.GetName(), err)
+			klog.Errorf("Failed to create worker machine set object %s: %q", machineSetObject.GetName(), err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
