@@ -12,7 +12,7 @@ import (
 const (
 	CMA_Install_Namespace      = "cma-install"
 	CMA_Install_ServiceAccount = "cma-sa"
-	Prometheus_Installer_Image = "zachpuck/protest:latest"
+	Prometheus_Installer_Image = "quay.io/samsung_cnct/cma-prometheus-installer:latest"
 )
 
 func InstallPrometheus(clientset *kubernetes.Clientset) error {
