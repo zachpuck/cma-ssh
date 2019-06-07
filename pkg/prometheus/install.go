@@ -22,9 +22,9 @@ func InstallPrometheus(clientset *kubernetes.Clientset) error {
 			Name: CMA_Install_Namespace,
 		},
 	}
-	_, nsErr := clientset.CoreV1().Namespaces().Create(ns)
-	if nsErr != nil {
-		return errors.Wrap(nsErr, "failed to create namespace for cma")
+	_, err := clientset.CoreV1().Namespaces().Create(ns)
+	if err != nil {
+		return errors.Wrap(err, "failed to create namespace for cma")
 	}
 
 	// Create service account to use for installing software on cluster
@@ -33,9 +33,9 @@ func InstallPrometheus(clientset *kubernetes.Clientset) error {
 			Name: CMA_Install_ServiceAccount,
 		},
 	}
-	_, saErr := clientset.CoreV1().ServiceAccounts(CMA_Install_Namespace).Create(sa)
-	if saErr != nil {
-		return errors.Wrap(saErr, "failed to create service account for cma")
+	_, err = clientset.CoreV1().ServiceAccounts(CMA_Install_Namespace).Create(sa)
+	if err != nil {
+		return errors.Wrap(err, "failed to create service account for cma")
 	}
 	// create cluster role binding with cluster-admin role to use for installing software on cluster
 	crb := &rbac.ClusterRoleBinding{
@@ -55,9 +55,9 @@ func InstallPrometheus(clientset *kubernetes.Clientset) error {
 			APIGroup: "",
 		},
 	}
-	_, crbErr := clientset.RbacV1().ClusterRoleBindings().Create(crb)
-	if crbErr != nil {
-		return errors.Wrap(crbErr, "failed to create cluster role binding for cma")
+	_, err = clientset.RbacV1().ClusterRoleBindings().Create(crb)
+	if err != nil {
+		return errors.Wrap(err, "failed to create cluster role binding for cma")
 	}
 
 	// create job to install prometheus
@@ -81,9 +81,9 @@ func InstallPrometheus(clientset *kubernetes.Clientset) error {
 			},
 		},
 	}
-	_, proErr := clientset.BatchV1().Jobs(CMA_Install_Namespace).Create(job)
-	if proErr != nil {
-		return errors.Wrap(proErr, "failed to create prometheus Job")
+	_, err = clientset.BatchV1().Jobs(CMA_Install_Namespace).Create(job)
+	if err != nil {
+		return errors.Wrap(err, "failed to create prometheus Job")
 	}
 	return nil
 }
