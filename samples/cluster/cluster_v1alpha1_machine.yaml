@@ -4,23 +4,10 @@ metadata:
   labels:
     controller-tools.k8s.io: "1.0"
   name: master
-  namespace: default
+  namespace: cluster
 spec:
   # Add fields here
   roles:
     - etcd
     - master
-  instanceType: standard
----
-apiVersion: cluster.cnct.sds.samsung.com/v1alpha1
-kind: CnctMachine
-metadata:
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: worker
-  namespace: default
-spec:
-  # Add fields here
-  roles:
-  - worker
   instanceType: standard

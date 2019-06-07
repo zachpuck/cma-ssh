@@ -4,7 +4,7 @@ metadata:
   labels:
     controller-tools.k8s.io: "1.0"
   name: cluster
-  namespace: default
+  namespace: cluster
 spec:
   # Add fields here
   kubernetesVersion: 1.13.5

@@ -485,7 +485,7 @@ func (c *creator) updateMachine() {
 
 	log.Info("update machine status to ready")
 	// update status to "creating"
-	c.machine.Status.Phase = common.ReadyMachinePhase
+	c.machine.Status.Phase = common.ProvisioningMachinePhase
 	c.machine.Status.KubernetesVersion = c.cluster.Spec.KubernetesVersion
 	c.machine.Status.SystemId = c.createResponse.SystemID
 	c.machine.Status.SshConfig.Host = c.createResponse.IPAddresses[0]

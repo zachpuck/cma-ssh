@@ -3,15 +3,20 @@ kind: CnctMachineSet
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: cnctmachineset-sample
+  name: worker-standard
+  namespace: cluster
 spec:
   # Add fields here
+  # selector labels and template metadata labels must match
   replicas: 1
+  selector:
+    matchLabels:
+      nodepool: standard
   machineTemplate:
-    Spec:
-      clusterref: cluster
+    metadata:
+      labels:
+        nodepool: standard
+    spec:
       roles:
         - worker
-      labels:
-        role: worker
       instanceType: standard
