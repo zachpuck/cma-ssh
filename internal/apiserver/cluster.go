@@ -3,6 +3,7 @@ package apiserver
 import (
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	v1alpha "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
+	"github.com/samsung-cnct/cma-ssh/pkg/controller/machineset"
 	pb "github.com/samsung-cnct/cma-ssh/pkg/generated/api"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	"golang.org/x/net/context"
@@ -80,7 +81,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 		}
 	}
 
-	// create worker plane machines
+	// create worker machineSet(s)
 	for _, machineSetConfig := range in.WorkerNodePools {
 		machineLabels := map[string]string{}
 		for _, label := range machineSetConfig.Labels {
@@ -112,6 +113,12 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 					},
 				},
 			},
+		}
+
+		// validate machineSet
+		isValid, err := machineset.ValidateMachineSet(machineSetObject)
+		if !isValid || err != nil {
+			return  nil, status.Error(codes.Internal, err.Error())
 		}
 
 		err = client.Create(ctx, machineSetObject)
