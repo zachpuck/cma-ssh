@@ -19,38 +19,29 @@ DATA=$(cat <<JSON
 {
   "name": "${CLUSTER_NAME}",
   "k8s_version": "${K8S_VERSION}",
-  "high_availability": true,
-  "network_fabric": "",
-  "control_plane_nodes": [
+  "control_plane_nodes": {
+    "labels": [
+      {
+        "name": "cma-ssh-test",
+        "value": "true"
+      }
+    ],
+    "instanceType": "standard",
+    "count": 1
+  },
+  "worker_node_pools": [
     {
-      "username": "test",
+      "name": "test-pool1",
       "labels": [
         {
           "name": "cma-ssh-test",
           "value": "true"
         }
       ],
-      "taints": [
-      ],
-      "instanceType": "standard"
+      "instanceType": "standard",
+      "count": 1
     }
-  ],
-  "worker_nodes": [
-    {
-      "username": "string",
-      "labels": [
-        {
-          "name": "cma-ssh-test",
-          "value": "true"
-        }
-      ],
-      "taints": [
-      ],
-      "instanceType": "standard"
-    }
-  ],
-  "api_endpoint": "",
-  "private_key": ""
+  ]
 }
 JSON
 )

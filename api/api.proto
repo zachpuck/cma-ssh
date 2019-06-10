@@ -199,7 +199,7 @@ message ControlPlaneMachineSpec {
     // Type of machines to provision (standard or gpu)
     string instanceType = 2;
     // The number of machines
-    string count = 3;
+    int32 count = 3;
 }
 
 // The specification for a set of machines
@@ -211,7 +211,7 @@ message MachineSpec {
     // Type of machines to provision (standard or gpu)
     string instanceType = 3;
     // The number of machines
-    string count = 4;
+    int32 count = 4;
 }
 
 // Get version of API Server
