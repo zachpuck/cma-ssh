@@ -163,7 +163,7 @@ func (r *ReconcileMachineSet) reconcile(machineSet *clusterv1alpha1.CnctMachineS
 	}
 
 	// Validate MachineSet
-	validMachineSet, err := validateMachineSet(machineSet)
+	validMachineSet, err := ValidateMachineSet(machineSet)
 	if !validMachineSet {
 		log.Error(err, "MachineSet failed validation")
 		return reconcile.Result{}, err

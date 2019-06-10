@@ -30,7 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func validateMachineSet(machineSet *clusterv1alpha1.CnctMachineSet) (bool, error) {
+// ValidateMachineSet returns true if the MachineSet is valid
+func ValidateMachineSet(machineSet *clusterv1alpha1.CnctMachineSet) (bool, error) {
 	selector, err := metav1.LabelSelectorAsSelector(&machineSet.Spec.Selector)
 	if err != nil {
 		return false, errors.Wrapf(err, "Failed to parse MachineSet %q label selector", machineSet.Name)
