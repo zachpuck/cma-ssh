@@ -188,19 +188,18 @@ func (c *creator) checkIfTokenExists() {
 	}
 
 	// find the first non-expired token
+	// FIXME (apo): if the token expires before kubeadm can run then the
+	//  node will never join the cluster.
 	for _, secret := range list.Items {
 		expires, ok := secret.Data["expiration"]
 		if ok && len(expires) > 0 {
 			t, err := time.Parse(time.RFC3339, string(expires))
-			if err != nil || t.Before(time.Now()) {
+			if err != nil || t.Before(time.Now().Add(30*time.Minute)) {
 				continue
 			}
-			log.Info("found an existing token")
-			c.token = fmt.Sprintf("%s.%s", list.Items[0].Data["token-id"], list.Items[0].Data["token-secret"])
-			return
 		}
-		log.Info("found an existing token")
-		c.token = fmt.Sprintf("%s.%s", list.Items[0].Data["token-id"], list.Items[0].Data["token-secret"])
+		log.Info("found an existing token", "token", secret.Name)
+		c.token = fmt.Sprintf("%s.%s", secret.Data["token-id"], secret.Data["token-secret"])
 		return
 	}
 }
