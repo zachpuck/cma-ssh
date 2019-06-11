@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2018 Samsung SDS.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-Package controllerutil contains utility functions for working with and implementing Controllers.
-*/
-package controllerutil
+// Package addons contains addons API versions
+package addons

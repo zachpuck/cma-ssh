@@ -1,6 +1,7 @@
 package apiserver
 
 import (
+	addonsv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/addons/v1alpha1"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	v1alpha "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"github.com/samsung-cnct/cma-ssh/pkg/controller/machineset"
@@ -118,13 +119,30 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 		// validate machineSet
 		isValid, err := machineset.ValidateMachineSet(machineSetObject)
 		if !isValid || err != nil {
-			return  nil, status.Error(codes.Internal, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
 		}
 
 		err = client.Create(ctx, machineSetObject)
 		if err != nil {
 			klog.Errorf("Failed to create worker machine set object %s: %q", machineSetObject.GetName(), err)
 			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+
+	// create addons appbundle for prometheus operator
+	{
+		appBundleObject := &addonsv1alpha1.AppBundle{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "prometheus-addons-appbundle",
+				Namespace: in.Name,
+			},
+			Spec: addonsv1alpha1.AppBundleSpec{
+				Image: "quay.io/samsung_cnct/cma-prometheus-installer:latest",
+			},
+		}
+		errAppBundle := client.Create(ctx, appBundleObject)
+		if errAppBundle != nil {
+			klog.Errorf("Failed to create prometheus addons app bundle for cluster", in.Name, errAppBundle)
 		}
 	}
 
