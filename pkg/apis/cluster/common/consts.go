@@ -52,6 +52,22 @@ const (
 	ErrorMachineSetPhase MachineSetStatusPhase = "ErrorMachineSet"
 )
 
+// Reasons for machineset events
+const (
+	// FailedCreateMachineReason is added in an event in a machineset
+	// when a machine for a machineset failed to be created.
+	FailedCreateMachineReason = "FailedCreate"
+	// SuccessfulCreateMachineReason is added in an event in a machineset
+	// when a machine is successfully created.
+	SuccessfulCreateMachineReason = "SuccessfulCreate"
+	// FailedDeleteMachineReason is added in an event and in a machineset
+	// when a machine for a replica set failed to be deleted.
+	FailedDeleteMachineReason = "FailedDelete"
+	// SuccessfulDeleteMachineReason is added in an event in a machineset
+	// when a machine is successfully deleted.
+	SuccessfulDeleteMachineReason = "SuccessfulDelete"
+)
+
 type ClusterStatusPhase string
 
 const (

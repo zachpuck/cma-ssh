@@ -73,8 +73,9 @@ func (r *ReconcileMachineSet) updateStatus(
 	if err != nil {
 		return err
 	}
-	r.Eventf(machineSetFreshInstance, eventType,
-		string(event), string(eventMessage), args...)
-
+	if eventType != "" {
+		r.Eventf(machineSetFreshInstance, eventType,
+			string(event), string(eventMessage), args...)
+	}
 	return nil
 }

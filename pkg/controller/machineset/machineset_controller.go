@@ -223,10 +223,10 @@ func (r *ReconcileMachineSet) reconcile(machineSet *clusterv1alpha1.CnctMachineS
 	// Always Update status (regardless of syncErr)
 	newStatus := calculateStatus(machineSet, filteredMachines)
 	machineSet.Status = newStatus
-	updateErr := r.updateStatus(machineSet, corev1.EventTypeNormal,
+
+	updateErr := r.updateStatus(machineSet, "",
 		common.ResourceStateChange, common.MessageResourceStateChange,
 		machineSet.GetName(), common.ReadyMachineSetPhase)
-
 	if syncErr != nil {
 		return reconcile.Result{}, errors.Wrapf(syncErr, "failed to sync Machineset replicas")
 	}
@@ -249,12 +249,18 @@ func (r *ReconcileMachineSet) syncReplicas(ms *clusterv1alpha1.CnctMachineSet, m
 		var machineList []*clusterv1alpha1.CnctMachine
 		var errstrings []string
 		for i := 0; i < diff; i++ {
-			log.Info("Creating machine", "machine", i+1)
+			log.Info("Creating cnctmachine", "machine", i+1)
 			machine := r.createMachine(ms)
 			if err := r.Client.Create(context.Background(), machine); err != nil {
-				log.Error(err, "Unable to create Machine", "Machine", machine.Name)
+				log.Error(err, "Unable to create cnctmachine", "Machine", machine.Name)
+				r.EventRecorder.Eventf(ms, corev1.EventTypeWarning, common.FailedCreateMachineReason,
+					"Error Creating cnctmachine: %v", machine.Name)
 				errstrings = append(errstrings, err.Error())
 				continue
+			} else {
+				log.Info("Created cnctmachine", "machine", machine.Name)
+				r.EventRecorder.Eventf(ms, corev1.EventTypeNormal, common.SuccessfulCreateMachineReason,
+					"Created cnctmachine: %v", machine.Name)
 			}
 
 			machineList = append(machineList, machine)
@@ -280,8 +286,14 @@ func (r *ReconcileMachineSet) syncReplicas(ms *clusterv1alpha1.CnctMachineSet, m
 				defer wg.Done()
 				err := r.Client.Delete(context.Background(), targetMachine)
 				if err != nil {
-					log.Error(err, "Unable to delete Machine", "Machine", targetMachine.Name)
+					log.Error(err, "Unable to delete cnctmachine", "Machine", targetMachine.Name)
+					r.EventRecorder.Eventf(ms, corev1.EventTypeWarning, common.FailedDeleteMachineReason,
+						"Error Deleting cnctmachine: %v", targetMachine.Name)
 					errCh <- err
+				} else {
+					log.Info("Deleted cnctmachine", "machine", targetMachine.Name)
+					r.EventRecorder.Eventf(ms, corev1.EventTypeNormal, common.SuccessfulDeleteMachineReason,
+						"Deleted cnctmachine: %v", targetMachine.Name)
 				}
 			}(machine)
 		}
@@ -291,6 +303,7 @@ func (r *ReconcileMachineSet) syncReplicas(ms *clusterv1alpha1.CnctMachineSet, m
 		case err := <-errCh:
 			// all errors have been reported before and they're likely to be the same, so we'll only return the first one we hit.
 			if err != nil {
+				log.Error(err, "Error while deleting cnctmachines")
 				return err
 			}
 		default:
