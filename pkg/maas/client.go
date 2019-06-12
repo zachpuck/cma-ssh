@@ -108,10 +108,10 @@ func (c Client) Create(ctx context.Context, request *CreateRequest) (*CreateResp
 	err = m.Start(startArgs)
 	if err != nil {
 		klog.Errorf("Create failed to deploy machine %s: %v", request.ProviderID, err)
-		err := c.Delete(ctx, &DeleteRequest{ProviderID: request.ProviderID,
+		errDelete := c.Delete(ctx, &DeleteRequest{ProviderID: request.ProviderID,
 			SystemID: m.SystemID()})
-		if err != nil {
-			klog.Errorf("Create failed to release machine %s: %v", request.ProviderID, err)
+		if errDelete != nil {
+			klog.Errorf("Create failed to release machine %s: %v", request.ProviderID, errDelete)
 		}
 		return nil, err
 	}
