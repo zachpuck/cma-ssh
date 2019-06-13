@@ -24,14 +24,14 @@ import (
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
 	"github.com/samsung-cnct/cma-ssh/pkg/maas"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -106,89 +106,6 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	log.Info("get parent cluster of machine")
-	// If this machine does not have an OwnerReference that matches the
-	// cluster then we add it now. If the cluster has not been created yet
-	// we will try again.
-	var cluster clusterv1alpha1.CnctCluster
-	var secret corev1.Secret
-	{
-		log.Info("listing clusters in machine namespace")
-		var clusterList clusterv1alpha1.CnctClusterList
-		if err := r.List(context.Background(), &client.ListOptions{Namespace: machine.Namespace}, &clusterList); err != nil {
-			return reconcile.Result{}, err
-		}
-		if len(clusterList.Items) != 1 {
-			log.Info("expected the number of clusters to be 1", "CnctClusterList", clusterList)
-			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
-		}
-		cluster = clusterList.Items[0]
-		log.Info("checking if machine has cluster owner reference")
-		needsOwnerRef := true
-		for _, ref := range machine.OwnerReferences {
-			if ref.UID == cluster.UID {
-				needsOwnerRef = false
-				break
-			}
-		}
-		if needsOwnerRef {
-			log.Info("adding cluster owner reference to machine")
-			isController := false
-			blockOwnerDeletion := true
-			gvk := clusterv1alpha1.SchemeGroupVersion.WithKind("CnctCluster")
-			machineOwnerRef := metav1.OwnerReference{
-				APIVersion:         gvk.GroupVersion().String(),
-				Kind:               gvk.Kind,
-				Name:               cluster.GetName(),
-				UID:                cluster.GetUID(),
-				BlockOwnerDeletion: &blockOwnerDeletion,
-				Controller:         &isController,
-			}
-			machine.OwnerReferences = append(machine.OwnerReferences, machineOwnerRef)
-			if err := r.Update(context.Background(), &machine); err != nil {
-				return reconcile.Result{}, err
-			}
-		}
-		log.Info("get the cluster secret")
-		err := r.Client.Get(
-			context.Background(),
-			client.ObjectKey{
-				Name:      "cluster-private-key",
-				Namespace: cluster.Namespace,
-			},
-			&secret,
-		)
-		if err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "could not get cluster secret")
-		}
-		log.Info("checking if the machine has the secret owner reference")
-		needsOwnerRef = true
-		for _, ref := range machine.OwnerReferences {
-			if ref.UID == secret.UID {
-				needsOwnerRef = false
-				break
-			}
-		}
-		if needsOwnerRef {
-			log.Info("adding secret owner reference to machine")
-			isController := false
-			blockOwnerDeletion := true
-			gvk := secret.GroupVersionKind()
-			machineOwnerRef := metav1.OwnerReference{
-				APIVersion:         gvk.GroupVersion().String(),
-				Kind:               gvk.Kind,
-				Name:               secret.GetName(),
-				UID:                secret.GetUID(),
-				BlockOwnerDeletion: &blockOwnerDeletion,
-				Controller:         &isController,
-			}
-			machine.OwnerReferences = append(machine.OwnerReferences, machineOwnerRef)
-			if err := r.Update(context.Background(), &machine); err != nil {
-				return reconcile.Result{}, err
-			}
-		}
-	}
-
 	log.Info("check if machine is being deleted")
 	if !machine.DeletionTimestamp.IsZero() && machine.Status.Phase != common.DeletingMachinePhase {
 		log.Info("machine is being deleted update phase to deleteing")
@@ -202,9 +119,9 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 	var err error
 	switch machine.Status.Phase {
 	case common.ProvisioningMachinePhase:
-		err = r.handleWaitingForReady(&machine, &secret)
+		err = r.handleWaitingForReady(&machine)
 	case common.DeletingMachinePhase:
-		err = r.handleDelete(&machine, &cluster)
+		err = r.handleDelete(&machine)
 	case common.ErrorMachinePhase, common.ReadyMachinePhase, common.UpgradingMachinePhase:
 	default:
 		err = create(r, &r.MAASClient, &machine)
@@ -292,8 +209,20 @@ func (r *ReconcileMachine) handleUpgrade(
 
 func (r *ReconcileMachine) handleWaitingForReady(
 	machine *clusterv1alpha1.CnctMachine,
-	secret *corev1.Secret,
 ) error {
+	var secret corev1.Secret
+	errSecret := r.Get(context.Background(), client.ObjectKey{Name: "cluster-private-key", Namespace: machine.Namespace}, &secret)
+	if apierrors.IsNotFound(errSecret) {
+		// TODO: set machine to deleting
+		errDelete := r.Delete(context.Background(), machine)
+		if apierrors.IsNotFound(errDelete) {
+			return nil
+		} else if errDelete != nil {
+			return errors.Wrap(errDelete, "secret not found while wating for ready. deleting machine failed")
+		}
+	} else if errSecret != nil {
+		return errors.Wrap(errSecret, "could not get secret")
+	}
 	configData, ok := secret.Data[corev1.ServiceAccountKubeconfigKey]
 	if !ok || len(configData) == 0 {
 		return notReadyError("no kubeconfig in secret")

@@ -4,6 +4,10 @@ import (
 	"context"
 	"time"
 
+	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
+	"github.com/samsung-cnct/cma-ssh/pkg/maas"
+	"github.com/samsung-cnct/cma-ssh/pkg/util"
+
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -15,17 +19,28 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubectl/drain"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
-	"github.com/samsung-cnct/cma-ssh/pkg/maas"
-	"github.com/samsung-cnct/cma-ssh/pkg/util"
 )
 
 func (r *ReconcileMachine) handleDelete(
 	machine *clusterv1alpha1.CnctMachine,
-	cluster *clusterv1alpha1.CnctCluster,
 ) error {
 	log.Info("handling machine delete")
+
+	var clusterList clusterv1alpha1.CnctClusterList
+	if err := r.List(context.Background(), &client.ListOptions{Namespace: machine.Namespace}, &clusterList); err != nil {
+		return errors.Wrap(err, "could not list clusters")
+	}
+	if len(clusterList.Items) == 0 {
+		if err := deleteMachine(r, machine); err != nil {
+			return errors.Wrap(err, "could not delete machine object")
+		}
+		return nil
+	} else if len(clusterList.Items) > 1 {
+		errTooManyClusters := errors.New("expected the number of clusters to be 1")
+		log.Error(errTooManyClusters, "clusters", clusterList)
+		return errTooManyClusters
+	}
+	cluster := clusterList.Items[0]
 
 	// If the machine does not have a system id yet then it has not been
 	// acquired or deployed in maas so we can just delete it.
@@ -33,6 +48,7 @@ func (r *ReconcileMachine) handleDelete(
 		if err := deleteMachine(r, machine); err != nil {
 			return errors.Wrap(err, "could not delete machine object")
 		}
+		return nil
 	}
 	log.Info("creating clientset for remote cluster")
 	var secret corev1.Secret
@@ -48,6 +64,7 @@ func (r *ReconcileMachine) handleDelete(
 		if err := deleteMachine(r, machine); err != nil {
 			return errors.Wrap(err, "could not delete machine object")
 		}
+		return nil
 	} else if err != nil {
 		return errors.Wrap(err, "could not get cluster secret")
 	}
@@ -76,6 +93,7 @@ func (r *ReconcileMachine) handleDelete(
 		if delerr := deleteMachine(r, machine); delerr != nil {
 			return errors.Wrap(delerr, "could not delete machine object")
 		}
+		return nil
 	} else if err != nil {
 		return errors.Wrapf(err, "could not get node %s", machine.Name)
 	}
