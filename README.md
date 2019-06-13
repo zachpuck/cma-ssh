@@ -51,7 +51,7 @@ To test `cma-ssh` you can use `kind` and `helm`. For example:
 
 ```bash
 kind create cluster
-export KUBECONFIG="$(kind get kubeconfig-path --name="1")"
+export KUBECONFIG="$(kind get kubeconfig-path --name="kind")"
 
 kubectl create clusterrolebinding superpowers --clusterrole=cluster-admin --user=system:serviceaccount:kube-system:default
 kubectl create rolebinding superpowers --clusterrole=cluster-admin --user=system:serviceaccount:kube-system:default
