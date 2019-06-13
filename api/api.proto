@@ -74,10 +74,23 @@ service Cluster {
             get : "/api/v1/version"
         };
     }
-    // Will adjust a provision a cluster
-    rpc AdjustClusterNodes (AdjustClusterMsg) returns (AdjustClusterReply) {
+    // Will add node pool to a provisioned cluster
+    rpc AddNodePool (AddNodePoolMsg) returns (AddNodePoolReply) {
         option (google.api.http) = {
-            put : "/api/v1/cluster"
+            post : "/api/v1/cluster/pool"
+            body : "*"
+        };
+    }
+    // Will delete a node pool from a provisioned cluster
+    rpc DeleteNodePool (DeleteNodePoolMsg) returns (DeleteNodePoolReply) {
+        option (google.api.http) = {
+            delete : "/api/v1/cluster/pool"
+        };
+    }
+    // Will scale the number of machines in a node pool for a provisioned cluster
+    rpc ScaleNodePool (ScaleNodePoolMsg) returns (ScaleNodePoolReply) {
+        option (google.api.http) = {
+            put : "/api/v1/cluster/pool"
             body : "*"
         };
     }
@@ -268,21 +281,45 @@ message UpgradeClusterReply {
     bool ok = 1;
 }
 
-message AdjustClusterMsg {
-    // What is the cluster that we are considering for upgrade
-    string name = 1;
-    // Machines which we want to add to the cluster
-    repeated MachineSpec add_nodes = 2;
-    // Machines which we want to remove from the cluster
-    repeated RemoveMachineSpec remove_nodes = 3;
-
-    message RemoveMachineSpec {
-        // The ip of machine
-        string ip = 1;
-    }
+message AddNodePoolMsg {
+    // What is the cluster to add node pools to
+    string clusterName = 1;
+    // What Machines to add to the cluster
+    repeated MachineSpec worker_node_pools = 2;
 }
 
-message AdjustClusterReply {
+message AddNodePoolReply {
+    // Whether or not the node pool was provisioned by this request
+    bool ok = 1;
+}
+
+message DeleteNodePoolMsg {
+    // What is the cluster to delete node pools
+    string clusterName = 1;
+    // What is the node pool names to delete
+    repeated string node_pool_names = 2;
+}
+
+message DeleteNodePoolReply {
+    // Was this a successful request
+    bool ok = 1;
+}
+
+message ScaleNodePoolMsg {
+    // What is the name of the cluster to scale a node pool
+    string clusterName = 1;
+    // What node pools to scale
+    repeated ScaleNodePoolSpec node_pools = 2;
+}
+
+message ScaleNodePoolSpec {
+    // What is the node pool name to scale
+    string name = 1;
+    // Number of machines to scale
+    int32 count = 2;
+}
+
+message ScaleNodePoolReply {
     // Was this a successful request
     bool ok = 1;
 }
