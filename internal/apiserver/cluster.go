@@ -118,7 +118,7 @@ func (s *Server) CreateCluster(ctx context.Context, in *pb.CreateClusterMsg) (*p
 		// validate machineSet
 		isValid, err := machineset.ValidateMachineSet(machineSetObject)
 		if !isValid || err != nil {
-			return  nil, status.Error(codes.Internal, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
 		}
 
 		err = client.Create(ctx, machineSetObject)
@@ -257,88 +257,6 @@ func (s *Server) GetClusterList(ctx context.Context, in *pb.GetClusterListMsg) (
 		Ok:       true,
 		Clusters: clusters,
 	}, nil
-}
-
-func (s *Server) AdjustClusterNodes(ctx context.Context, in *pb.AdjustClusterMsg) (*pb.AdjustClusterReply, error) {
-	// get client
-	client := s.Manager.GetClient()
-
-	// get cluster
-	clusterInstance := &v1alpha.CnctCluster{}
-	err := client.Get(
-		ctx,
-		clientlib.ObjectKey{
-			Namespace: in.Name,
-			Name:      in.Name,
-		}, clusterInstance)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil, status.Error(codes.NotFound, err.Error())
-		}
-		klog.Errorf("Could not query for cluster %s: %q", in.Name, err)
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	for _, addedNode := range in.AddNodes {
-
-		machineLabels := map[string]string{}
-		for _, label := range addedNode.Labels {
-			machineLabels[label.Name] = label.Value
-		}
-		machineObject := &v1alpha.CnctMachine{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "worker-",
-				Namespace:    clusterInstance.GetNamespace(),
-				Labels: map[string]string{
-					"controller-tools.k8s.io": "1.0",
-				},
-			},
-			Spec: v1alpha.MachineSpec{
-				Roles: []common.MachineRoles{common.MachineRoleWorker},
-			},
-		}
-
-		err = client.Create(ctx, machineObject)
-		if err != nil {
-			klog.Errorf("Failed to create worker machine object %s: %q", machineObject.GetName(), err)
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-	}
-
-	for _, removedNode := range in.RemoveNodes {
-		machineName, err := GetMachineName(clusterInstance.GetName(), removedNode.Ip, s.Manager)
-		if err != nil {
-			klog.Errorf("Failed to get machine name for node %s: %q", removedNode.Ip, err)
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
-		if machineName == "" {
-			klog.Errorf("Got empty machine name for node %s", removedNode.Ip)
-			return nil, status.Error(codes.Internal, "machine is empty")
-		}
-
-		machineObject := &v1alpha.CnctMachine{}
-		err = client.Get(ctx,
-			clientlib.ObjectKey{
-				Namespace: clusterInstance.GetNamespace(),
-				Name:      machineName,
-			}, machineObject)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				return nil, status.Error(codes.NotFound, err.Error())
-			}
-			klog.Errorf("Could not get machine %s: %q", machineName, err)
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
-		err = client.Delete(ctx, machineObject)
-		if err != nil {
-			klog.Errorf("Could not delete machine %s: %q", machineName, err)
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-	}
-
-	return &pb.AdjustClusterReply{Ok: true}, nil
 }
 
 func (s *Server) GetUpgradeClusterInformation(ctx context.Context, in *pb.GetUpgradeClusterInformationMsg) (*pb.GetUpgradeClusterInformationReply, error) {

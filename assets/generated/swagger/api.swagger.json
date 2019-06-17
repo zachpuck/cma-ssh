@@ -93,31 +93,6 @@
         "tags": [
           "Cluster"
         ]
-      },
-      "put": {
-        "summary": "Will adjust a provision a cluster",
-        "operationId": "AdjustClusterNodes",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/cmasshAdjustClusterReply"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/cmasshAdjustClusterMsg"
-            }
-          }
-        ],
-        "tags": [
-          "Cluster"
-        ]
       }
     },
     "/api/v1/cluster/list": {
@@ -132,6 +107,93 @@
             }
           }
         },
+        "tags": [
+          "Cluster"
+        ]
+      }
+    },
+    "/api/v1/cluster/pool": {
+      "delete": {
+        "summary": "Will delete a node pool from a provisioned cluster",
+        "operationId": "DeleteNodePool",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/cmasshDeleteNodePoolReply"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "clusterName",
+            "description": "What is the cluster to delete node pools.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "node_pool_names",
+            "description": "What is the node pool names to delete.",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          }
+        ],
+        "tags": [
+          "Cluster"
+        ]
+      },
+      "post": {
+        "summary": "Will add node pool to a provisioned cluster",
+        "operationId": "AddNodePool",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/cmasshAddNodePoolReply"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/cmasshAddNodePoolMsg"
+            }
+          }
+        ],
+        "tags": [
+          "Cluster"
+        ]
+      },
+      "put": {
+        "summary": "Will scale the number of machines in a node pool for a provisioned cluster",
+        "operationId": "ScaleNodePool",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/cmasshScaleNodePoolReply"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/cmasshScaleNodePoolMsg"
+            }
+          }
+        ],
         "tags": [
           "Cluster"
         ]
@@ -207,15 +269,6 @@
     }
   },
   "definitions": {
-    "AdjustClusterMsgRemoveMachineSpec": {
-      "type": "object",
-      "properties": {
-        "ip": {
-          "type": "string",
-          "title": "The ip of machine"
-        }
-      }
-    },
     "GetVersionReplyVersionInformation": {
       "type": "object",
       "properties": {
@@ -249,36 +302,29 @@
         }
       }
     },
-    "cmasshAdjustClusterMsg": {
+    "cmasshAddNodePoolMsg": {
       "type": "object",
       "properties": {
-        "name": {
+        "clusterName": {
           "type": "string",
-          "title": "What is the cluster that we are considering for upgrade"
+          "title": "What is the cluster to add node pools to"
         },
-        "add_nodes": {
+        "worker_node_pools": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/cmasshMachineSpec"
           },
-          "title": "Machines which we want to add to the cluster"
-        },
-        "remove_nodes": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/AdjustClusterMsgRemoveMachineSpec"
-          },
-          "title": "Machines which we want to remove from the cluster"
+          "title": "What Machines to add to the cluster"
         }
       }
     },
-    "cmasshAdjustClusterReply": {
+    "cmasshAddNodePoolReply": {
       "type": "object",
       "properties": {
         "ok": {
           "type": "boolean",
           "format": "boolean",
-          "title": "Was this a successful request"
+          "title": "Whether or not the node pool was provisioned by this request"
         }
       }
     },
@@ -408,6 +454,16 @@
         }
       }
     },
+    "cmasshDeleteNodePoolReply": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "format": "boolean",
+          "title": "Was this a successful request"
+        }
+      }
+    },
     "cmasshGetClusterListReply": {
       "type": "object",
       "properties": {
@@ -508,6 +564,46 @@
         }
       },
       "title": "The specification for a set of machines"
+    },
+    "cmasshScaleNodePoolMsg": {
+      "type": "object",
+      "properties": {
+        "clusterName": {
+          "type": "string",
+          "title": "What is the name of the cluster to scale a node pool"
+        },
+        "node_pools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/cmasshScaleNodePoolSpec"
+          },
+          "title": "What node pools to scale"
+        }
+      }
+    },
+    "cmasshScaleNodePoolReply": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "format": "boolean",
+          "title": "Was this a successful request"
+        }
+      }
+    },
+    "cmasshScaleNodePoolSpec": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "What is the node pool name to scale"
+        },
+        "count": {
+          "type": "integer",
+          "format": "int32",
+          "title": "Number of machines to scale"
+        }
+      }
     },
     "cmasshUpgradeClusterMsg": {
       "type": "object",
