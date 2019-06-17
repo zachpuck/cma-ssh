@@ -4,9 +4,8 @@
 ## Table of Contents
 
 - [api.proto](#api.proto)
-    - [AdjustClusterMsg](#cmassh.AdjustClusterMsg)
-    - [AdjustClusterMsg.RemoveMachineSpec](#cmassh.AdjustClusterMsg.RemoveMachineSpec)
-    - [AdjustClusterReply](#cmassh.AdjustClusterReply)
+    - [AddNodePoolMsg](#cmassh.AddNodePoolMsg)
+    - [AddNodePoolReply](#cmassh.AddNodePoolReply)
     - [ClusterDetailItem](#cmassh.ClusterDetailItem)
     - [ClusterItem](#cmassh.ClusterItem)
     - [ControlPlaneMachineSpec](#cmassh.ControlPlaneMachineSpec)
@@ -14,6 +13,8 @@
     - [CreateClusterReply](#cmassh.CreateClusterReply)
     - [DeleteClusterMsg](#cmassh.DeleteClusterMsg)
     - [DeleteClusterReply](#cmassh.DeleteClusterReply)
+    - [DeleteNodePoolMsg](#cmassh.DeleteNodePoolMsg)
+    - [DeleteNodePoolReply](#cmassh.DeleteNodePoolReply)
     - [GetClusterListMsg](#cmassh.GetClusterListMsg)
     - [GetClusterListReply](#cmassh.GetClusterListReply)
     - [GetClusterMsg](#cmassh.GetClusterMsg)
@@ -25,6 +26,9 @@
     - [GetVersionReply.VersionInformation](#cmassh.GetVersionReply.VersionInformation)
     - [KubernetesLabel](#cmassh.KubernetesLabel)
     - [MachineSpec](#cmassh.MachineSpec)
+    - [ScaleNodePoolMsg](#cmassh.ScaleNodePoolMsg)
+    - [ScaleNodePoolReply](#cmassh.ScaleNodePoolReply)
+    - [ScaleNodePoolSpec](#cmassh.ScaleNodePoolSpec)
     - [UpgradeClusterMsg](#cmassh.UpgradeClusterMsg)
     - [UpgradeClusterReply](#cmassh.UpgradeClusterReply)
   
@@ -35,9 +39,8 @@
   
 
 - [api.proto](#api.proto)
-    - [AdjustClusterMsg](#cmassh.AdjustClusterMsg)
-    - [AdjustClusterMsg.RemoveMachineSpec](#cmassh.AdjustClusterMsg.RemoveMachineSpec)
-    - [AdjustClusterReply](#cmassh.AdjustClusterReply)
+    - [AddNodePoolMsg](#cmassh.AddNodePoolMsg)
+    - [AddNodePoolReply](#cmassh.AddNodePoolReply)
     - [ClusterDetailItem](#cmassh.ClusterDetailItem)
     - [ClusterItem](#cmassh.ClusterItem)
     - [ControlPlaneMachineSpec](#cmassh.ControlPlaneMachineSpec)
@@ -45,6 +48,8 @@
     - [CreateClusterReply](#cmassh.CreateClusterReply)
     - [DeleteClusterMsg](#cmassh.DeleteClusterMsg)
     - [DeleteClusterReply](#cmassh.DeleteClusterReply)
+    - [DeleteNodePoolMsg](#cmassh.DeleteNodePoolMsg)
+    - [DeleteNodePoolReply](#cmassh.DeleteNodePoolReply)
     - [GetClusterListMsg](#cmassh.GetClusterListMsg)
     - [GetClusterListReply](#cmassh.GetClusterListReply)
     - [GetClusterMsg](#cmassh.GetClusterMsg)
@@ -56,6 +61,9 @@
     - [GetVersionReply.VersionInformation](#cmassh.GetVersionReply.VersionInformation)
     - [KubernetesLabel](#cmassh.KubernetesLabel)
     - [MachineSpec](#cmassh.MachineSpec)
+    - [ScaleNodePoolMsg](#cmassh.ScaleNodePoolMsg)
+    - [ScaleNodePoolReply](#cmassh.ScaleNodePoolReply)
+    - [ScaleNodePoolSpec](#cmassh.ScaleNodePoolSpec)
     - [UpgradeClusterMsg](#cmassh.UpgradeClusterMsg)
     - [UpgradeClusterReply](#cmassh.UpgradeClusterReply)
   
@@ -76,47 +84,31 @@
 
 
 
-<a name="cmassh.AdjustClusterMsg"></a>
+<a name="cmassh.AddNodePoolMsg"></a>
 
-### AdjustClusterMsg
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | What is the cluster that we are considering for upgrade |
-| add_nodes | [MachineSpec](#cmassh.MachineSpec) | repeated | Machines which we want to add to the cluster |
-| remove_nodes | [AdjustClusterMsg.RemoveMachineSpec](#cmassh.AdjustClusterMsg.RemoveMachineSpec) | repeated | Machines which we want to remove from the cluster |
-
-
-
-
-
-
-<a name="cmassh.AdjustClusterMsg.RemoveMachineSpec"></a>
-
-### AdjustClusterMsg.RemoveMachineSpec
+### AddNodePoolMsg
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| ip | [string](#string) |  | The ip of machine |
+| clusterName | [string](#string) |  | What is the cluster to add node pools to |
+| worker_node_pools | [MachineSpec](#cmassh.MachineSpec) | repeated | What Machines to add to the cluster |
 
 
 
 
 
 
-<a name="cmassh.AdjustClusterReply"></a>
+<a name="cmassh.AddNodePoolReply"></a>
 
-### AdjustClusterReply
+### AddNodePoolReply
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| ok | [bool](#bool) |  | Was this a successful request |
+| ok | [bool](#bool) |  | Whether or not the node pool was provisioned by this request |
 
 
 
@@ -234,6 +226,37 @@ The specification for a set of control plane machines
 | ----- | ---- | ----- | ----------- |
 | ok | [bool](#bool) |  | Could the cluster be destroyed |
 | status | [string](#string) |  | Status of the request |
+
+
+
+
+
+
+<a name="cmassh.DeleteNodePoolMsg"></a>
+
+### DeleteNodePoolMsg
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| clusterName | [string](#string) |  | What is the cluster to delete node pools |
+| node_pool_names | [string](#string) | repeated | What is the node pool names to delete |
+
+
+
+
+
+
+<a name="cmassh.DeleteNodePoolReply"></a>
+
+### DeleteNodePoolReply
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| ok | [bool](#bool) |  | Was this a successful request |
 
 
 
@@ -409,6 +432,53 @@ The specification for a set of machines
 
 
 
+<a name="cmassh.ScaleNodePoolMsg"></a>
+
+### ScaleNodePoolMsg
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| clusterName | [string](#string) |  | What is the name of the cluster to scale a node pool |
+| node_pools | [ScaleNodePoolSpec](#cmassh.ScaleNodePoolSpec) | repeated | What node pools to scale |
+
+
+
+
+
+
+<a name="cmassh.ScaleNodePoolReply"></a>
+
+### ScaleNodePoolReply
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| ok | [bool](#bool) |  | Was this a successful request |
+
+
+
+
+
+
+<a name="cmassh.ScaleNodePoolSpec"></a>
+
+### ScaleNodePoolSpec
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | What is the node pool name to scale |
+| count | [int32](#int32) |  | Number of machines to scale |
+
+
+
+
+
+
 <a name="cmassh.UpgradeClusterMsg"></a>
 
 ### UpgradeClusterMsg
@@ -475,7 +545,9 @@ The specification for a set of machines
 | DeleteCluster | [DeleteClusterMsg](#cmassh.DeleteClusterMsg) | [DeleteClusterReply](#cmassh.DeleteClusterReply) | Will delete a cluster |
 | GetClusterList | [GetClusterListMsg](#cmassh.GetClusterListMsg) | [GetClusterListReply](#cmassh.GetClusterListReply) | Will retrieve a list of clusters |
 | GetVersionInformation | [GetVersionMsg](#cmassh.GetVersionMsg) | [GetVersionReply](#cmassh.GetVersionReply) | Will return version information about api server |
-| AdjustClusterNodes | [AdjustClusterMsg](#cmassh.AdjustClusterMsg) | [AdjustClusterReply](#cmassh.AdjustClusterReply) | Will adjust a provision a cluster |
+| AddNodePool | [AddNodePoolMsg](#cmassh.AddNodePoolMsg) | [AddNodePoolReply](#cmassh.AddNodePoolReply) | Will add node pool to a provisioned cluster |
+| DeleteNodePool | [DeleteNodePoolMsg](#cmassh.DeleteNodePoolMsg) | [DeleteNodePoolReply](#cmassh.DeleteNodePoolReply) | Will delete a node pool from a provisioned cluster |
+| ScaleNodePool | [ScaleNodePoolMsg](#cmassh.ScaleNodePoolMsg) | [ScaleNodePoolReply](#cmassh.ScaleNodePoolReply) | Will scale the number of machines in a node pool for a provisioned cluster |
 | GetUpgradeClusterInformation | [GetUpgradeClusterInformationMsg](#cmassh.GetUpgradeClusterInformationMsg) | [GetUpgradeClusterInformationReply](#cmassh.GetUpgradeClusterInformationReply) | Will return upgrade options for a given cluster |
 | UpgradeCluster | [UpgradeClusterMsg](#cmassh.UpgradeClusterMsg) | [UpgradeClusterReply](#cmassh.UpgradeClusterReply) | Will attempt to upgrade a cluster |
 
@@ -490,47 +562,31 @@ The specification for a set of machines
 
 
 
-<a name="cmassh.AdjustClusterMsg"></a>
+<a name="cmassh.AddNodePoolMsg"></a>
 
-### AdjustClusterMsg
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | What is the cluster that we are considering for upgrade |
-| add_nodes | [MachineSpec](#cmassh.MachineSpec) | repeated | Machines which we want to add to the cluster |
-| remove_nodes | [AdjustClusterMsg.RemoveMachineSpec](#cmassh.AdjustClusterMsg.RemoveMachineSpec) | repeated | Machines which we want to remove from the cluster |
-
-
-
-
-
-
-<a name="cmassh.AdjustClusterMsg.RemoveMachineSpec"></a>
-
-### AdjustClusterMsg.RemoveMachineSpec
+### AddNodePoolMsg
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| ip | [string](#string) |  | The ip of machine |
+| clusterName | [string](#string) |  | What is the cluster to add node pools to |
+| worker_node_pools | [MachineSpec](#cmassh.MachineSpec) | repeated | What Machines to add to the cluster |
 
 
 
 
 
 
-<a name="cmassh.AdjustClusterReply"></a>
+<a name="cmassh.AddNodePoolReply"></a>
 
-### AdjustClusterReply
+### AddNodePoolReply
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| ok | [bool](#bool) |  | Was this a successful request |
+| ok | [bool](#bool) |  | Whether or not the node pool was provisioned by this request |
 
 
 
@@ -648,6 +704,37 @@ The specification for a set of control plane machines
 | ----- | ---- | ----- | ----------- |
 | ok | [bool](#bool) |  | Could the cluster be destroyed |
 | status | [string](#string) |  | Status of the request |
+
+
+
+
+
+
+<a name="cmassh.DeleteNodePoolMsg"></a>
+
+### DeleteNodePoolMsg
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| clusterName | [string](#string) |  | What is the cluster to delete node pools |
+| node_pool_names | [string](#string) | repeated | What is the node pool names to delete |
+
+
+
+
+
+
+<a name="cmassh.DeleteNodePoolReply"></a>
+
+### DeleteNodePoolReply
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| ok | [bool](#bool) |  | Was this a successful request |
 
 
 
@@ -823,6 +910,53 @@ The specification for a set of machines
 
 
 
+<a name="cmassh.ScaleNodePoolMsg"></a>
+
+### ScaleNodePoolMsg
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| clusterName | [string](#string) |  | What is the name of the cluster to scale a node pool |
+| node_pools | [ScaleNodePoolSpec](#cmassh.ScaleNodePoolSpec) | repeated | What node pools to scale |
+
+
+
+
+
+
+<a name="cmassh.ScaleNodePoolReply"></a>
+
+### ScaleNodePoolReply
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| ok | [bool](#bool) |  | Was this a successful request |
+
+
+
+
+
+
+<a name="cmassh.ScaleNodePoolSpec"></a>
+
+### ScaleNodePoolSpec
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | What is the node pool name to scale |
+| count | [int32](#int32) |  | Number of machines to scale |
+
+
+
+
+
+
 <a name="cmassh.UpgradeClusterMsg"></a>
 
 ### UpgradeClusterMsg
@@ -889,7 +1023,9 @@ The specification for a set of machines
 | DeleteCluster | [DeleteClusterMsg](#cmassh.DeleteClusterMsg) | [DeleteClusterReply](#cmassh.DeleteClusterReply) | Will delete a cluster |
 | GetClusterList | [GetClusterListMsg](#cmassh.GetClusterListMsg) | [GetClusterListReply](#cmassh.GetClusterListReply) | Will retrieve a list of clusters |
 | GetVersionInformation | [GetVersionMsg](#cmassh.GetVersionMsg) | [GetVersionReply](#cmassh.GetVersionReply) | Will return version information about api server |
-| AdjustClusterNodes | [AdjustClusterMsg](#cmassh.AdjustClusterMsg) | [AdjustClusterReply](#cmassh.AdjustClusterReply) | Will adjust a provision a cluster |
+| AddNodePool | [AddNodePoolMsg](#cmassh.AddNodePoolMsg) | [AddNodePoolReply](#cmassh.AddNodePoolReply) | Will add node pool to a provisioned cluster |
+| DeleteNodePool | [DeleteNodePoolMsg](#cmassh.DeleteNodePoolMsg) | [DeleteNodePoolReply](#cmassh.DeleteNodePoolReply) | Will delete a node pool from a provisioned cluster |
+| ScaleNodePool | [ScaleNodePoolMsg](#cmassh.ScaleNodePoolMsg) | [ScaleNodePoolReply](#cmassh.ScaleNodePoolReply) | Will scale the number of machines in a node pool for a provisioned cluster |
 | GetUpgradeClusterInformation | [GetUpgradeClusterInformationMsg](#cmassh.GetUpgradeClusterInformationMsg) | [GetUpgradeClusterInformationReply](#cmassh.GetUpgradeClusterInformationReply) | Will return upgrade options for a given cluster |
 | UpgradeCluster | [UpgradeClusterMsg](#cmassh.UpgradeClusterMsg) | [UpgradeClusterReply](#cmassh.UpgradeClusterReply) | Will attempt to upgrade a cluster |
 
