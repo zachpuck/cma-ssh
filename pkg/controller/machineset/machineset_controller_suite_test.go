@@ -36,7 +36,7 @@ var cfg *rest.Config
 
 func TestMain(m *testing.M) {
 	t := &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crds")},
+		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "crd")},
 	}
 	apis.AddToScheme(scheme.Scheme)
 
@@ -63,7 +63,7 @@ func SetupTestReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan 
 }
 
 // StartTestManager adds recFn
-func StartTestManager(mgr manager.Manager, g *gomega.GomegaWithT) (chan struct{}, *sync.WaitGroup) {
+func StartTestManagerGomega(mgr manager.Manager, g *gomega.GomegaWithT) (chan struct{}, *sync.WaitGroup) {
 	stop := make(chan struct{})
 	wg := &sync.WaitGroup{}
 	wg.Add(1)

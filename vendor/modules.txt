@@ -459,9 +459,9 @@ k8s.io/client-go/kubernetes/typed/storage/v1beta1
 k8s.io/client-go/util/flowcontrol
 k8s.io/client-go/tools/auth
 k8s.io/client-go/util/homedir
+k8s.io/client-go/tools/reference
 k8s.io/client-go/util/workqueue
 k8s.io/client-go/tools/cache
-k8s.io/client-go/tools/reference
 k8s.io/client-go/pkg/version
 k8s.io/client-go/plugin/pkg/client/auth/exec
 k8s.io/client-go/rest/watch
@@ -473,6 +473,7 @@ k8s.io/client-go/util/integer
 k8s.io/client-go/tools/pager
 k8s.io/client-go/util/buffer
 k8s.io/client-go/util/retry
+k8s.io/client-go/testing
 k8s.io/client-go/pkg/apis/clientauthentication
 k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1
 k8s.io/client-go/pkg/apis/clientauthentication/v1beta1
@@ -522,6 +523,7 @@ sigs.k8s.io/controller-runtime/pkg/internal/controller
 sigs.k8s.io/controller-runtime/pkg/predicate
 sigs.k8s.io/controller-runtime/pkg/event
 sigs.k8s.io/controller-runtime/pkg/source/internal
+sigs.k8s.io/controller-runtime/pkg/client/fake
 sigs.k8s.io/controller-runtime/pkg/cache/internal
 sigs.k8s.io/controller-runtime/pkg/patch
 sigs.k8s.io/controller-runtime/pkg/webhook/internal/metrics
