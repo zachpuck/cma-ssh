@@ -459,9 +459,9 @@ k8s.io/client-go/kubernetes/typed/storage/v1beta1
 k8s.io/client-go/util/flowcontrol
 k8s.io/client-go/tools/auth
 k8s.io/client-go/util/homedir
-k8s.io/client-go/tools/reference
 k8s.io/client-go/util/workqueue
 k8s.io/client-go/tools/cache
+k8s.io/client-go/tools/reference
 k8s.io/client-go/pkg/version
 k8s.io/client-go/plugin/pkg/client/auth/exec
 k8s.io/client-go/rest/watch
