@@ -1,0 +1,9 @@
+apiVersion: addons.cnct.sds.samsung.com/v1alpha1
+kind: AppBundle
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: appbundle-nginx-sample
+spec:
+  image: quay.io/samsung_cnct/kind:0.1.7
+  command: helm install stable/nginx-ingress

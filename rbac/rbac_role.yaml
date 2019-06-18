@@ -5,6 +5,26 @@ metadata:
   name: rbac-role
 rules:
 - apiGroups:
+  - addons.cnct.sds.samsung.com
+  resources:
+  - appbundles
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - addons.cnct.sds.samsung.com
+  resources:
+  - appbundles/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
   - cluster.cnct.sds.samsung.com
   resources:
   - cnctclusters

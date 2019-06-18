@@ -152,11 +152,11 @@ github.com/onsi/gomega/types
 github.com/onsi/gomega/internal/oraclematcher
 github.com/onsi/gomega/format
 github.com/onsi/gomega/matchers/support/goraph/bipartitegraph
-github.com/onsi/gomega/gbytes
-github.com/onsi/gomega/gexec
 github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
+github.com/onsi/gomega/gbytes
+github.com/onsi/gomega/gexec
 # github.com/pborman/uuid v0.0.0-20180906182336-adf5a7427709
 github.com/pborman/uuid
 # github.com/pelletier/go-toml v1.3.0
@@ -326,9 +326,10 @@ gopkg.in/tomb.v1
 gopkg.in/yaml.v2
 # k8s.io/api v0.0.0-20181213150558-05914d821849
 k8s.io/api/core/v1
+k8s.io/api/batch/v1
+k8s.io/api/rbac/v1
 k8s.io/api/apps/v1
 k8s.io/api/policy/v1beta1
-k8s.io/api/rbac/v1
 k8s.io/api/admissionregistration/v1beta1
 k8s.io/api/admissionregistration/v1alpha1
 k8s.io/api/apps/v1beta1
@@ -341,7 +342,6 @@ k8s.io/api/authorization/v1beta1
 k8s.io/api/autoscaling/v1
 k8s.io/api/autoscaling/v2beta1
 k8s.io/api/autoscaling/v2beta2
-k8s.io/api/batch/v1
 k8s.io/api/batch/v1beta1
 k8s.io/api/batch/v2alpha1
 k8s.io/api/certificates/v1beta1
@@ -370,9 +370,9 @@ k8s.io/apimachinery/pkg/apis/meta/v1
 k8s.io/apimachinery/pkg/labels
 k8s.io/apimachinery/pkg/runtime
 k8s.io/apimachinery/pkg/runtime/schema
+k8s.io/apimachinery/pkg/types
 k8s.io/apimachinery/pkg/util/errors
 k8s.io/apimachinery/pkg/util/wait
-k8s.io/apimachinery/pkg/types
 k8s.io/apimachinery/pkg/api/meta
 k8s.io/apimachinery/pkg/api/resource
 k8s.io/apimachinery/pkg/util/intstr
@@ -403,10 +403,10 @@ k8s.io/apimachinery/pkg/runtime/serializer/recognizer
 k8s.io/apimachinery/pkg/util/framer
 k8s.io/apimachinery/pkg/util/yaml
 k8s.io/apimachinery/pkg/version
-k8s.io/apimachinery/pkg/util/mergepatch
-k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/pkg/util/cache
 k8s.io/apimachinery/pkg/util/diff
+k8s.io/apimachinery/pkg/util/mergepatch
+k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/pkg/api/validation
 k8s.io/apimachinery/pkg/apis/meta/v1/validation
 k8s.io/apimachinery/pkg/apis/meta/internalversion
@@ -506,7 +506,6 @@ sigs.k8s.io/controller-runtime/pkg/runtime/signals
 sigs.k8s.io/controller-runtime/pkg/client
 sigs.k8s.io/controller-runtime/pkg/runtime/scheme
 sigs.k8s.io/controller-runtime/pkg/controller
-sigs.k8s.io/controller-runtime/pkg/controller/controllerutil
 sigs.k8s.io/controller-runtime/pkg/handler
 sigs.k8s.io/controller-runtime/pkg/reconcile
 sigs.k8s.io/controller-runtime/pkg/source
